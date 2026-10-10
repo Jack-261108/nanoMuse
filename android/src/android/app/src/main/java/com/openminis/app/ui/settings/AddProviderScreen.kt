@@ -589,11 +589,9 @@ private fun ColumnScope.ApiKeyConfigSection(
         } else {
             "The URL is used verbatim. Include the full path up to (but not including) the endpoint."
         }
-        // nanoMuse: plain http:// only for addresses on the local network (io.github.nanomuse.net.LanOnly)
-        val baseUrlProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
         SettingsSection(
             header = stringResource(R.string.add_provider_endpoint),
-            footer = baseUrlProblem ?: baseUrlFooter,
+            footer = baseUrlFooter,
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
@@ -676,12 +674,9 @@ private fun ColumnScope.ApiKeyConfigSection(
         // (custom base URL filled in) — ollama / LM Studio / LiteLLM /
         // private relays need no key. Official endpoints and OAuth flows
         // keep requiring a credential. Mirrors iOS AddProviderView.
-        // nanoMuse: no saving while the endpoint is a plain http:// address off the local network
-        enabled = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL) == null && (
-            apiKey.isNotBlank() || (
-                customBaseURL.isNotBlank() &&
-                    (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
-            )
+        enabled = apiKey.isNotBlank() || (
+            customBaseURL.isNotBlank() &&
+                (providerType == ProviderType.openAI || providerType == ProviderType.anthropic)
         ),
     ) {
         Text(stringResource(R.string.provider_list_add_provider))
@@ -898,11 +893,9 @@ private fun ColumnScope.OAuthConfigSection(
             ProviderType.antigravity,
             ProviderType.unsupported -> ""
         }
-        // nanoMuse: plain http:// only for addresses on the local network
-        val manualBaseProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
         SettingsSection(
             header = stringResource(R.string.add_provider_or_configure_manually),
-            footer = manualBaseProblem ?: stringResource(R.string.add_provider_for_third_party_coding_plans_e_g_minimax),
+            footer = stringResource(R.string.add_provider_for_third_party_coding_plans_e_g_minimax),
         ) {
             SettingsCardBlock {
                 RowLabel(text = stringResource(R.string.add_provider_custom_api_base_optional))
@@ -952,7 +945,7 @@ private fun ColumnScope.OAuthConfigSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
-            enabled = manualToken.isNotBlank() && manualBaseProblem == null, // nanoMuse: LanOnly
+            enabled = manualToken.isNotBlank(),
         ) {
             Text(stringResource(R.string.provider_list_add_provider))
         }

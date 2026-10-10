@@ -237,14 +237,13 @@ holding the phone first: *once* or *always for that device*, revocable under Per
 A path another device or the agent names (hub `files`, `nanomuse-media`, `nanomuse-pc put`)
 is resolved inside the sandbox only (`io.github.nanomuse.sandbox.SandboxPaths`): `..` and a
 symlink out of the rootfs lead nowhere, so the app's own private files stay out of reach.
-The app allows plain `http://` only for addresses on your own network (the private ranges
+The app allows plain `http://` on your own network for a relay of your own (the private ranges
 `10/8`, `172.16/12`, `192.168/16`, the carrier-grade `100.64/10` Tailscale hands out, link-local,
 IPv6 ULA, `localhost`, a name without a dot, and the suffixes `.local`, `.lan`, `.home`,
-`.internal`, `.home.arpa`, `.localdomain`, `.ts.net`), a model server or a computer of your own,
-and refuses it at the provider URL field for anything else (`io.github.nanomuse.net.LanOnly`).
+`.internal`, `.home.arpa`, `.localdomain`, `.ts.net`, judged by `io.github.nanomuse.net.LanOnly`).
 The address is parsed before it is judged, so a public name such as `10.foo.example.com` is
-not taken for a private address. The same rule decides whether a relay of your own may be
-`http://`; nanoMuse Cloud and the hub to it are TLS only. The in-app web view is not exported
+not taken for a private address; nanoMuse Cloud and the hub to it are TLS only. Provider URL
+fields accept plain `http://` addresses as entered. The in-app web view is not exported
 to other apps.
 
 ## Building it yourself

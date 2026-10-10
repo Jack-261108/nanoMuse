@@ -189,13 +189,11 @@ base URL（从不包括中继的，从不包括局域网地址）它回答代理
 或写入什么（hub 的 `shell`、`files`、`open`、`screen`……），要先经拿着手机的人批准：「一次」或
 「对这台设备总是允许」，可在「权限」里撤销。另一台设备或智能体说出的路径（hub 的 `files`、
 `nanomuse-media`、`nanomuse-pc put`）只在沙箱内解析（`io.github.nanomuse.sandbox.SandboxPaths`）：
-`..` 和指向 rootfs 之外的符号链接都无处可去，App 自己的私有文件始终够不着。App 只对你自己网络内的地址（私有网段 `10/8`、`172.16/12`、
+`..` 和指向 rootfs 之外的符号链接都无处可去，App 自己的私有文件始终够不着。对于自己的中继，App 只对你自己网络内的地址（私有网段 `10/8`、`172.16/12`、
 `192.168/16`、Tailscale 分配的 `100.64/10`、链路本地地址、IPv6 ULA、`localhost`、不带点的名字，
-以及 `.local`、`.lan`、`.home`、`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀），也就是一台模型
-服务器或你自己的电脑，允许明文 `http://`，其他地址在服务商 URL 字段里一律拒绝
-（`io.github.nanomuse.net.LanOnly`）。地址先解析再判断，所以 `10.foo.example.com` 这样的公网名字
-不会被当成私有地址。自己的中继能否用 `http://` 也按同一条规则判断；nanoMuse Cloud 以及到它的
-hub 只走 TLS。App 内的
+以及 `.local`、`.lan`、`.home`、`.internal`、`.home.arpa`、`.localdomain`、`.ts.net` 后缀，
+按 `io.github.nanomuse.net.LanOnly` 判断）允许明文 `http://`。地址先解析再判断，所以 `10.foo.example.com` 这样的公网名字
+不会被当成私有地址；nanoMuse Cloud 以及到它的 hub 只走 TLS。服务商 URL 字段允许直接输入明文 `http://`。App 内的
 web view 不对其他 App 导出。
 
 ## 自己构建 {#building-it-yourself}
