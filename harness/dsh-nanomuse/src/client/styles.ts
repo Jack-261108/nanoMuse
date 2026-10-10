@@ -129,7 +129,7 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-rail-top { height:
    Windows draws its caption buttons over the top right corner (titleBarOverlay, 40px): the same
    drag handles, and the chat's header keeps clear of the buttons. Linux has its system bar. */
 html:is([data-nm-platform='darwin'], [data-nm-platform='win32']) [data-window-drag], html:is([data-nm-platform='darwin'], [data-nm-platform='win32']) .nm-ob { -webkit-app-region: drag; }
-html:is([data-nm-platform='darwin'], [data-nm-platform='win32']) :is([data-window-drag], .nm-ob, [data-slot="conversation.session.header"]) :is(button, a, input, select, textarea, [contenteditable], [role="button"], [role="dialog"], [role="menu"]) { -webkit-app-region: no-drag; }
+html:is([data-nm-platform='darwin'], [data-nm-platform='win32']) :is([data-window-drag], .nm-ob, [data-slot="conversation.session.header"]) :is(button, a, input, select, textarea, [contenteditable], [role="button"], [role="dialog"], [role="menu"], .nm-fr-scroll) { -webkit-app-region: no-drag; }
 /* The chat's header is not a drag region (the shell marks its <header data-window-drag>; that
    and its leading box are reset here): the only handle over the chat is .nm-header-drag, an
    empty strip above the face (MuseHeader). Chromium builds the window's drag map as
@@ -1184,7 +1184,7 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-fr-top { height: 6
 .nm-fr-dot.nm-on { background: var(--dsw-alias-label-primary); opacity: 1; }
 .nm-fr-gear { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; border-radius: 50%; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; -webkit-app-region: no-drag; }
 .nm-fr-gear:hover { background: var(--nm-hover); color: var(--dsw-alias-label-primary); }
-.nm-fr-scroll { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 24px 32px; }
+.nm-fr-scroll { flex: 1; min-height: 0; width: 100%; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; padding: 8px 24px 32px; -webkit-app-region: no-drag; }
 .nm-fr-page { width: min(420px, 100%); gap: 14px; margin: auto 0; }
 .nm-fr-page .nm-ob-sub { margin: -4px 0 2px; }
 .nm-fr-primary { margin-top: 4px; }

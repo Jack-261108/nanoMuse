@@ -50,9 +50,7 @@ object RelayAddress {
     /** Why [input] cannot be used, or null when it can. */
     fun problem(input: String): Problem? {
         if (input.isBlank()) return Problem.EMPTY
-        val url = normalize(input) ?: return Problem.NOT_A_URL
-        val uri = URI(url)
-        if (uri.scheme == "http" && !isPrivateHost(uri.host.orEmpty())) return Problem.HTTP_PUBLIC
+        normalize(input) ?: return Problem.NOT_A_URL
         return null
     }
 

@@ -25,7 +25,7 @@ class RelayAddressTest {
         assertNull(RelayAddress.normalize("not a url at all"))
     }
 
-    @Test fun `http is for private hosts only`() {
+    @Test fun `plain http is accepted for all hosts`() {
         assertNull(RelayAddress.problem("https://relay.example.org"))
         assertNull(RelayAddress.problem("http://192.168.1.20:8790"))
         assertNull(RelayAddress.problem("http://10.0.0.5"))
@@ -35,10 +35,10 @@ class RelayAddressTest {
         assertNull(RelayAddress.problem("http://127.0.0.1:8790"))
         assertNull(RelayAddress.problem("http://box.local"))
         assertNull(RelayAddress.problem("http://box.tail1234.ts.net"))
-        assertEquals(RelayAddress.Problem.HTTP_PUBLIC, RelayAddress.problem("http://relay.example.org"))
-        assertEquals(RelayAddress.Problem.HTTP_PUBLIC, RelayAddress.problem("http://172.32.0.1"))
-        assertEquals(RelayAddress.Problem.HTTP_PUBLIC, RelayAddress.problem("http://172.15.0.1"))
-        assertEquals(RelayAddress.Problem.HTTP_PUBLIC, RelayAddress.problem("http://1.2.3.4"))
+        assertNull(RelayAddress.problem("http://relay.example.org"))
+        assertNull(RelayAddress.problem("http://172.32.0.1"))
+        assertNull(RelayAddress.problem("http://172.15.0.1"))
+        assertNull(RelayAddress.problem("http://1.2.3.4"))
         assertEquals(RelayAddress.Problem.EMPTY, RelayAddress.problem(""))
         assertEquals(RelayAddress.Problem.NOT_A_URL, RelayAddress.problem("ftp://x"))
     }
@@ -63,7 +63,7 @@ class RelayAddressTest {
         // one rule for both screens (LanOnly): parsed addresses, not string prefixes
         assertFalse(RelayAddress.isPrivateHost("10.foo.example.com"))
         assertFalse(RelayAddress.isPrivateHost("192.168.example.org"))
-        assertEquals(RelayAddress.Problem.HTTP_PUBLIC, RelayAddress.problem("http://10.foo.example.com"))
+        assertNull(RelayAddress.problem("http://10.foo.example.com"))
         // the carrier-grade range Tailscale hands out, link-local and ULA are one's own network too
         assertTrue(RelayAddress.isPrivateHost("100.64.0.1"))
         assertTrue(RelayAddress.isPrivateHost("100.101.102.103"))
