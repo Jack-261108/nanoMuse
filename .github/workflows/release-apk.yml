@@ -115,6 +115,26 @@ jobs:
           export PATH="$GOPATH/bin:$PATH"
           bash scripts/android/build-natives.sh
 
+      - name: Setup Signing Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'nanomuse' }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "配置正式发布签名证书..."
+            mkdir -p /home/runner/.nanomuse-release
+            echo "$KEYSTORE_BASE64" | base64 -d > /home/runner/.nanomuse-release/nanomuse.jks
+            printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "/home/runner/.nanomuse-release/nanomuse.jks" \
+              "$KEYSTORE_PASSWORD" \
+              "$KEY_ALIAS" \
+              "$KEYSTORE_PASSWORD" > android/keystore.properties
+            echo "keystore.properties 配置就绪。"
+          else
+            echo "未检测到 RELEASE_KEYSTORE_BASE64 凭据，将回退至 debug 签名。"
+          fi
+
       - name: Build Release APK
         working-directory: android/src/android
         run: |
