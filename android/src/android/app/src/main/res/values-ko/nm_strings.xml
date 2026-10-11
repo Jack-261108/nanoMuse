@@ -509,6 +509,10 @@
     <string name="nm_hands_need_granted">허용됨</string>
     <string name="nm_hands_need_ok">준비됨</string>
     <string name="nm_hands_need_set_up">설정</string>
+    <string name="nm_hands_need_ime">입력 기능 강화</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (준비됨)</string>
+    <string name="nm_hands_need_ime_off">비활성화됨 (선택: Shizuku 및 ADB Keyboard 필요)</string>
+    <string name="nm_hands_need_optional">선택</string>
     <string name="nm_hands_section_model">손 모델</string>
     <string name="nm_hands_model_footer">매 단계마다 이 모델에 스크린샷 한 장을 보냅니다. 채팅 모델과는 별개의 설정입니다. 더 작은 비전 모델도 여기서는 충분하고 비용이 적습니다. Cloud의 더 넓은 카탈로그에 있는 모델은 직접 고른 경우에만 씁니다.</string>
     <string name="nm_hands_why_chosen">여기서 고름</string>

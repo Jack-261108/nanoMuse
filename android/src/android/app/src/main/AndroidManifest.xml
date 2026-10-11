@@ -155,6 +155,8 @@
         <!-- [T-android-privileged-backend] AXManager — same package-visibility
              need so PrivilegedBackend can detect/launch it under Android 11+. -->
         <package android:name="frb.axeron.manager" />
+        <!-- nanoMuse: ADBKeyBoard input method enhancement -->
+        <package android:name="com.android.adbkeyboard" />
         <!-- Crash-share dialog: ACTION_SENDTO mailto: needs explicit
              visibility under Android 11+ before resolveActivity / startActivity
              will return a real email-app candidate. Without it the

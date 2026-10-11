@@ -518,6 +518,10 @@
     <string name="nm_hands_need_granted">Разрешено</string>
     <string name="nm_hands_need_ok">Готово</string>
     <string name="nm_hands_need_set_up">Настроить</string>
+    <string name="nm_hands_need_ime">Улучшенный ввод текста</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (готово)</string>
+    <string name="nm_hands_need_ime_off">Не включено (необязательно: требуются Shizuku и ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Необязательно</string>
     <string name="nm_hands_section_model">Модель для рук</string>
     <string name="nm_hands_model_footer">Каждый шаг отправляет этой модели один снимок экрана; это отдельная настройка от чат-модели. Небольшие vision-модели здесь подходят и стоят дешевле. Модель из широкого каталога Cloud используется только когда вы её выберете.</string>
     <string name="nm_hands_why_chosen">выбрана здесь</string>

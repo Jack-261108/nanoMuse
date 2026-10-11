@@ -509,6 +509,10 @@
     <string name="nm_hands_need_granted">許可済み</string>
     <string name="nm_hands_need_ok">準備完了</string>
     <string name="nm_hands_need_set_up">設定する</string>
+    <string name="nm_hands_need_ime">入力機能の拡張</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard（準備完了）</string>
+    <string name="nm_hands_need_ime_off">無効（任意: Shizuku と ADB Keyboard が必要）</string>
+    <string name="nm_hands_need_optional">任意</string>
     <string name="nm_hands_section_model">ハンズのモデル</string>
     <string name="nm_hands_model_footer">各ステップでスクリーンショットを 1 枚このモデルに送ります。チャットモデルとは別の設定です。小さめのビジョンモデルで十分で、費用も抑えられます。Cloud の広いカタログのモデルは、自分で選んだときだけ使われます。</string>
     <string name="nm_hands_why_chosen">ここで選択</string>

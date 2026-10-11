@@ -1,11 +1,15 @@
 package io.github.nanomuse.hands
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Path
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
@@ -507,12 +511,43 @@ class HandsOperator(private val context: Context) {
     /** Types into the field with the cursor; [HANDOFF] when that field is a secret. */
     private fun typeText(svc: MinisAccessibilityService, action: HandsAction.InputText): String {
         if (TapWords.looksSecret(action.field)) return HANDOFF
-        val node = focusedField(svc) ?: return "no text field has the cursor; tap the field first, then type in the next turn."
-        if (node.isPassword) return HANDOFF
-        val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString()).joinToString(" ")
+        val node = focusedField(svc)
+        if (node?.isPassword == true) return HANDOFF
+        val hint = listOfNotNull(node?.hintText?.toString(), node?.contentDescription?.toString()).joinToString(" ")
         if (hint.isNotBlank() && TapWords.looksSecret(hint)) return HANDOFF
+
+        // 1. Try ADB Keyboard if available (Open-AutoGLM pattern: triggers TextWatcher & commitText, restores on finally)
+        if (AdbKeyboardHelper.isAvailable(context)) {
+            val typed = AdbKeyboardHelper.typeText(action.text)
+            if (typed) return "typed “${action.text.take(60)}” into the field."
+            AppLogger.warning(TAG, "ADBKeyBoard typing failed, falling back to setNodeText")
+        }
+
+        if (node == null) return "no text field has the cursor; tap the field first, then type in the next turn."
+
+        // 2. Standard Accessibility ACTION_SET_TEXT
         val ok = svc.setNodeText(node, action.text)
-        return if (ok) "typed “${action.text.take(60)}” into the field." else "the field did not accept text (ACTION_SET_TEXT failed); tap it and try again."
+        if (ok) return "typed “${action.text.take(60)}” into the field."
+
+        // 3. Fallback: clipboard paste
+        val pasted = pasteViaClipboard(node, action.text)
+        if (pasted) return "typed “${action.text.take(60)}” into the field."
+
+        return "the field did not accept text (ACTION_SET_TEXT failed); tap it and try again."
+    }
+
+    private fun pasteViaClipboard(node: AccessibilityNodeInfo, text: String): Boolean {
+        return runCatching {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+            val clip = ClipData.newPlainText("hands_input", text)
+            val latch = CountDownLatch(1)
+            Handler(Looper.getMainLooper()).post {
+                runCatching { cm.setPrimaryClip(clip) }
+                latch.countDown()
+            }
+            latch.await(500, TimeUnit.MILLISECONDS)
+            node.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+        }.getOrDefault(false)
     }
 
     private fun pressEnter(svc: MinisAccessibilityService): String {

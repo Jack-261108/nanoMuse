@@ -512,6 +512,10 @@
     <string name="nm_hands_need_granted">Autorisé</string>
     <string name="nm_hands_need_ok">Prêt</string>
     <string name="nm_hands_need_set_up">Configurer</string>
+    <string name="nm_hands_need_ime">Amélioration de saisie</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (prêt)</string>
+    <string name="nm_hands_need_ime_off">Désactivé (optionnel : requiert Shizuku et ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Optionnel</string>
     <string name="nm_hands_section_model">Modèle des mains</string>
     <string name="nm_hands_model_footer">Chaque étape envoie une capture d’écran à ce modèle ; c’est un réglage distinct du modèle de chat. De petits modèles de vision conviennent ici et coûtent moins. Un modèle du catalogue élargi du Cloud n’est utilisé que si vous le choisissez.</string>
     <string name="nm_hands_why_chosen">choisi ici</string>

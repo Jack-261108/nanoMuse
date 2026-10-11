@@ -512,6 +512,10 @@
     <string name="nm_hands_need_granted">İzin verildi</string>
     <string name="nm_hands_need_ok">Hazır</string>
     <string name="nm_hands_need_set_up">Ayarla</string>
+    <string name="nm_hands_need_ime">Giriş yöntemi geliştirmesi</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (hazır)</string>
+    <string name="nm_hands_need_ime_off">Etkin değil (isteğe bağlı: Shizuku ve ADB Keyboard gerektirir)</string>
+    <string name="nm_hands_need_optional">İsteğe bağlı</string>
     <string name="nm_hands_section_model">Eller modeli</string>
     <string name="nm_hands_model_footer">Her adım bu modele bir ekran görüntüsü gönderir; sohbet modelinden ayrı bir ayardır. Daha küçük görü modelleri burada yeterlidir ve daha ucuzdur. Cloud’un geniş kataloğundan bir model yalnızca sen seçtiğinde kullanılır.</string>
     <string name="nm_hands_why_chosen">burada seçildi</string>

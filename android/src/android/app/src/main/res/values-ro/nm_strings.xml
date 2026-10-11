@@ -515,6 +515,10 @@
     <string name="nm_hands_need_granted">Permis</string>
     <string name="nm_hands_need_ok">Gata</string>
     <string name="nm_hands_need_set_up">Configurează</string>
+    <string name="nm_hands_need_ime">Îmbunătățire introducere text</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (gata)</string>
+    <string name="nm_hands_need_ime_off">Neactivat (opțional: necesită Shizuku și ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Opțional</string>
     <string name="nm_hands_section_model">Modelul mâinilor</string>
     <string name="nm_hands_model_footer">Fiecare pas trimite o captură de ecran acestui model; e o setare separată de modelul de chat. Modelele de viziune mai mici sunt potrivite aici și costă mai puțin. Un model din catalogul extins al Cloud-ului e folosit doar când îl alegi.</string>
     <string name="nm_hands_why_chosen">ales aici</string>

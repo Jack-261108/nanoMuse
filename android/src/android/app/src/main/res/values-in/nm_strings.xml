@@ -509,6 +509,10 @@
     <string name="nm_hands_need_granted">Diizinkan</string>
     <string name="nm_hands_need_ok">Siap</string>
     <string name="nm_hands_need_set_up">Atur</string>
+    <string name="nm_hands_need_ime">Peningkatan input</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (siap)</string>
+    <string name="nm_hands_need_ime_off">Belum aktif (opsional: memerlukan Shizuku dan ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Opsional</string>
     <string name="nm_hands_section_model">Model tangan</string>
     <string name="nm_hands_model_footer">Setiap langkah mengirim satu tangkapan layar ke model ini; ini pengaturan terpisah dari model chat. Model visi yang lebih kecil cukup di sini dan lebih murah. Model dari katalog Cloud yang lebih luas hanya dipakai saat kamu memilihnya.</string>
     <string name="nm_hands_why_chosen">dipilih di sini</string>

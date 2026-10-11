@@ -494,6 +494,10 @@
     <string name="nm_hands_need_granted">已允許</string>
     <string name="nm_hands_need_ok">就緒</string>
     <string name="nm_hands_need_set_up">去設定</string>
+    <string name="nm_hands_need_ime">輸入法增強</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard（就緒）</string>
+    <string name="nm_hands_need_ime_off">未啟用（可選：需 Shizuku 及 ADB Keyboard）</string>
+    <string name="nm_hands_need_optional">可選</string>
     <string name="nm_hands_section_model">動手用的模型</string>
     <string name="nm_hands_model_footer">每一步都會把一張截圖傳給這個模型，它和對話模型是兩個獨立的設定。小一點的視覺模型就夠用，也更省錢。雲端選單之外的模型只有你自己選了才會用。</string>
     <string name="nm_hands_why_chosen">在這裡選的</string>
