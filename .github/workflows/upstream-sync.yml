@@ -46,9 +46,23 @@ jobs:
 
           UPSTREAM_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")
 
-          # 如果本地已包含上游所有更新，检查官方最新发布是否在本仓库已发布
+          # 清理函数：当 main 已包含最新上游提交时，自动关闭遗留的冲突 PR 并清理分支
+          cleanup_sync_prs() {
+            echo "检查是否存在待清理的历史冲突同步 PR 与临时分支..."
+            OPEN_SYNC_PRS=$(gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | startswith("sync/upstream")) | .number' 2>/dev/null || true)
+            for PR_NO in $OPEN_SYNC_PRS; do
+              echo "自动关闭已解决的冲突 PR #$PR_NO..."
+              gh pr close "$PR_NO" --comment "✅ 上游更新已合入主分支 \`main\`，自动关闭此同步 PR 并清理临时分支。" --delete-branch || true
+            done
+
+            # 清理远端残余的 sync/upstream 同步分支
+            git push origin --delete sync/upstream 2>/dev/null || true
+          }
+
+          # 如果本地已包含上游所有更新，清理历史冲突 PR 并检查官方最新发布是否在本仓库已发布
           if git merge-base --is-ancestor upstream/main HEAD; then
             echo "本地 main 分支已包含官方所有最新提交。"
+            cleanup_sync_prs
             if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
               if ! gh release view "$UPSTREAM_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
                 echo "检测到官方最新版本 $UPSTREAM_TAG 在本仓库尚未发布，触发 release-apk 打包发布流水线..."
@@ -66,6 +80,7 @@ jobs:
           if git merge --no-edit upstream/main; then
             echo "自动合并成功，推送到 origin/main..."
             git push origin main --tags
+            cleanup_sync_prs
 
             # 若发现新版本标签且尚未发布 Release，自动触发全平台打包与发布
             if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
@@ -95,37 +110,58 @@ jobs:
             exit 0
           fi
 
-          # 3. 检测到冲突：取消合并，创建同步分支并提 PR
-          echo "⚠️ 自动合并检测到代码冲突，取消当前合并并创建 PR..."
+          # 3. 检测到冲突：取消合并，管理冲突分支与 PR 生命周期
+          echo "⚠️ 自动合并检测到代码冲突，取消当前合并..."
           git merge --abort
 
-          BRANCH_NAME="sync/upstream-$(date +%Y%m%d-%H%M%S)"
-          git checkout -b "$BRANCH_NAME" upstream/main
-          git push origin "$BRANCH_NAME"
+          BRANCH_NAME="sync/upstream"
+
+          # 检查是否已有针对该分支打开的冲突 PR
+          EXISTING_PR_JSON=$(gh pr list --head "$BRANCH_NAME" --state open --json number,url --jq '.[0]' 2>/dev/null || true)
+          EXISTING_PR_NUM=$(echo "$EXISTING_PR_JSON" | jq -r '.number // empty' 2>/dev/null || true)
+          EXISTING_PR_URL=$(echo "$EXISTING_PR_JSON" | jq -r '.url // empty' 2>/dev/null || true)
+
+          # 检查远端 sync/upstream 分支是否已存在且与当前上游提交一致
+          REMOTE_SYNC_HASH=$(git ls-remote origin "refs/heads/$BRANCH_NAME" 2>/dev/null | cut -f1 || true)
+
+          if [ -n "$EXISTING_PR_NUM" ] && [ "$REMOTE_SYNC_HASH" = "$UPSTREAM_HASH" ]; then
+            echo "冲突 PR #${EXISTING_PR_NUM} (${EXISTING_PR_URL}) 处于待裁决状态，且上游无新提交变化，无需重复推送或告警。"
+            exit 0
+          fi
+
+          # 切换或创建固定冲突同步分支，并强制同步至最新 upstream/main
+          git checkout -B "$BRANCH_NAME" upstream/main
+          git push origin "$BRANCH_NAME" --force
 
           PR_TITLE="⚠️ [需裁决] 自动同步官方新版本冲突 (${UPSTREAM_TAG})"
 
-          # 构造 PR Body
-          cat << 'EOF' > /tmp/pr_body.md
-          ## 官方仓库有新更新，自动合并时检测到冲突
+          if [ -n "$EXISTING_PR_NUM" ]; then
+            echo "更新现有冲突 PR #${EXISTING_PR_NUM}..."
+            PR_URL="$EXISTING_PR_URL"
+            gh pr comment "$EXISTING_PR_NUM" --body "🔄 检测到官方上游有新提交，分支 \`$BRANCH_NAME\` 已强制同步更新（最新标签：\`${UPSTREAM_TAG}\`）。请及时合并裁决。" || true
+          else
+            # 构造 PR Body
+            cat << 'EOF' > /tmp/pr_body.md
+            ## 官方仓库有新更新，自动合并时检测到冲突
 
-          ### 上游最新信息
-          - 目标合并分支: `main`
-          - 上游同步分支: 分支已推送
+            ### 上游最新信息
+            - 目标合并分支: `main`
+            - 上游同步分支: `sync/upstream`
 
-          ### 如何解决冲突？
-          1. 本地拉取该分支解决：
-             ```bash
-             git fetch origin
-             git checkout main
-             git merge origin/${BRANCH_NAME}
-             git push origin main
-             ```
-          2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。
-          EOF
+            ### 如何解决冲突？
+            1. 本地拉取该分支解决：
+               ```bash
+               git fetch origin
+               git checkout main
+               git merge origin/sync/upstream
+               git push origin main
+               ```
+            2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。
+            EOF
 
-          PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body-file /tmp/pr_body.md)
-          echo "Pull Request 已创建: $PR_URL"
+            PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body-file /tmp/pr_body.md)
+            echo "Pull Request 已创建: $PR_URL"
+          fi
 
           # 4. 发送 Telegram 冲突告警
           if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
