@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   sync-upstream:
@@ -58,6 +59,16 @@ jobs:
           if git merge --no-edit upstream/main; then
             echo "自动合并成功，推送到 origin/main..."
             git push origin main --tags
+
+            # 若发现新版本标签且尚未发布 Release，自动触发全平台打包与发布
+            if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
+              if ! gh release view "$UPSTREAM_TAG" >/dev/null 2>&1; then
+                echo "发现新版本标签 $UPSTREAM_TAG 尚未发布，触发全平台打包发布流水线..."
+                gh workflow run release-apk.yml -f release_tag="$UPSTREAM_TAG" || true
+                gh workflow run desktop-app.yml -f release_tag="$UPSTREAM_TAG" || true
+                gh workflow run harness.yml -f release_tag="$UPSTREAM_TAG" || true
+              fi
+            fi
 
             # 合并成功：发送 Telegram 简报通知（若已配置）
             if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then

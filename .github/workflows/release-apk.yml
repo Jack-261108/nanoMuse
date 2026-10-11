@@ -1,0 +1,102 @@
+name: Release APK
+
+# Builds and attaches the release Android APK (arm64-v8a) to the GitHub Release.
+# Triggers on version tags (v*), or manually with release_tag.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v1.0.2); empty defaults to current tag"
+        required: false
+        default: ""
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  NDK_VERSION: 27.2.12479018
+
+jobs:
+  publish-apk:
+    name: build and publish APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26"
+          cache-dependency-path: android/deps/rclone-mobile/go.sum
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build Native Artifacts
+        env:
+          GOTOOLCHAIN: auto
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          export GOROOT="$(go env GOROOT)" GOPATH="$(go env GOPATH)"
+          export PATH="$GOPATH/bin:$PATH"
+          bash scripts/android/build-natives.sh
+
+      - name: Build Release APK
+        working-directory: android/src/android
+        run: |
+          export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
+          ./gradlew :app:assembleRelease --console=plain --no-daemon
+
+      - name: Package and Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.release_tag || github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG#v}"
+          APK_SRC="android/src/android/app/build/outputs/apk/release/app-release.apk"
+
+          mkdir -p dist
+          APK_DEST="dist/nanoMuse-${VERSION}-arm64.apk"
+          cp "$APK_SRC" "$APK_DEST"
+          (cd dist && sha256sum "nanoMuse-${VERSION}-arm64.apk" > "nanoMuse-${VERSION}-arm64.apk.sha256")
+
+          # 确保 GitHub Release 页面存在
+          if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            NOTES_FILE="docs/releases/${TAG}.md"
+            if [ -f "$NOTES_FILE" ]; then
+              TITLE="$(head -1 "$NOTES_FILE" | sed 's/^# *//')"
+              gh release create "$TAG" -R "$REPO" --title "$TITLE" --notes-file "$NOTES_FILE" --latest
+            else
+              gh release create "$TAG" -R "$REPO" --title "nanoMuse $VERSION" --generate-notes --latest
+            fi
+          fi
+
+          # 上传 APK 及校验签名文件
+          gh release upload "$TAG" "dist/nanoMuse-${VERSION}-arm64.apk" "dist/nanoMuse-${VERSION}-arm64.apk.sha256" -R "$REPO" --clobber
+
+      - name: Dispatch Desktop and Harness Builds
+        if: inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          gh workflow run desktop-app.yml -f release_tag="$TAG" || true
+          gh workflow run harness.yml -f release_tag="$TAG" || true
