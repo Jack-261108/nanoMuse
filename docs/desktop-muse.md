@@ -59,20 +59,26 @@ stylesheet over the harness's stable DOM hooks (`data-composer-card`,
   profile panel. At the top right, *Invite* (with an account), then the harness's
   right-sidebar toggle; the harness's own title row, tabs (*Conversation* / *Trace*)
   and session actions are hidden: the chat rows carry rename, pin and archive.
-- The conversation: your messages in bubbles toned from the accent on the right, the
-  agent's in large-radius grey bubbles on the left, timestamps and the per-message
-  actions on hover only; an empty chat has no greeting: the composer waits at the
-  bottom, as in Muse, with the workspace and preset row above it.
+- The conversation is monochrome, as on the phone: your messages are ink pills on the
+  right (black with white text in the light theme, white with black text in the dark
+  one), the agent's are large-radius grey pills a step off the canvas on the left,
+  timestamps and the per-message actions on hover only; a link inside your pill keeps
+  the pill's text colour, underlined. The header is a scrim over the conversation rather
+  than a bar: messages scroll under the face and dissolve into the canvas, and no line
+  runs under it. An empty chat has no greeting: the composer waits at the bottom, as in
+  Muse, with the workspace and preset row above it.
 - The composer is one pill: *+* (attach), *Message*, the send disc (the stop square
-  while a turn runs). The harness's model picker, permission mode and plan toggle are
+  while a turn runs); the send disc and the harness's scroll-to-latest disc are the same
+  ink as your pills, with the glyph in the opposite colour. The harness's model picker, permission mode and plan toggle are
   hidden from it (the models live in Settings → Models, dsh's own Models page is under
   Advanced, and the default permission mode in General, as in Muse) and come back with
   *Show DeepSeek Harness controls* under General. The microphone appears when the harness's voice input is switched on in
   Plugins (Settings → Dictation says how).
 - Theme: the harness's light and dark palettes are overridden to Muse's tones (`#f9f9f9`
-  surfaces, `#e3e4e6` agent bubbles in the light; `#171717` with `#242424` bubbles and
-  `#2b2b2b` fields in the dark) and the accent follows the face's colour on the account,
-  so a face coloured on the phone colours the desktop too. The desktop shell paints the
+  surfaces with a plain white chat canvas, `#000000` user pills and `#f2f2f7` agent pills
+  in the light; `#171717` with `#ffffff` user pills, `#242424` agent pills and `#2b2b2b`
+  fields in the dark) and the accent follows the face's colour on the account, so a face
+  coloured on the phone colours the desktop's lights and links too. The desktop shell paints the
   window in the same base colour, so a resize never flashes white in the dark.
 
 ## The first run
@@ -413,9 +419,14 @@ page it opened, named for the page you came from; a pick in the sidebar starts f
   - **Ways on**: your account's row first while signed in (what it covers right now, from
     the relay's model list), then the catalogue in the first run's groups: the region's
     providers, the ChatGPT sign-in, the rest ordered by how much they cover, the local
-    servers, a custom endpoint. Each row says what it covers, takes or changes a key inline,
+    servers, the custom endpoints. Each row says what it covers, takes or changes a key inline,
     links to the vendor's key page and has *Remove*; removing a row drops its credential and
-    any chat or hands choice that pointed at it. The ChatGPT row runs the bundled runtime's
+    any chat or hands choice that pointed at it. The custom endpoints are one row each (#294):
+    a saved endpoint reads its name over its host and has *Rename* beside *Change key* and
+    *Remove*; the *Add an endpoint* row under them adds another with a key of its own
+    (`NANOMUSE_KEY_CUSTOM`, `NANOMUSE_KEY_CUSTOM_2`, ...) without touching the others, and
+    each stands as a group of its own in the Models page's pickers. An endpoint saved before
+    this stays the first row. The ChatGPT row runs the bundled runtime's
     sign-in: *Sign in* opens OpenAI's page, the row waits with *Cancel* (and *Open the
     sign-in page* again), then reads *Signed in as ChatGPT Plus* and offers *Sign out*; the
     sign-in covers chat and the hands only, not pictures or clips, and the line about

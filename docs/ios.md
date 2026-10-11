@@ -92,7 +92,12 @@ Ours, in `NanoMuse/`:
   then *On it: 〈brief〉*, and the model's name when idle; while a new face is being drawn it
   reads the avatar flow's line. The face (`NanoMuseFaces.swift`, the drawn face from Application
   Support or the dragon from the bundle, five moods with the breath, bob, tilt, pop and shake of
-  the other clients) is tapped into **the agent's page**. The drawer holds the sessions, search,
+  the other clients) is tapped into **the agent's page**. A short clip of your own can play as the
+  face instead (`NanoMuseOwnClip.swift`: *Your own clip…* under the pen on the agent's page and in
+  the avatar studio; MP4 or MOV with H.264 or HEVC video, up to 15 seconds and 30 MB, previewed
+  before it is used, kept on that phone only under `Application Support/nanomuse/avatar/own-clip.mp4`,
+  and *Default face* removes it; the section in [avatar.md](avatar.md) has the fallback rule).
+  The drawer holds the sessions, search,
   a new side chat, *Pin as the main chat*, *All chats* and the nanoMuse settings; it opens from
   the round button and, on the main chat, from a swipe in at the left edge
   (`NanoMuseEdgeSwipe.swift`, a screen-edge pan on the window, as Android's drawer on the Chat
@@ -316,8 +321,10 @@ Ours, in `NanoMuse/`:
   bottom bar was a `safeAreaInset` on the `NavigationStack`'s ancestor, hidden while the keyboard is
   up; the chat respected that inset at launch and no longer after the bar had left and come back,
   so the whole chat ran under the bar and the composer, bottom-aligned, laid out, healthy by every
-  measure the watchdog had, sat behind it. Since 0.1.40 the **bar is a row under the rooms** (a
-  `VStack`, as on Android), and the composer column (the cards, the tool strip, the input bar) is
+  measure the watchdog had, sat behind it. Since 0.1.40 the **bar is laid out under the chat by
+  plain layout, never as an inset of the chat's ancestor** (a `VStack` row in 0.1.40; since the
+  floating pill bar, below, bottom padding of the bar's height on the chat layer, which is the same
+  layout), and the composer column (the cards, the tool strip, the input bar) is
   likewise **a row under the message list**: `NanoMuseComposerHost` is a plain `VStack`, the list is
   passed a bottom inset of 0, the `/` and `@` popup is an overlay of the list's bottom edge and so
   stands on the column's top edge by layout. Nothing lies over the UIKit list and there is no
@@ -517,6 +524,50 @@ Ours, in `NanoMuse/`:
   *Not set* state is no longer reachable through this switch. A provider of your own switched off
   on its page keeps upstream's path: the chat re-resolves through the default group and, when
   nothing is left, says *No model configured. Add a provider in Settings.*
+- **The bottom bar is a floating pill** (`NanoMuseShell.swift` → `NanoMuseBottomBar`,
+  `NanoMuseTones.tabIndicator` / `tabIndicatorGlyph` in `NanoMuseFaces.swift`; Android's
+  `MuseBottomBar`, #329 by @Ichiro786): the five tabs sit in a `Capsule` 12 pt above the bottom
+  safe area, as wide as the composer above it (the same 16 pt margins; 420 pt at most, centred on
+  a wider screen), icons only, with the same SF symbols, accessibility labels and selected trait as
+  before. The pill is `.ultraThinMaterial` under the shell's surface tone at 55 percent opacity (the
+  tint carries the contrast, the material carries the blur, as Android's 55 percent surface over its
+  backdrop blur) with a 1 pt `NanoMuseTones.hairline` edge; the old full-width strip and its hairline
+  on top are gone. The five tabs share the pill's width equally, each slot tappable across; the
+  current one shows the filled symbol in `tabIndicatorGlyph` on a 60 by 46 pt capsule of
+  `tabIndicator` (the chat's ink: black with a white symbol in light, white with a black symbol
+  in dark, as Android's `MuseBottomBar`) that slides to the tab tapped next with a spring
+  (`matchedGeometryEffect`); the others show the outlined symbol in the secondary colour. The bar
+  still leaves while the keyboard or the chat's voice panel is up. Layout: the pill lies over the
+  rooms and the chat in a `ZStack` aligned to the bottom. The chat keeps the 0.1.40 rule above
+  (bottom padding of the bar's height, 70 pt: 46 plus 6 above and below plus the 12 pt gap, so the
+  composer sits above the pill and nothing is an inset of the `NavigationStack`'s ancestor); the
+  rooms, plain SwiftUI scroll views, take the same height as a `safeAreaInset`, so their content
+  scrolls under the pill and the glass has something to blur. Written on Linux without a Mac: the
+  iOS check compiles it, and no device has shown it yet.
+- **The chat is monochrome** (`NanoMuseTones.ink` / `onInk` / `agentPill` in `NanoMuseFaces.swift`,
+  `NanoMuseHeaderScrim` in `NanoMuseHeader.swift`, `NanoMuseComposer.swift`,
+  `NanoMuseChatCards.swift`, and `// nanoMuse:` lines in `Views/Chat/ChatMessageViews.swift` and
+  `Views/Chat/AIChatView.swift`; Android's #331 by @Ichiro786). With the Muse shell on, your
+  messages are pills in the ink colour with text in the canvas colour: black with white text on
+  the white canvas in light, white with black text on the black canvas in dark, no blue and no
+  grey. The agent's replies sit in a pill a shade off
+  the canvas, `#F2F2F7` in light and `#1C1C1E` in dark, in the theme's text colour; code, tables
+  and raw markup stay bare as before. The send arrow in the composer pill is a 30 pt disc of the
+  same ink with the arrow in the canvas colour (a faint wash of the ink and a 40 percent arrow
+  while there is nothing to send), and the stop square while the agent answers sits on the same
+  disc; the composer pill itself keeps its grey. The scroll-to-latest
+  disc under the list is the same ink with the chevron in the canvas colour; the walk-back
+  button above it keeps its light disc. The header over the main chat is no longer a blur: a
+  scrim of the canvas colour from 80 percent at the top edge, 35 percent a little past the
+  middle, to clear at the bottom, so the conversation scrolls under the face and dissolves
+  instead of stopping at a line, and while the list is scrolled away from the latest message a
+  second fade in the full canvas colour comes in over 250 ms from the top edge (the shell's
+  `safeAreaInset` background, bound to the main chat's `isNearBottom` the way the header binds
+  its mood). A queued message keeps upstream's dashed outline and grey text, the *From {device}*
+  caption and the attachments stay outside the pill, and the long-press preview is the opaque
+  card it was. Side chats pushed from the drawer keep the system bar on its material; the rooms
+  keep their canvas. Written on Linux without a Mac: the iOS check compiles it, and no device
+  has shown it yet.
 
 ## Voice prompts from the Action Button
 

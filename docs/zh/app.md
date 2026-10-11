@@ -22,7 +22,7 @@ nanomuse serve --port 9000 --no-qr
   <img src="../screenshots/web/library.png" width="24%" alt="资源库：带实时预览的页面">
 </p>
 
-外观跟着 Meta 的 Muse 走：接近纯白和接近纯黑的底色，一种蓝色作强调，智能体的气泡是灰色、你的是浅蓝色，聊天顶部有一只小龙，姿势跟着智能体正在做的事变，底下是一枚带五个图标的毛玻璃悬浮胶囊栏。字体是 [Figtree](https://github.com/erikdkennedy/figtree)（OFL），已内置。这些选择背后的研究在 [design.md](design.md)。
+外观跟着 Meta 的 Muse 走：接近纯白和接近纯黑的底色，一种蓝色作强调，智能体的气泡是灰色、你的是浅蓝色（手机上是黑底上的白色、白底上的黑色，见 [android.md](android.md)），聊天顶部有一只小龙，姿势跟着智能体正在做的事变，底下是一枚带五个图标的毛玻璃悬浮胶囊栏。字体是 [Figtree](https://github.com/erikdkennedy/figtree)（OFL），已内置。这些选择背后的研究在 [design.md](design.md)。
 
 ## 装到手机上 {#getting-it-onto-your-phone}
 
@@ -48,7 +48,7 @@ nanomuse serve --port 9000 --no-qr
 
 ## 屏幕上有什么 {#what-is-on-the-screen}
 
-五个标签页（聊天、动态、点子、目标、资源库）加上形象后面的一个菜单。手机宽度下，这五个放在一枚圆角胶囊里，悬浮在底边上方 12 px 处，只有图标、没有文字，和 Android 应用画的是同一条栏：胶囊半透明，把身后的内容模糊掉，边上有一圈细线；当前标签页显示填充的图形，底下垫一块淡蓝色的指示块，其余的保持灰色描边。各个页面和聊天的输入框都会让开它。宽窗口下，以及桌面应用在任何宽度下，由侧栏代替这条栏。
+五个标签页（聊天、动态、点子、目标、资源库）加上形象后面的一个菜单。手机宽度下，这五个放在一枚圆角胶囊里，悬浮在底边上方 12 px 处，和聊天的输入框一样宽（最宽 420 px，更宽的屏幕上居中），只有图标、没有文字，和 Android 应用画的是同一条栏：胶囊半透明，把身后的内容模糊掉，边上有一圈细线；当前标签页显示填充的图形，底下垫一块墨色的指示块（浅色主题黑、深色主题白），其余的保持灰色描边。各个页面和聊天的输入框都会让开它。宽窗口下，以及桌面应用在任何宽度下，由侧栏代替这条栏。
 
 **聊天。** 一个主要聊天，加上旁聊（右上角的「对话」按钮）。消息一边生成一边流进来。工具调用显示成小标签：点一下看参数和输出。智能体写的文件显示成构件卡片，在应用里就能打开。哨兵（Sentinel）需要你拿主意时出现一张审批卡片；智能体需要信息时出现一张提问卡片。智能体干活时输入框一直开着；你这时发的任何东西都会在下一次调用模型之前并进正在进行的这一轮。
 
@@ -72,7 +72,7 @@ nanomuse serve --port 9000 --no-qr
 
 **资源库。** 智能体工作区里的每一个文件，最新的在前，可以按类型筛（页面、文档、图片、数据、代码），可以搜索。文件在应用里就能打开：页面实时渲染，Markdown 排好版，CSV 变成表格，图片和 PDF 内嵌显示。智能体写的页面跑在一个沙箱化的、来源不透明（opaque origin）的 iframe 里（它读不到访问令牌，也调不了 API）；出于同样的原因，服务器给每个 HTML 文件都带上 `Content-Security-Policy: sandbox`。
 
-**形象。** 小龙坐在聊天顶部，下面一行状态：智能体此刻在这个聊天里做什么，或者它在等你。每种状态各有一张静态图（`web/public/avatars/dragon-*.webp`）：待命；干活时戴着耳机在一台小笔记本上打字；等你回复时盯着一只水晶球；一轮跑完抱着一颗星星；工具调用失败或被拒绝时冒一滴汗。点它一下，它会很高兴。在[形象工作室](avatar.md)里画出来的面孔有同样的五张静态图；「设置」里也可以换成一个 emoji，整体做动作（呼吸、摇摆、蹦一下）。在 `prefers-reduced-motion` 下这些全部停止。聊天标签页上有一个角标，是任何地方等着你的审批数。点形象打开状态面板：大图的形象、同一行状态、有东西在跑时的一个「停止」按钮（这一轮结束，那个聊天里待处理的卡片关闭，对话照常能用）、模型和哨兵模式，然后是：
+**形象。** 小龙坐在聊天顶部，下面一行状态：智能体此刻在这个聊天里做什么，或者它在等你。每种状态各有一张静态图（`web/public/avatars/dragon-*.webp`）：待命；干活时戴着耳机在一台小笔记本上打字；等你回复时盯着一只水晶球；一轮跑完抱着一颗星星；工具调用失败或被拒绝时冒一滴汗。点它一下，它会很高兴。在[形象工作室](avatar.md)里画出来的面孔有同样的五张静态图；「设置」里也可以换成一个 emoji，整体做动作（呼吸、摇摆、蹦一下）。Android 应用里还可以用一段你自己的短视频当形象，只留在那台手机上（[avatar.md](avatar.md#你自己的视频)）。在 `prefers-reduced-motion` 下这些全部停止。聊天标签页上有一个角标，是任何地方等着你的审批数。点形象打开状态面板：大图的形象、同一行状态、有东西在跑时的一个「停止」按钮（这一轮结束，那个聊天里待处理的卡片关闭，对话照常能用）、模型和哨兵模式，然后是：
 
 - *审批*：所有聊天里等着你的卡片队列，当场就能回答。有待处理的时候先打开它。
 - *活动*：审计记录，每一次工具调用、判定和审批，包括被拒绝的。
@@ -165,10 +165,14 @@ Meta 的 Muse「自己会做事，但不会做太多」。「设置」里的*主
 | POST | `/api/hooks/{id}?key=` | 触发器的 webhook：不要应用令牌，key 就是凭据（也接受 `X-Hook-Key` 头）；请求体（≤ 64 KB，JSON 会格式化）就是上下文。id 或 key 错了返回 404，已取消返回 409，投递太密返回 429 |
 | GET | `/api/files` · `/api/files/{path}?download=1` | 列出 / 读取工作区文件（HTML 和 SVG 带着 `Content-Security-Policy: sandbox` 返回） |
 | GET / PUT | `/api/settings` | 查看 / 修改 `{profile{name (≤ 20), avatar, emoji, color, tagline (≤ 60), tone, communication, style, user_name, proactive, goal_interval_minutes}, sentinel_mode, show_thinking, language}`；查看时还包含 `onboarded` 和 `llm_ready` |
-| GET | `/api/connections` | 模型（`key_source`：vault · config · missing · none）、服务商预设、邮件、浏览器、MCP 服务器（`connected`、`tools`、`from_app`）、保险库里的名字、`onboarded` |
-| PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` | 换模型；`api_key` 给了 → 存进保险库，`""` → 不用 key，没给 → 不变。在每个会话里立即生效 |
+| GET | `/api/connections` | 模型（`key_source`：vault · config · missing · none；是列表里的接口时带 `endpoint`）、服务商预设、`endpoints`（列表里的自定义 OpenAI 兼容接口，每个是 `{id, label, base_url, key_source, models, slots}`，从不带 key）、邮件、浏览器、MCP 服务器（`connected`、`tools`、`from_app`）、保险库里的名字、`onboarded` |
+| PUT | `/api/connections/llm` `{provider, model, base_url, tool_mode, api_key}` 或 `{endpoint, model, tool_mode}` | 换模型；`api_key` 给了 → 存进保险库，`""` → 不用 key，没给 → 不变。`endpoint` 指向列表里的一个接口，槽位借用它的地址和它自己的 key（按引用）。在每个会话里立即生效 |
 | POST | `/api/connections/llm/test` | 和模型来一次简短往返：`{ok, reply, ms}` 或 `{ok: false, error}` |
-| POST | `/api/llm/models` `{preset, base_url, api_key}` | 一个端点提供的模型：查它的 `/models`（然后 `/v1/models`），用给定的 key，没给就用保险库里的，返回 `{models, source: "live"}`；连不上时返回预设的内置目录，带 `source: "catalogue"` 和 `error`。什么都不保存 |
+| POST | `/api/llm/models` `{preset, base_url, api_key}` 或 `{endpoint}` | 一个端点提供的模型：查它的 `/models`（然后 `/v1/models`），用给定的 key，没给就用保险库里的，返回 `{models, source: "live"}`；连不上时返回预设的内置目录，带 `source: "catalogue"` 和 `error`；对列表里的 `endpoint` 则返回随它保存的模型。什么都不保存 |
+| POST | `/api/connections/endpoints` `{label, base_url, api_key, models}` | 往列表里添加一个自定义 OpenAI 兼容接口（#294）：`label` 可选（不填就用主机名），`api_key` 可选（保险库：`ENDPOINT_<ID>_API_KEY`），`models` 是它提供的模型 id，逗号分隔，在它列不出模型时填（两者都没有时回 400 和一句话）。返回这个条目；nanoMuse Cloud 或目录预设的地址会被拒绝 |
+| PUT | `/api/connections/endpoints/{id}` `{label, base_url, api_key, models}` | 修改一个接口：新名字、新地址、新 key（`""` 删掉）或手填的模型；没给的字段不变。用到这个接口的每个槽位一起跟着变。id 不存在回 404 |
+| DELETE | `/api/connections/endpoints/{id}` | 移除一个接口和它在保险库里的 key；设在它上面的双手、图片或短片回到自动。对话模型正通过它回答时回 409 |
+| POST | `/api/connections/endpoints/{id}/models` | 重新向接口要一遍模型并保存：返回条目加 `source: "live"`，它没回答时是 `"kept"` 和 `error`，沿用已保存的列表 |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | 按含义召回：`mode` 为 auto/on/off；`base_url` 为 `""` → 用模型的端点；`model` 为 `""` → 用端点的默认值；`api_key` 给了 → 保险库（`EMBEDDINGS_API_KEY`），`""` → 用模型的 key，没给 → 不变。当场重建向量模型 |
 | POST | `/api/connections/embeddings/test` | 调一次向量接口，然后给每条记忆建索引：`{ok, model, dims, indexed, ms}` 或 `{ok: false, error}` |
 | PUT | `/api/connections/search` `{provider, api_key, base_url}` | 网页搜索：`provider` 为 duckduckgo/brave/tavily/searxng；`api_key` 给了 → 保险库（`SEARCH_API_KEY`），`""` 删掉它，没给 → 不变；`base_url` 是 SearXNG 实例。从下一次搜索起生效 |
@@ -185,7 +189,7 @@ Meta 的 Muse「自己会做事，但不会做太多」。「设置」里的*主
 | POST | `/api/connections/contacts/test` | 把每本通讯录重读一遍：`{ok, contacts, sources}` 或 `{ok: false, error}` |
 | GET | `/api/contacts?q=&limit=` | 按智能体的方式查人：`[{id, name, emails[], phones[], org, …}]` |
 | PUT | `/api/connections/browser` `{enabled}` | 打开或关闭浏览器工具 |
-| PUT | `/api/connections/gui` `{enabled, provider, model, base_url, api_key}` | 操作手机（[gui.md](gui.md)）：这个开关立刻添加或移除手机工具；模型字段是操作器自己的模型（`""` → 用主模型的）；`api_key` 给了 → 保险库（`GUI_API_KEY`），`""` → 用主 key，没给 → 不变 |
+| PUT | `/api/connections/gui` `{enabled, provider, model, base_url, api_key}` | 操作手机（[gui.md](gui.md)）：这个开关立刻添加或移除手机工具；模型字段是操作器自己的模型（`""` → 用主模型的）；`api_key` 给了 → 保险库（`GUI_API_KEY`），`""` → 用主 key，没给 → 不变。用 `endpoint` 代替 `provider` / `base_url` / `api_key` 时指向列表里的一个接口，和对话模型一样；`PUT /api/connections/image` 和 `/video` 也是 |
 | POST | `/api/connections/gui/test` | 和操作器的模型来一次简短往返：`{ok, reply, ms}` 或 `{ok: false, error}` |
 | GET | `/api/phone` | `{connected, device{id, name, platform, gui, apps, width, height}, gui_enabled, last_screen, screen}`：哪台手机连着，以及它最后发来的屏幕 |
 | POST · DELETE | `/api/connections/mcp` `{name, command, args[], env{}, url, risk}` · `/api/connections/mcp/{name}` | 现在就连接一个服务器（起不来返回 502）/ 断开并移除一个从应用里添加的 |
