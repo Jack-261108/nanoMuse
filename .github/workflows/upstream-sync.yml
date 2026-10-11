@@ -61,19 +61,20 @@ jobs:
 
             # 合并成功：发送 Telegram 简报通知（若已配置）
             if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-              MSG="🎉 *nanoMuse 官方更新已自动合并*
-
-📌 *上游最新标签*: \`${UPSTREAM_TAG}\`
-📝 *合并的新提交概览*:
-\`\`\`
-${NEW_COMMITS}
-\`\`\`
-已成功无冲突合并至您的主分支 \`main\`。"
-
-              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-                -d chat_id="${TELEGRAM_CHAT_ID}" \
-                -d parse_mode="Markdown" \
-                -d text="${MSG}" || true
+              python3 -c "
+              import os, urllib.request, json
+              token = os.environ.get('TELEGRAM_BOT_TOKEN')
+              chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+              tag = '''${UPSTREAM_TAG}'''.strip()
+              commits = '''${NEW_COMMITS}'''.strip()
+              text = f'🎉 *nanoMuse 官方更新已自动合并*\n\n📌 *上游最新标签*: `{tag}`\n📝 *新提交概览*:\n```\n{commits}\n```\n已成功无损合并至主分支 `main`。'
+              data = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
+              req = urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data, headers={'Content-Type': 'application/json'})
+              try:
+                  urllib.request.urlopen(req, timeout=15)
+              except Exception as e:
+                  print('Telegram notify failed:', e)
+              " || true
             fi
             exit 0
           fi
@@ -87,52 +88,46 @@ ${NEW_COMMITS}
           git push origin "$BRANCH_NAME"
 
           PR_TITLE="⚠️ [需裁决] 自动同步官方新版本冲突 (${UPSTREAM_TAG})"
-          PR_BODY="## 官方仓库有新更新，自动合并时检测到冲突
 
-### 上游最新信息
-- **上游最新标签/版本**: \`${UPSTREAM_TAG}\`
-- **目标合并分支**: \`main\`
-- **上游同步分支**: \`${BRANCH_NAME}\`
+          # 构造 PR Body
+          cat << 'EOF' > /tmp/pr_body.md
+          ## 官方仓库有新更新，自动合并时检测到冲突
 
-### 新增提交概览
-\`\`\`
-${NEW_COMMITS}
-\`\`\`
+          ### 上游最新信息
+          - 目标合并分支: `main`
+          - 上游同步分支: 分支已推送
 
-### 如何解决冲突？
-1. 本地拉取该分支解决：
-   \`\`\`bash
-   git fetch origin
-   git checkout main
-   git merge origin/${BRANCH_NAME}
-   # 解决冲突文件并测试
-   git push origin main
-   \`\`\`
-2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。"
+          ### 如何解决冲突？
+          1. 本地拉取该分支解决：
+             ```bash
+             git fetch origin
+             git checkout main
+             git merge origin/${BRANCH_NAME}
+             git push origin main
+             ```
+          2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。
+          EOF
 
-          PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body "$PR_BODY")
+          PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body-file /tmp/pr_body.md)
           echo "Pull Request 已创建: $PR_URL"
 
           # 4. 发送 Telegram 冲突告警
           if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            TG_MSG="⚠️ *nanoMuse 官方同步冲突提醒*
-
-官方仓库发布了新版本（\`${UPSTREAM_TAG}\`），在尝试自动合并到您的 \`main\` 时检测到冲突！
-
-已自动为您创建冲突审查 PR：
-🔗 [点击查看并裁决 PR](${PR_URL})
-
-📝 *上游提交简报*:
-\`\`\`
-${NEW_COMMITS}
-\`\`\`
-
-请点击上方链接进行冲突裁决。"
-
-            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              -d chat_id="${TELEGRAM_CHAT_ID}" \
-              -d parse_mode="Markdown" \
-              -d text="${TG_MSG}" || true
+            python3 -c "
+            import os, urllib.request, json
+            token = os.environ.get('TELEGRAM_BOT_TOKEN')
+            chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+            tag = '''${UPSTREAM_TAG}'''.strip()
+            commits = '''${NEW_COMMITS}'''.strip()
+            pr = '''${PR_URL}'''.strip()
+            text = f'⚠️ *nanoMuse 官方同步冲突提醒*\n\n官方发布了新版本（`{tag}`），自动合并到 `main` 时发生冲突！\n\n🔗 [点击查看并裁决 PR]({pr})\n\n📝 *上游提交简报*:\n```\n{commits}\n```\n请点击上方链接进行裁决。'
+            data = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
+            req = urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data, headers={'Content-Type': 'application/json'})
+            try:
+                urllib.request.urlopen(req, timeout=15)
+            except Exception as e:
+                print('Telegram notify failed:', e)
+            " || true
           else
             echo "未配置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过 Telegram 发送。"
           fi
