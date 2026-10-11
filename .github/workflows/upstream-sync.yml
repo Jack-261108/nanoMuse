@@ -1,0 +1,138 @@
+name: Upstream Sync
+
+on:
+  schedule:
+    # 每天 UTC 0点、6点、12点、18点（北京时间 8点、14点、20点、2点）定时检查
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch and Sync from Upstream
+        id: sync
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          # 1. 确保并拉取官方上游
+          git remote add upstream https://github.com/nano-muse/nanoMuse.git || git remote set-url upstream https://github.com/nano-muse/nanoMuse.git
+          git fetch upstream main --tags
+
+          LOCAL_HASH=$(git rev-parse HEAD)
+          UPSTREAM_HASH=$(git rev-parse upstream/main)
+
+          echo "Local main: $LOCAL_HASH"
+          echo "Upstream main: $UPSTREAM_HASH"
+
+          # 如果本地已包含上游所有更新，则无需操作
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "本地 main 分支已包含官方所有最新提交，无需同步。"
+            exit 0
+          fi
+
+          NEW_COMMITS=$(git log --oneline HEAD..upstream/main -n 10)
+          UPSTREAM_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")
+
+          echo "检测到官方有新更新，尝试自动无损合并..."
+
+          # 2. 尝试自动合并
+          if git merge --no-edit upstream/main; then
+            echo "自动合并成功，推送到 origin/main..."
+            git push origin main --tags
+
+            # 合并成功：发送 Telegram 简报通知（若已配置）
+            if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+              MSG="🎉 *nanoMuse 官方更新已自动合并*
+
+📌 *上游最新标签*: \`${UPSTREAM_TAG}\`
+📝 *合并的新提交概览*:
+\`\`\`
+${NEW_COMMITS}
+\`\`\`
+已成功无冲突合并至您的主分支 \`main\`。"
+
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                -d chat_id="${TELEGRAM_CHAT_ID}" \
+                -d parse_mode="Markdown" \
+                -d text="${MSG}" || true
+            fi
+            exit 0
+          fi
+
+          # 3. 检测到冲突：取消合并，创建同步分支并提 PR
+          echo "⚠️ 自动合并检测到代码冲突，取消当前合并并创建 PR..."
+          git merge --abort
+
+          BRANCH_NAME="sync/upstream-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME" upstream/main
+          git push origin "$BRANCH_NAME"
+
+          PR_TITLE="⚠️ [需裁决] 自动同步官方新版本冲突 (${UPSTREAM_TAG})"
+          PR_BODY="## 官方仓库有新更新，自动合并时检测到冲突
+
+### 上游最新信息
+- **上游最新标签/版本**: \`${UPSTREAM_TAG}\`
+- **目标合并分支**: \`main\`
+- **上游同步分支**: \`${BRANCH_NAME}\`
+
+### 新增提交概览
+\`\`\`
+${NEW_COMMITS}
+\`\`\`
+
+### 如何解决冲突？
+1. 本地拉取该分支解决：
+   \`\`\`bash
+   git fetch origin
+   git checkout main
+   git merge origin/${BRANCH_NAME}
+   # 解决冲突文件并测试
+   git push origin main
+   \`\`\`
+2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。"
+
+          PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body "$PR_BODY")
+          echo "Pull Request 已创建: $PR_URL"
+
+          # 4. 发送 Telegram 冲突告警
+          if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+            TG_MSG="⚠️ *nanoMuse 官方同步冲突提醒*
+
+官方仓库发布了新版本（\`${UPSTREAM_TAG}\`），在尝试自动合并到您的 \`main\` 时检测到冲突！
+
+已自动为您创建冲突审查 PR：
+🔗 [点击查看并裁决 PR](${PR_URL})
+
+📝 *上游提交简报*:
+\`\`\`
+${NEW_COMMITS}
+\`\`\`
+
+请点击上方链接进行冲突裁决。"
+
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d chat_id="${TELEGRAM_CHAT_ID}" \
+              -d parse_mode="Markdown" \
+              -d text="${TG_MSG}" || true
+          else
+            echo "未配置 TELEGRAM_BOT_TOKEN 或 TELEGRAM_CHAT_ID，跳过 Telegram 发送。"
+          fi
