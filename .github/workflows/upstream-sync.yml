@@ -44,14 +44,21 @@ jobs:
           echo "Local main: $LOCAL_HASH"
           echo "Upstream main: $UPSTREAM_HASH"
 
-          # 如果本地已包含上游所有更新，则无需操作
+          UPSTREAM_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")
+
+          # 如果本地已包含上游所有更新，检查官方最新发布是否在本仓库已发布
           if git merge-base --is-ancestor upstream/main HEAD; then
-            echo "本地 main 分支已包含官方所有最新提交，无需同步。"
+            echo "本地 main 分支已包含官方所有最新提交。"
+            if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
+              if ! gh release view "$UPSTREAM_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+                echo "检测到官方最新版本 $UPSTREAM_TAG 在本仓库尚未发布，触发 release-apk 打包发布流水线..."
+                gh workflow run release-apk.yml -R "$GITHUB_REPOSITORY" -f release_tag="$UPSTREAM_TAG" || true
+              fi
+            fi
             exit 0
           fi
 
           NEW_COMMITS=$(git log --oneline HEAD..upstream/main -n 10)
-          UPSTREAM_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")
 
           echo "检测到官方有新更新，尝试自动无损合并..."
 
@@ -62,11 +69,9 @@ jobs:
 
             # 若发现新版本标签且尚未发布 Release，自动触发全平台打包与发布
             if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
-              if ! gh release view "$UPSTREAM_TAG" >/dev/null 2>&1; then
-                echo "发现新版本标签 $UPSTREAM_TAG 尚未发布，触发全平台打包发布流水线..."
-                gh workflow run release-apk.yml -f release_tag="$UPSTREAM_TAG" || true
-                gh workflow run desktop-app.yml -f release_tag="$UPSTREAM_TAG" || true
-                gh workflow run harness.yml -f release_tag="$UPSTREAM_TAG" || true
+              if ! gh release view "$UPSTREAM_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+                echo "发现新版本标签 $UPSTREAM_TAG 尚未发布，触发 release-apk 打包发布流水线..."
+                gh workflow run release-apk.yml -R "$GITHUB_REPOSITORY" -f release_tag="$UPSTREAM_TAG" || true
               fi
             fi
 

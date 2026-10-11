@@ -27,13 +27,16 @@ env:
 jobs:
   publish-apk:
     name: build and publish APK
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive # android/deps/proot (our fork)
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -48,6 +51,42 @@ jobs:
           packages: platforms;android-36 build-tools;35.0.0 cmake;3.22.1 ndk;${{ env.NDK_VERSION }}
 
       - uses: gradle/actions/setup-gradle@v6
+
+      - name: Resolve and verify target release version
+        id: version
+        run: |
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            RAW_TAG="${{ inputs.release_tag }}"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            RAW_TAG="${{ github.ref_name }}"
+          else
+            # 优先从项目单一真实源 pyproject.toml 提取版本，并与 git 标签结合
+            PROJECT_VER=$(grep '^version = ' pyproject.toml | head -1 | sed -E 's/version = "(.*)"/\1/' || true)
+            LATEST_GIT_TAG=$(git tag -l "v*" --sort=-v:refname | head -n 1 || true)
+            if [ -n "$PROJECT_VER" ]; then
+              RAW_TAG="v${PROJECT_VER}"
+            elif [ -n "$LATEST_GIT_TAG" ]; then
+              RAW_TAG="$LATEST_GIT_TAG"
+            else
+              RAW_TAG="v1.0.2"
+            fi
+          fi
+
+          VERSION="${RAW_TAG#v}"
+          TAG="v${VERSION}"
+
+          echo "目标发布版本号: ${VERSION}"
+          echo "Release 标签: ${TAG}"
+
+          # 确保 Android 工程的 versionName 与目标版本号完全一致
+          GRADLE_VER=$(grep -E '^\s*versionName = "' android/src/android/app/build.gradle.kts | head -1 | sed -E 's/.*versionName = "(.*)".*/\1/')
+          if [ -n "$GRADLE_VER" ] && [ "$GRADLE_VER" != "$VERSION" ]; then
+            echo "提示: Android versionName ($GRADLE_VER) 与目标版本 ($VERSION) 不一致，正在对齐..."
+            sed -i "s/versionName = \"$GRADLE_VER\"/versionName = \"$VERSION\"/" android/src/android/app/build.gradle.kts
+          fi
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build Native Artifacts
         env:
@@ -64,13 +103,26 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/$NDK_VERSION"
           ./gradlew :app:assembleRelease --console=plain --no-daemon
 
+      - name: Verify Built APK Version
+        run: |
+          APK_SRC="android/src/android/app/build/outputs/apk/release/app-release.apk"
+          [ -f "$APK_SRC" ] || { echo "未找到 Release APK: $APK_SRC" >&2; exit 1; }
+          bt="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          badging="$("$bt/aapt" dump badging "$APK_SRC")"
+          echo "$badging" | grep -E "^package:.*versionName='${{ steps.version.outputs.version }}'" || {
+            echo "错误: APK 内的 versionName 与官方发布版本号 ${{ steps.version.outputs.version }} 不一致！" >&2
+            echo "$badging" | grep -E "^package:" >&2
+            exit 1
+          }
+          echo "APK 校验成功: 内部 versionName 与目标发布版本号 ${{ steps.version.outputs.version }} 完全一致。"
+
       - name: Package and Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.release_tag || github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
           REPO: ${{ github.repository }}
         run: |
-          VERSION="${TAG#v}"
           APK_SRC="android/src/android/app/build/outputs/apk/release/app-release.apk"
 
           mkdir -p dist
@@ -85,18 +137,42 @@ jobs:
               TITLE="$(head -1 "$NOTES_FILE" | sed 's/^# *//')"
               gh release create "$TAG" -R "$REPO" --title "$TITLE" --notes-file "$NOTES_FILE" --latest
             else
-              gh release create "$TAG" -R "$REPO" --title "nanoMuse $VERSION" --generate-notes --latest
+              # 吸收提交日志提取逻辑，自动生成清晰的变更说明
+              PREV_TAG="$(git tag --list 'v*' --sort=-v:refname | grep -v "^${TAG}$" | head -n 1 || true)"
+              if [ -n "$PREV_TAG" ]; then
+                RANGE="${PREV_TAG}..HEAD"
+              else
+                RANGE="HEAD"
+              fi
+
+              TMP_NOTES="/tmp/release-notes-${TAG}.md"
+              echo "## nanoMuse ${VERSION}" > "$TMP_NOTES"
+              echo "" >> "$TMP_NOTES"
+              echo "nanoMuse Android 客户端 Release 构建产物。" >> "$TMP_NOTES"
+              echo "" >> "$TMP_NOTES"
+              echo "### 变更记录" >> "$TMP_NOTES"
+              git log --pretty=format:"- %h %s" -n 25 "$RANGE" >> "$TMP_NOTES" || true
+
+              gh release create "$TAG" -R "$REPO" --title "nanoMuse $VERSION" --notes-file "$TMP_NOTES" --latest
+              rm -f "$TMP_NOTES"
             fi
           fi
 
           # 上传 APK 及校验签名文件
           gh release upload "$TAG" "dist/nanoMuse-${VERSION}-arm64.apk" "dist/nanoMuse-${VERSION}-arm64.apk.sha256" -R "$REPO" --clobber
 
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nanoMuse-release-apk
+          path: dist/*
+          retention-days: 14
+          if-no-files-found: error
+
       - name: Dispatch Desktop and Harness Builds
-        if: inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.release_tag }}
+          TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
-          gh workflow run desktop-app.yml -f release_tag="$TAG" || true
-          gh workflow run harness.yml -f release_tag="$TAG" || true
+          gh workflow run desktop-app.yml -R "$REPO" -f release_tag="$TAG" || true
+          gh workflow run harness.yml -R "$REPO" -f release_tag="$TAG" || true
