@@ -10,7 +10,6 @@ permissions:
   contents: write
   pull-requests: write
   actions: write
-  workflows: write
 
 jobs:
   sync-upstream:
@@ -21,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure Git
         run: |
@@ -31,7 +30,7 @@ jobs:
       - name: Fetch and Sync from Upstream
         id: sync
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
@@ -80,7 +79,10 @@ jobs:
           # 2. 尝试自动合并
           if git merge --no-edit upstream/main; then
             echo "自动合并成功，推送到 origin/main..."
-            git push origin main --tags
+            if ! git push origin main --tags; then
+              echo "::error::推送失败。若上游更新包含工作流文件（.github/workflows/），默认 GITHUB_TOKEN 无权修改 workflow 文件。请在仓库配置拥有 workflow 权限的 Personal Access Token (Secret: SYNC_PAT)，或在本地执行 git merge upstream/main && git push 推送。"
+              exit 1
+            fi
             cleanup_sync_prs
 
             # 若发现新版本标签且尚未发布 Release，自动触发全平台打包与发布
