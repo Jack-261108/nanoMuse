@@ -20,7 +20,6 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-          token: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure Git
         run: |
@@ -30,10 +29,21 @@ jobs:
       - name: Fetch and Sync from Upstream
         id: sync
         env:
-          GH_TOKEN: ${{ secrets.SYNC_PAT || secrets.GITHUB_TOKEN }}
+          SYNC_PAT: ${{ secrets.SYNC_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          # 若配置了具备 workflow 权限的 SYNC_PAT，优先使用该凭据认证
+          if [ -n "$SYNC_PAT" ]; then
+            echo "检测到 SYNC_PAT，配置 origin 认证凭据与 GH_TOKEN..."
+            export GH_TOKEN="$SYNC_PAT"
+            git config --local --unset-all http.https://github.com/.extraheader || true
+            git remote set-url origin "https://x-access-token:${SYNC_PAT}@github.com/${GITHUB_REPOSITORY}.git"
+          else
+            export GH_TOKEN="$GITHUB_TOKEN"
+          fi
+
           # 1. 确保并拉取官方上游
           git remote add upstream https://github.com/nano-muse/nanoMuse.git || git remote set-url upstream https://github.com/nano-muse/nanoMuse.git
           git fetch upstream main --tags
