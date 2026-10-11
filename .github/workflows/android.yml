@@ -72,6 +72,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Pinned proot revision
+        id: proot
+        run: echo "rev=$(git rev-parse HEAD:android/deps/proot 2>/dev/null || echo no-proot)" >> "$GITHUB_OUTPUT"
+
+      - name: Native artifacts cache (proot, Alpine rootfs, rclone.aar)
+        id: native-cache
+        uses: actions/cache@v6
+        with:
+          path: |
+            android/src/android/app/src/main/assets/proot-aarch64
+            android/src/android/app/src/main/assets/alpine-minirootfs.tar.gz
+            android/src/android/app/src/main/jniLibs/arm64-v8a
+            android/src/android/app/libs/rclone.aar
+          key: android-natives-${{ runner.os }}-${{ env.NDK_VERSION }}-${{ steps.proot.outputs.rev }}-${{ hashFiles('scripts/android/build-natives.sh', 'android/deps/build_proot.sh', 'android/scripts/prepare_android_sandbox.sh', 'android/deps/build_rclone_android.sh', 'android/deps/rclone-mobile/go.sum') }}
+          restore-keys: |
+            android-natives-${{ runner.os }}-${{ env.NDK_VERSION }}-${{ steps.proot.outputs.rev }}-
+            android-natives-${{ runner.os }}-${{ env.NDK_VERSION }}-
+
       - name: Native artifacts (proot, Alpine rootfs, rclone.aar)
         env:
           GOTOOLCHAIN: auto
