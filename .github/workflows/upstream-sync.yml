@@ -4,7 +4,7 @@ on:
   schedule:
     # 每天 UTC 0点、6点、12点、18点（北京时间 8点、14点、20点、2点）定时检查
     - cron: '0 */6 * * *'
-  workflow_dispatch: # 支持手动点击触发
+  workflow_dispatch:
 
 permissions:
   contents: write
