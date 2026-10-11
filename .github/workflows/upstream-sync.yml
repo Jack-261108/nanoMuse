@@ -54,7 +54,12 @@ jobs:
           echo "Local main: $LOCAL_HASH"
           echo "Upstream main: $UPSTREAM_HASH"
 
-          UPSTREAM_TAG=$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")
+          UPSTREAM_RELEASE_TAG=$(gh release view -R "nano-muse/nanoMuse" --json tagName --jq '.tagName' 2>/dev/null || true)
+          LOCAL_RELEASE_TAG=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName --jq '.tagName' 2>/dev/null || true)
+          UPSTREAM_TAG="${UPSTREAM_RELEASE_TAG:-$(git describe --tags --abbrev=0 upstream/main 2>/dev/null || echo "main-latest")}"
+
+          echo "Official release: $UPSTREAM_RELEASE_TAG"
+          echo "Local release: $LOCAL_RELEASE_TAG"
 
           # 清理函数：当 main 已包含最新上游提交时，自动关闭遗留的冲突 PR 并清理分支
           cleanup_sync_prs() {
@@ -69,16 +74,21 @@ jobs:
             git push origin --delete sync/upstream 2>/dev/null || true
           }
 
+          # 检查是否真正有官方新 Release 需要触发打包发布
+          check_and_trigger_release() {
+            if [ -n "$UPSTREAM_RELEASE_TAG" ] && [ "$UPSTREAM_RELEASE_TAG" != "$LOCAL_RELEASE_TAG" ]; then
+              if git merge-base --is-ancestor "$UPSTREAM_RELEASE_TAG" HEAD 2>/dev/null; then
+                echo "检测到官方发布了新版本 $UPSTREAM_RELEASE_TAG（当前仓库尚未发布），触发 release-apk 打包发布流水线..."
+                gh workflow run release-apk.yml -R "$GITHUB_REPOSITORY" -f release_tag="$UPSTREAM_RELEASE_TAG" || true
+              fi
+            fi
+          }
+
           # 如果本地已包含上游所有更新，清理历史冲突 PR 并检查官方最新发布是否在本仓库已发布
           if git merge-base --is-ancestor upstream/main HEAD; then
             echo "本地 main 分支已包含官方所有最新提交。"
             cleanup_sync_prs
-            if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
-              if ! gh release view "$UPSTREAM_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-                echo "检测到官方最新版本 $UPSTREAM_TAG 在本仓库尚未发布，触发 release-apk 打包发布流水线..."
-                gh workflow run release-apk.yml -R "$GITHUB_REPOSITORY" -f release_tag="$UPSTREAM_TAG" || true
-              fi
-            fi
+            check_and_trigger_release
             exit 0
           fi
 
@@ -94,14 +104,7 @@ jobs:
               exit 1
             fi
             cleanup_sync_prs
-
-            # 若发现新版本标签且尚未发布 Release，自动触发全平台打包与发布
-            if [ -n "$UPSTREAM_TAG" ] && [ "$UPSTREAM_TAG" != "main-latest" ]; then
-              if ! gh release view "$UPSTREAM_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-                echo "发现新版本标签 $UPSTREAM_TAG 尚未发布，触发 release-apk 打包发布流水线..."
-                gh workflow run release-apk.yml -R "$GITHUB_REPOSITORY" -f release_tag="$UPSTREAM_TAG" || true
-              fi
-            fi
+            check_and_trigger_release
 
             # 合并成功：发送 Telegram 简报通知（若已配置）
             if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
