@@ -2,8 +2,8 @@ name: Upstream Sync
 
 on:
   schedule:
-    # 每天 UTC 0点、6点、12点、18点（北京时间 8点、14点、20点、2点）定时检查
-    - cron: '0 */6 * * *'
+    # 每小时错峰检查一次（第 17 分钟，避免整点排队拥堵）
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
