@@ -244,9 +244,7 @@ fun ProviderDetailScreen(
 
         // ─── Custom Base URL ────────────────────────────────────────
         if (instance.providerType != ProviderType.openRouter) {
-            // nanoMuse: plain http:// only for addresses on the local network (io.github.nanomuse.net.LanOnly)
-            val baseUrlProblem = io.github.nanomuse.net.LanOnly.refusedHost(customBaseURL)?.let { stringResource(R.string.nm_lan_only_https, it) }
-            SettingsSection(header = stringResource(R.string.provider_detail_custom_api_base), footer = baseUrlProblem) {
+            SettingsSection(header = stringResource(R.string.provider_detail_custom_api_base)) {
                 // URL input row — tighter vertical padding to match T226's
                 // SectionTextField height shrink (~-20%).
                 Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -325,7 +323,6 @@ fun ProviderDetailScreen(
                 // Save action — TextButton presentation so it reads as a list
                 // row rather than a floating filled button inside the card.
                 MinisSmallTextButton(
-                    enabled = baseUrlProblem == null, // nanoMuse: LanOnly
                     onClick = {
                         providerRepository.updateInstance(
                             instance.copy(

@@ -518,6 +518,10 @@
     <string name="nm_hands_need_granted">Zezwolono</string>
     <string name="nm_hands_need_ok">Gotowe</string>
     <string name="nm_hands_need_set_up">Skonfiguruj</string>
+    <string name="nm_hands_need_ime">Usprawnienie wprowadzania</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (gotowe)</string>
+    <string name="nm_hands_need_ime_off">Nie włączono (opcjonalnie: wymaga Shizuku i ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Opcjonalne</string>
     <string name="nm_hands_section_model">Model rąk</string>
     <string name="nm_hands_model_footer">Każdy krok wysyła do tego modelu jeden zrzut ekranu; to ustawienie niezależne od modelu czatu. Mniejsze modele wizyjne wystarczą tu w zupełności i kosztują mniej. Model z szerszego katalogu Cloud jest używany tylko wtedy, gdy go wybierzesz.</string>
     <string name="nm_hands_why_chosen">wybrany tutaj</string>

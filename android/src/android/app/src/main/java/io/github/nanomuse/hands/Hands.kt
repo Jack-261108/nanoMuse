@@ -64,6 +64,7 @@ object Hands {
         val serviceOn: Boolean,
         val overlayOk: Boolean,
         val model: ScreenModel?,
+        val keyboardEnhanced: Boolean = false,
     ) {
         val ready: Boolean get() = androidOk && serviceOn && overlayOk && model != null
     }
@@ -73,6 +74,7 @@ object Hands {
         serviceOn = MinisAccessibilityService.getInstance() != null,
         overlayOk = Settings.canDrawOverlays(context),
         model = screenModel(context),
+        keyboardEnhanced = AdbKeyboardHelper.isAvailable(context),
     )
 
     /** Usable right now: switched on and every prerequisite in place. */

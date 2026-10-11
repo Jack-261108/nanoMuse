@@ -503,6 +503,10 @@
     <string name="nm_hands_need_granted">Allowed</string>
     <string name="nm_hands_need_ok">Ready</string>
     <string name="nm_hands_need_set_up">Set up</string>
+    <string name="nm_hands_need_ime">Input enhancement</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (ready)</string>
+    <string name="nm_hands_need_ime_off">Not enabled (optional: requires Shizuku and ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Optional</string>
     <string name="nm_hands_section_model">Hands model</string>
     <string name="nm_hands_model_footer">Every step sends one screenshot to this model; it is a setting apart from the chat model. Smaller vision models are fine here and cost less. A model from the Cloud\'s wider catalog is used only when you pick it.</string>
     <string name="nm_hands_why_chosen">chosen here</string>

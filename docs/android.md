@@ -99,10 +99,7 @@ only), which runs that one turn on the relay's chat model and changes no row.
 otherwise: *Use a different server* under the sign-in form takes the address of a relay
 you run yourself ([cloud.md](cloud.md), `cloud/docker-compose.yml`), *Check* asks its
 `/healthz` and shows the version it answers with, *Use this server* keeps the address
-across launches. `https://` is required for anything outside your own network; plain
-`http://` is accepted for an address on your own network, judged by the same rule as a
-model server's (below: the private ranges as parsed addresses, `localhost`, a name without
-a dot, a `.local`, `.lan`, `.home`, `.internal`, `.home.arpa` or `.ts.net` name). Settings → Account shows *Server: `<host>`* with *Change*, which signs the phone out first: the key it holds belongs to the
+across launches. Plain `http://` is accepted for any relay address (as entered), private or public. Settings → Account shows *Server: `<host>`* with *Change*, which signs the phone out first: the key it holds belongs to the
 server that issued it. Everything the app does with the account (sign-in, the hub, sync,
 usage, the model menu) goes to that address.
 
@@ -237,14 +234,9 @@ holding the phone first: *once* or *always for that device*, revocable under Per
 A path another device or the agent names (hub `files`, `nanomuse-media`, `nanomuse-pc put`)
 is resolved inside the sandbox only (`io.github.nanomuse.sandbox.SandboxPaths`): `..` and a
 symlink out of the rootfs lead nowhere, so the app's own private files stay out of reach.
-The app allows plain `http://` only for addresses on your own network (the private ranges
-`10/8`, `172.16/12`, `192.168/16`, the carrier-grade `100.64/10` Tailscale hands out, link-local,
-IPv6 ULA, `localhost`, a name without a dot, and the suffixes `.local`, `.lan`, `.home`,
-`.internal`, `.home.arpa`, `.localdomain`, `.ts.net`), a model server or a computer of your own,
-and refuses it at the provider URL field for anything else (`io.github.nanomuse.net.LanOnly`).
-The address is parsed before it is judged, so a public name such as `10.foo.example.com` is
-not taken for a private address. The same rule decides whether a relay of your own may be
-`http://`; nanoMuse Cloud and the hub to it are TLS only. The in-app web view is not exported
+The app allows plain `http://` for a relay of your own as entered (public and private addresses alike);
+nanoMuse Cloud and the hub to it are TLS only. Provider URL fields also accept plain `http://` addresses
+as entered. The in-app web view is not exported
 to other apps.
 
 ## Building it yourself

@@ -509,6 +509,10 @@
     <string name="nm_hands_need_granted">Dibenarkan</string>
     <string name="nm_hands_need_ok">Sedia</string>
     <string name="nm_hands_need_set_up">Sediakan</string>
+    <string name="nm_hands_need_ime">Peningkatan input</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (sedia)</string>
+    <string name="nm_hands_need_ime_off">Tidak didayakan (pilihan: memerlukan Shizuku dan ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Pilihan</string>
     <string name="nm_hands_section_model">Model tangan</string>
     <string name="nm_hands_model_footer">Setiap langkah menghantar satu tangkapan skrin ke model ini; ia tetapan yang berasingan daripada model sembang. Model visi yang lebih kecil memadai di sini dan lebih murah. Model daripada katalog Cloud yang lebih luas hanya digunakan apabila anda memilihnya.</string>
     <string name="nm_hands_why_chosen">dipilih di sini</string>

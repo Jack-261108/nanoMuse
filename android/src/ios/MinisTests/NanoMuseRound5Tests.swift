@@ -119,12 +119,12 @@ final class NanoMuseRound5Tests: XCTestCase {
         }
     }
 
-    func testHttpsIsRequiredUnlessPrivate() {
+    func testHttpIsAcceptedForRelay() {
         XCTAssertNil(NanoMuseCloud.relayProblem("https://relay.example.org"))
         XCTAssertNil(NanoMuseCloud.relayProblem("relay.example.org"), "no scheme means https")
         XCTAssertNil(NanoMuseCloud.relayProblem("http://192.168.1.20:8787"))
         XCTAssertNil(NanoMuseCloud.relayProblem("http://mac.local:8787"))
-        XCTAssertNotNil(NanoMuseCloud.relayProblem("http://relay.example.org"), "plain http on the internet")
+        XCTAssertNil(NanoMuseCloud.relayProblem("http://relay.example.org"))
         XCTAssertNotNil(NanoMuseCloud.relayProblem("ftp://relay.example.org"))
         XCTAssertNotNil(NanoMuseCloud.relayProblem(""))
     }

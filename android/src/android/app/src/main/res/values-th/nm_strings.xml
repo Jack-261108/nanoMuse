@@ -509,6 +509,10 @@
     <string name="nm_hands_need_granted">อนุญาตแล้ว</string>
     <string name="nm_hands_need_ok">พร้อม</string>
     <string name="nm_hands_need_set_up">ตั้งค่า</string>
+    <string name="nm_hands_need_ime">การปรับปรุงการป้อนข้อมูล</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (พร้อม)</string>
+    <string name="nm_hands_need_ime_off">ยังไม่เปิดใช้งาน (ทางเลือก: ต้องใช้ Shizuku และ ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">ทางเลือก</string>
     <string name="nm_hands_section_model">โมเดลของมือ</string>
     <string name="nm_hands_model_footer">ทุกขั้นตอนส่งภาพหน้าจอหนึ่งภาพไปยังโมเดลนี้ เป็นการตั้งค่าแยกจากโมเดลแชท โมเดลวิชันขนาดเล็กใช้ได้ดีและราคาถูกกว่า โมเดลจากแคตตาล็อกที่กว้างกว่าของ Cloud จะใช้เฉพาะเมื่อคุณเลือกเท่านั้น</string>
     <string name="nm_hands_why_chosen">เลือกไว้ที่นี่</string>

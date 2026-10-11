@@ -1206,7 +1206,7 @@ def create_app(
             return Response(status_code=204)
 
         console_dir = Path(__file__).parent / "console"
-        if console_dir.is_dir():
+        if settings.console_enabled and console_dir.is_dir():
             app.mount("/app", StaticFiles(directory=str(console_dir), html=True), name="console")
 
     # -- admin ------------------------------------------------------------------------------------

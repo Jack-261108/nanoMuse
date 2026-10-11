@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Accessibility
+import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Visibility
@@ -37,6 +38,7 @@ import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
+import io.github.nanomuse.hands.AdbKeyboardHelper
 import io.github.nanomuse.hands.Hands
 import io.github.nanomuse.ui.home.MuseTones
 
@@ -133,6 +135,16 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                 okText = readiness.model?.let { m -> m.label + " · " + stringResource(whyText(m.why)) } ?: "",
                 fixText = stringResource(R.string.nm_hands_need_model_fix),
                 onFix = onOpenProviders,
+                showDivider = true,
+            )
+            NeedRow(
+                icon = Icons.Outlined.Keyboard,
+                title = stringResource(R.string.nm_hands_need_ime),
+                ok = readiness.keyboardEnhanced,
+                okText = stringResource(R.string.nm_hands_need_ime_ready),
+                fixText = stringResource(R.string.nm_hands_need_ime_off),
+                trailingText = stringResource(if (readiness.keyboardEnhanced) R.string.nm_hands_need_ok else R.string.nm_hands_need_optional),
+                onFix = { AdbKeyboardHelper.guideSetup(context) },
                 showDivider = !readiness.androidOk,
             )
             if (!readiness.androidOk) {
@@ -178,6 +190,7 @@ private fun NeedRow(
     fixText: String,
     onFix: () -> Unit,
     showDivider: Boolean = true,
+    trailingText: String? = null,
 ) {
     SettingsRow(
         title = title,
@@ -190,10 +203,10 @@ private fun NeedRow(
         minHeight = 64.dp,
         trailing = {
             Text(
-                text = stringResource(if (ok) R.string.nm_hands_need_ok else R.string.nm_hands_need_set_up),
+                text = trailingText ?: stringResource(if (ok) R.string.nm_hands_need_ok else R.string.nm_hands_need_set_up),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (ok) MaterialTheme.colorScheme.onSurfaceVariant else MuseTones.action,
+                color = if (ok || trailingText != null) MaterialTheme.colorScheme.onSurfaceVariant else MuseTones.action,
             )
         },
     )

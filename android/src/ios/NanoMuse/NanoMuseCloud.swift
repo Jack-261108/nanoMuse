@@ -177,10 +177,7 @@ enum NanoMuseCloud {
             return AppLocalized("Enter the server's address, for example https://relay.example.org.")
         }
         let scheme = url.scheme?.lowercased() ?? ""
-        if scheme == "https" { return nil }
-        if scheme == "http" {
-            return isPrivateHost(host) ? nil : AppLocalized("Use https unless the server is on your own network.")
-        }
+        if scheme == "https" || scheme == "http" { return nil }
         return AppLocalized("Enter the server's address, for example https://relay.example.org.")
     }
 

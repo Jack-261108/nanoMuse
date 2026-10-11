@@ -165,7 +165,7 @@ fun CloudSignInScreen(
     val canSubmit = when {
         byPassword -> identifier.isNotBlank() && password.isNotEmpty() && !verifying
         codeSent -> code.length >= 4 && !verifying
-        else -> identifier.isNotBlank() && !sending && !phoneAbroad
+        else -> identifier.isNotBlank() && countdown == 0 && !sending && !phoneAbroad
     }
     fun submit() = when {
         byPassword -> login()
@@ -250,7 +250,15 @@ fun CloudSignInScreen(
 
             OutlinedTextField(
                 value = identifier,
-                onValueChange = { identifier = it; if (codeSent) { codeSent = false; code = "" } },
+                onValueChange = {
+                    if (it != identifier) {
+                        identifier = it
+                        if (codeSent) {
+                            codeSent = false
+                            code = ""
+                        }
+                    }
+                },
                 label = { Text(stringResource(R.string.nm_cloud_identifier)) },
                 placeholder = { Text(stringResource(R.string.nm_cloud_identifier_hint)) },
                 singleLine = true,

@@ -512,6 +512,10 @@
     <string name="nm_hands_need_granted">Pinayagan</string>
     <string name="nm_hands_need_ok">Handa na</string>
     <string name="nm_hands_need_set_up">I-set up</string>
+    <string name="nm_hands_need_ime">Pagpapahusay sa pag-input</string>
+    <string name="nm_hands_need_ime_ready">ADB Keyboard (handa na)</string>
+    <string name="nm_hands_need_ime_off">Hindi pinagana (opsyonal: kailangan ng Shizuku at ADB Keyboard)</string>
+    <string name="nm_hands_need_optional">Opsyonal</string>
     <string name="nm_hands_section_model">Modelo ng mga kamay</string>
     <string name="nm_hands_model_footer">Bawat hakbang ay nagpapadala ng isang screenshot sa modelong ito; isa itong setting na hiwalay sa chat model. Sapat na dito ang mas maliliit na vision model at mas mura. Ginagamit lang ang modelo mula sa mas malawak na catalog ng Cloud kapag pinili mo ito.</string>
     <string name="nm_hands_why_chosen">pinili dito</string>

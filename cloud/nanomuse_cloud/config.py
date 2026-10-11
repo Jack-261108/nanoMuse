@@ -457,9 +457,11 @@ class Settings:
 
     # The hub (multi-device): one WebSocket frame may carry a file or a
     # screenshot, base64-encoded; uvicorn's own cap (--ws-max-size) must be at
-    # least this. HUB_ENABLED=0 turns the hub and the console off.
+    # least this. HUB_ENABLED=0 turns the hub off.
     hub_enabled: bool = field(default_factory=lambda: _env("HUB_ENABLED", "1") not in ("0", "false", "no"))
     hub_frame_limit: int = field(default_factory=lambda: _int("HUB_FRAME_LIMIT", 16 * 1024 * 1024))
+    # The web console at /app (user app and /app/admin/): CONSOLE_ENABLED=0 disables it.
+    console_enabled: bool = field(default_factory=lambda: _env("CONSOLE_ENABLED", "1") not in ("0", "false", "no"))
 
     # Money (0.5). Every account has one allowance for its lifetime, not a day:
     # ALLOWANCE_CNY yuan of the operator's provider bill (0 = no limit), counted
