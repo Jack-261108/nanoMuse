@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * A long-running PRoot shell process that persists across commands.
@@ -486,7 +487,7 @@ class PersistentShell(
         val wrappedCommand = "$command\necho \"__MINIS_DONE_${marker}_EXIT_\$?__\"\n"
 
         return withContext(Dispatchers.IO) {
-            val result = withTimeoutOrNull(timeout) {
+            val result = withTimeoutOrNull(timeout.milliseconds) {
                 suspendCancellableCoroutine { cont ->
                     val cb = CommandCallback(
                         marker = marker,
