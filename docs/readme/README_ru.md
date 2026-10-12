@@ -20,7 +20,7 @@
 <p align="center">
   <a href="https://github.com/nano-muse/nanoMuse/stargazers"><img src="https://img.shields.io/github/stars/nano-muse/nanoMuse?style=flat&label=stars" alt="Звёзды GitHub"></a>
   <a href="https://github.com/nano-muse/nanoMuse/releases"><img src="https://img.shields.io/github/downloads/nano-muse/nanoMuse/total?label=downloads" alt="Загрузки"></a>
-  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
+  <img src="https://hits.sh/github.com/nano-muse/nanoMuse.svg?label=visitors&color=0a66e4&extraCount=16719" alt="Visitors">
   <a href="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml"><img src="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml/badge.svg?branch=main" alt="Test Suite"></a>
   <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
   <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="Статья на arXiv"></a>
@@ -177,6 +177,6 @@ nanoMuse — независимый проект сообщества, не св
 [GPL-3.0-or-later](../../LICENSE). Приложение для телефона основано на OpenMinis 1.13 (GPL-3.0) и изменяется с 2026-09-24; см. [NOTICE](../../NOTICE). Более ранние версии линии Python были под MIT (тег `pre-openminis`).
 
 <p align="center">
-  <em>Спасибо, что заглянули ✨ nanoMuse!</em><br><br>
-  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
+  <em>Спасибо, что заглянули ✨ nanoMuse.</em><br><br>
+  <img src="https://hits.sh/github.com/nano-muse/nanoMuse.svg?label=visitors&color=0a66e4&extraCount=16719" alt="Visitors">
 </p>

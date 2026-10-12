@@ -20,7 +20,7 @@
 <p align="center">
   <a href="https://github.com/nano-muse/nanoMuse/stargazers"><img src="https://img.shields.io/github/stars/nano-muse/nanoMuse?style=flat&label=stars" alt="GitHub 스타"></a>
   <a href="https://github.com/nano-muse/nanoMuse/releases"><img src="https://img.shields.io/github/downloads/nano-muse/nanoMuse/total?label=downloads" alt="다운로드"></a>
-  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
+  <img src="https://hits.sh/github.com/nano-muse/nanoMuse.svg?label=visitors&color=0a66e4&extraCount=16719" alt="Visitors">
   <a href="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml"><img src="https://github.com/nano-muse/nanoMuse/actions/workflows/ci.yml/badge.svg?branch=main" alt="Test Suite"></a>
   <a href="https://github.com/nano-muse/nanoMuse/blob/main/LICENSE"><img src="https://img.shields.io/github/license/nano-muse/nanoMuse?label=license" alt="GPL-3.0-or-later"></a>
   <a href="https://arxiv.org/abs/2610.08699"><img src="https://img.shields.io/badge/arXiv-2610.08699-b31b1b" alt="arXiv 논문"></a>
@@ -177,6 +177,6 @@ nanoMuse는 독립적인 커뮤니티 프로젝트로, Meta Platforms, Inc.와 �
 [GPL-3.0-or-later](../../LICENSE). 휴대폰 앱은 OpenMinis 1.13(GPL-3.0)을 바탕으로 2026-09-24부터 수정했습니다. [NOTICE](../../NOTICE) 참고. 그 이전 Python 계열 버전은 MIT였습니다(태그 `pre-openminis`).
 
 <p align="center">
-  <em>방문해 주셔서 감사합니다 ✨ nanoMuse!</em><br><br>
-  <img src="https://komarev.com/ghpvc/?username=nano-muse-nanomuse&label=visitors&color=0a66e4&base=13835" alt="Visitors">
+  <em>방문해 주셔서 감사합니다 ✨ nanoMuse.</em><br><br>
+  <img src="https://hits.sh/github.com/nano-muse/nanoMuse.svg?label=visitors&color=0a66e4&extraCount=16719" alt="Visitors">
 </p>

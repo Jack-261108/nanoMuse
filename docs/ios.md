@@ -8,8 +8,8 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
 0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
 passed Apple's beta review, so the public link
-(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18 and 1.0.2 is build 19, both submitted to the review (2026-10-10 and
-2026-10-11; *Where it stands* below). The testers' reports have driven the fixes in the release
+(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18, 1.0.2 is build 19 and 1.0.3 is build 22, all three submitted to the review (2026-10-10,
+2026-10-11 and 2026-10-12; *Where it stands* below). Builds 20 and 21 (1.0.2) went to the internal testers only. The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -92,7 +92,8 @@ Ours, in `NanoMuse/`:
   then *On it: 〈brief〉*, and the model's name when idle; while a new face is being drawn it
   reads the avatar flow's line. The face (`NanoMuseFaces.swift`, the drawn face from Application
   Support or the dragon from the bundle, five moods with the breath, bob, tilt, pop and shake of
-  the other clients) is tapped into **the agent's page**. A short clip of your own can play as the
+  the other clients; with Reduce Motion on the still keeps still and only the mood's crossfade
+  remains) is tapped into **the agent's page**. A short clip of your own can play as the
   face instead (`NanoMuseOwnClip.swift`: *Your own clip…* under the pen on the agent's page and in
   the avatar studio; MP4 or MOV with H.264 or HEVC video, up to 15 seconds and 30 MB, previewed
   before it is used, kept on that phone only under `Application Support/nanomuse/avatar/own-clip.mp4`,
@@ -536,7 +537,8 @@ Ours, in `NanoMuse/`:
   current one shows the filled symbol in `tabIndicatorGlyph` on a 60 by 46 pt capsule of
   `tabIndicator` (the chat's ink: black with a white symbol in light, white with a black symbol
   in dark, as Android's `MuseBottomBar`) that slides to the tab tapped next with a spring
-  (`matchedGeometryEffect`); the others show the outlined symbol in the secondary colour. The bar
+  (`matchedGeometryEffect`; with Reduce Motion on it moves without the spring); the others show
+  the outlined symbol in the secondary colour. The bar
   still leaves while the keyboard or the chat's voice panel is up. Layout: the pill lies over the
   rooms and the chat in a `ZStack` aligned to the bottom. The chat keeps the 0.1.40 rule above
   (bottom padding of the bar's height, 70 pt: 46 plus 6 above and below plus the 12 pt gap, so the
@@ -665,7 +667,7 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
   delivered before); build 17, 1.0.0 with the fixes merged after the tag, went to the internal
   testers only. **Build 18 (1.0.1)** was added to *nanoMuse Beta* and submitted to the review on
-  2026-10-10, **build 19 (1.0.2)** on 2026-10-11; the link installs build 16 until one passes. The public link delivers a build only
+  2026-10-10, **build 19 (1.0.2)** on 2026-10-11 and **build 22 (1.0.3)** on 2026-10-12; the link installs build 16 until one passes. The public link delivers a build only
   once a review has passed, and each new version repeats the step (the review is per version;
   later builds of an approved version need none).
   Nothing towards the App Store: the app is not going there.

@@ -7,7 +7,7 @@ Mac runner 上构建后交给 TestFlight。这一页说的是：源码树里有�
 **现状。** 源码树、品牌、nanoMuse Cloud 登录、hub 客户端和流水线都是在一台 Linux 机器上
 写的。这个 App **能构建、能签名、已经上了 TestFlight**：第一个构建 0.1.31 (2) 于 2026-10-03 走完
 *iOS · TestFlight* 工作流；1.0.0 是构建 16，已通过 Apple 的 beta 审核，公开链接
-（`https://testflight.apple.com/join/ZHexbDqc`）装的就是它；1.0.1 是构建 18，1.0.2 是构建 19，分别于 2026-10-10 和 2026-10-11 提交了审核（见下文*现状*）。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
+（`https://testflight.apple.com/join/ZHexbDqc`）装的就是它；1.0.1 是构建 18，1.0.2 是构建 19，1.0.3 是构建 22，分别于 2026-10-10、2026-10-11 和 2026-10-12 提交了审核（见下文*现状*）；构建 20 和 21（1.0.2）只到了内部测试员手里。测试员的反馈推动了发布说明里的那些修复（输入框、引导、退出登录）；「设备」区
 和来自其他设备的通知仍是真机上跑得最少的部分。第一次归档教会了流水线一件事：
 自动签名需要一台已注册的设备，这就是它现在改为手动签名的原因。
 
@@ -83,7 +83,8 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   `tool_title`（模型自己对这一步的描述，比如 *打开携程网站*），然后是 *正在写回复*，然后是
   *正在处理：〈简述〉*，空闲时是模型的名字；正在画新形象时，显示的是形象流程那边的那行字。
   形象（`NanoMuseFaces.swift`：Application Support 里画出来的脸，或者 bundle 里的小龙，五种
-  状态，带着其他客户端那样的呼吸、浮动、歪头、弹出和抖动）点一下进入**智能体的页面**。
+  状态，带着其他客户端那样的呼吸、浮动、歪头、弹出和抖动；开了「减弱动态效果」静态图就不动了，
+  只剩状态切换时的淡入淡出）点一下进入**智能体的页面**。
   也可以换成一段你自己的短视频来当形象（`NanoMuseOwnClip.swift`：智能体页面钢笔菜单和形象
   工作室里的 *你自己的视频…*；MP4 或 MOV，H.264 或 HEVC 视频，最长 15 秒、最大 30 MB，用之前
   先预览，只保存在这台手机的 `Application Support/nanomuse/avatar/own-clip.mp4`，*默认形象*
@@ -366,7 +367,7 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   等级；文件在但读不出来时（手机锁着、App 在后台被唤醒），存储等下一次调用再读，而不是从
   空表开始并把空表写回去覆盖每个账号的记录。图片和视频生成和同一服务商的聊天一样走
   「网络」里的代理（`NanoMuseProxy.SessionSlot`），失败时是每种语言都有的整句，*服务商拒绝了
-  这把密钥（HTTP 401）*、*视频超过 12 分钟仍未完成*，服务商自己的话跟在*服务商说：*后面。
+  这把密钥（HTTP 401）*、*视频超过 12 分钟仍未完成*，服务商自己的话跟在「服务商说：」后面。
 - **审计第三遍（第 11 轮）**（`NanoMuseHubTasks.swift`、`NanoMuseHub.swift`）：其他设备发来的
   `stop` 既能按任务帧的 id 找到这次运行（`stop {call}`，桌面端发的就是这个），也能按会话找；
   只有发起任务的设备能停它；停下之后任务按 [hub.md](hub.md) 的约定答 `cancelled`。socket
@@ -397,7 +398,7 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   源码，我们的 key 里出现破折号、感叹号或翻译过的中继名就失败。服务商表单在保存 key 之前先拿它
   去取服务商的模型列表：401 或 403 时手机保持原样，并在输入框下面说明原因；之前上游的回退会
   填入一份目录里的模型列表，表单像 key 正确一样关闭。订阅的 429 带的 `Retry-After` 现在会传到
-  可达性卡片，ChatGPT 或 Claude 订阅也能看到*……后重置*。动态详情的几行是一个 `Grid`，标签列
+  可达性卡片，ChatGPT 或 Claude 订阅也能看到「……后重置」。动态详情的几行是一个 `Grid`，标签列
   按最长的标签取宽；形象大小改成菜单，不再是五段分段控件。
 - **第三轮审计：版本行（1.0.x）**（`NanoMuseUpdateCheck.swift`、
   `MinisTests/NanoMuseLogicTests.swift`）：`nanomuse.cn/dl/index.json` 的形状是
@@ -445,7 +446,7 @@ scripts/gen-ios-icons.py         the app icon and the four alternates, from asse
   五个标签平分胶囊的宽度，每一格整格可点；当前这个用 `tabIndicatorGlyph` 色显示实心符号，底下一个
   60 × 46 pt 的 `tabIndicator` 色胶囊（聊天的墨色：浅色黑底白符号，深色白底黑符号，和 Android 的
   `MuseBottomBar` 一样），点下一个标签时它带着弹簧滑过去
-  （`matchedGeometryEffect`）；其他标签用次要颜色显示线框符号。键盘弹起或聊天的语音面板打开时，
+  （`matchedGeometryEffect`；开了「减弱动态效果」就不带弹簧，直接过去）；其他标签用次要颜色显示线框符号。键盘弹起或聊天的语音面板打开时，
   底栏仍然离开。布局：胶囊在一个贴底对齐的 `ZStack` 里盖在房间和聊天上面。聊天沿用上面
   0.1.40 的规矩（聊天层加一段底栏高度、70 pt 的底部 padding：46 加上下各 6，再加 12 pt 的间隙，所以输入区在胶囊上面，
   `NavigationStack` 的祖先上没有任何 inset）；房间是普通的 SwiftUI 滚动视图，同样的高度用
@@ -549,7 +550,7 @@ open src/ios/Minis.xcodeproj
   审核联系人和中继上的一个审核账号；
 - **构建 16（1.0.0）** 于 2026-10-09 加进 *nanoMuse Beta* 并提交 Apple 的 beta 审核，已经通过，公开链接装的就是它
   （在那之前链接给的是构建 14，0.1.41）；构建 17 是打标签之后合并的修复加上 1.0.0，只到了内部测试员手里。
-  **构建 18（1.0.1）** 于 2026-10-10、**构建 19（1.0.2）** 于 2026-10-11 加进 *nanoMuse Beta* 并提交审核，有一个通过之前链接装的仍是构建 16。公开链接只在审核
+  **构建 18（1.0.1）** 于 2026-10-10、**构建 19（1.0.2）** 于 2026-10-11、**构建 22（1.0.3）** 于 2026-10-12 加进 *nanoMuse Beta* 并提交审核，有一个通过之前链接装的仍是构建 16。公开链接只在审核
   通过后才会给出构建，以后每个新版本都要重复这一步（审核按版本进行；已通过版本的后续构建不用再审）。任何通往 App Store 的事
   都没有：这个 App 不上架。
 
