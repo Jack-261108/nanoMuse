@@ -653,6 +653,8 @@ fun ChatScreen(
     val selectedGroupName by viewModel.selectedGroupName.collectAsState()
     val providerName by viewModel.providerName.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    // nanoMuse: the floating bottom pill height, so the snackbar sits above it
+    var nmSnackbarBottomPad by remember { mutableStateOf(0.dp) }
 
     // [T-android-voice-panel] Shared 3-stage RECORD_AUDIO permission flow
     // (system dialog → post-DENY poll → in-app settings gate). Extracted from
@@ -3388,7 +3390,8 @@ fun ChatScreen(
             )
             } // nanoMuse: close the header-fade wrapper
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        // nanoMuse: raise the snackbar above the floating bottom pill
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.padding(bottom = nmSnackbarBottomPad)) },
     ) { padding ->
         // [T-android-scroll-fab-content-inset] The chat pane's own width, used
         // below to inset the scroll buttons to the capped content column.
@@ -3429,6 +3432,8 @@ fun ChatScreen(
             modifier = Modifier.fillMaxSize(),
             bottomInset = nmBottomOverlay,
             content = { bottomChromeHeight ->
+            // nanoMuse: feed the pill height back so the Scaffold's snackbar clears it
+            SideEffect { nmSnackbarBottomPad = bottomChromeHeight }
             // Dismiss keyboard when the USER scrolls the messages. Gated on
             // `isUserDragging` (a real finger drag) rather than
             // `listState.isScrollInProgress` — the latter is also true during
