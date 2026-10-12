@@ -108,13 +108,13 @@ jobs:
 
             # 合并成功：发送 Telegram 简报通知（若已配置）
             if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-              python3 -c "
+              NM_TAG="$UPSTREAM_TAG" NM_COMMITS="$NEW_COMMITS" python3 -c "
               import os, urllib.request, json
-              token = os.environ.get('TELEGRAM_BOT_TOKEN')
-              chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-              tag = '''${UPSTREAM_TAG}'''.strip()
-              commits = '''${NEW_COMMITS}'''.strip()
-              text = f'🎉 *nanoMuse 官方更新已自动合并*\n\n📌 *上游最新标签*: `{tag}`\n📝 *新提交概览*:\n```\n{commits}\n```\n已成功无损合并至主分支 `main`。'
+              token = os.environ['TELEGRAM_BOT_TOKEN']
+              chat_id = os.environ['TELEGRAM_CHAT_ID']
+              tag = os.environ['NM_TAG']
+              commits = os.environ['NM_COMMITS']
+              text = f'🎉 *nanoMuse 官方更新已自动合并*\n\n📌 *上游最新标签*: \`{tag}\`\n📝 *新提交概览*:\n\`\`\`\n{commits}\n\`\`\`\n已成功无损合并至主分支 \`main\`。'
               data = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
               req = urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data, headers={'Content-Type': 'application/json'})
               try:
@@ -181,14 +181,14 @@ jobs:
 
           # 4. 发送 Telegram 冲突告警
           if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
-            python3 -c "
+            NM_TAG="$UPSTREAM_TAG" NM_COMMITS="$NEW_COMMITS" NM_PR_URL="$PR_URL" python3 -c "
             import os, urllib.request, json
-            token = os.environ.get('TELEGRAM_BOT_TOKEN')
-            chat_id = os.environ.get('TELEGRAM_CHAT_ID')
-            tag = '''${UPSTREAM_TAG}'''.strip()
-            commits = '''${NEW_COMMITS}'''.strip()
-            pr = '''${PR_URL}'''.strip()
-            text = f'⚠️ *nanoMuse 官方同步冲突提醒*\n\n官方发布了新版本（`{tag}`），自动合并到 `main` 时发生冲突！\n\n🔗 [点击查看并裁决 PR]({pr})\n\n📝 *上游提交简报*:\n```\n{commits}\n```\n请点击上方链接进行裁决。'
+            token = os.environ['TELEGRAM_BOT_TOKEN']
+            chat_id = os.environ['TELEGRAM_CHAT_ID']
+            tag = os.environ['NM_TAG']
+            commits = os.environ['NM_COMMITS']
+            pr = os.environ['NM_PR_URL']
+            text = f'⚠️ *nanoMuse 官方同步冲突提醒*\n\n官方发布了新版本（\`{tag}\`），自动合并到 \`main\` 时发生冲突！\n\n🔗 [点击查看并裁决 PR]({pr})\n\n📝 *上游提交简报*:\n\`\`\`\n{commits}\n\`\`\`\n请点击上方链接进行裁决。'
             data = json.dumps({'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}).encode('utf-8')
             req = urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data, headers={'Content-Type': 'application/json'})
             try:
