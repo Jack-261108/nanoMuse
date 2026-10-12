@@ -312,7 +312,11 @@ def test_deferred_notices_are_queued_then_flushed_in_order():
     assert len(ctl.evaluate(3, defer_mail=True)) == 2 and sent == []
     assert ctl.flush_notices_later() is True
     for _ in range(100):
-        if len(sent) == 2 and len(db.audit_recent(10)) >= 2 and not any(t.name == "nm-notices" and t.is_alive() for t in threading.enumerate()):
+        if (
+            len(sent) == 2
+            and len(db.audit_recent(10)) >= 2
+            and not any(t.name == "nm-notices" and t.is_alive() for t in threading.enumerate())
+        ):
             break
         time.sleep(0.02)
     assert [m["Subject"].endswith(f"3 accounts: rule #{i} fired") for i, m in enumerate(sent, 1)] == [True, True]
