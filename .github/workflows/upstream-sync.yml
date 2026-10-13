@@ -44,6 +44,9 @@ jobs:
             export GH_TOKEN="$GITHUB_TOKEN"
           fi
 
+          # 显式将当前仓库设为 gh 默认仓库，防止 fork 仓库自动关联上游导致 gh pr 默认指向官方仓库
+          gh repo set-default "$GITHUB_REPOSITORY" 2>/dev/null || true
+
           # 1. 确保并拉取官方上游
           git remote add upstream https://github.com/nano-muse/nanoMuse.git || git remote set-url upstream https://github.com/nano-muse/nanoMuse.git
           git fetch upstream main --tags
@@ -64,10 +67,10 @@ jobs:
           # 清理函数：当 main 已包含最新上游提交时，自动关闭遗留的冲突 PR 并清理分支
           cleanup_sync_prs() {
             echo "检查是否存在待清理的历史冲突同步 PR 与临时分支..."
-            OPEN_SYNC_PRS=$(gh pr list --state open --json number,headRefName --jq '.[] | select(.headRefName | startswith("sync/upstream")) | .number' 2>/dev/null || true)
+            OPEN_SYNC_PRS=$(gh pr list -R "$GITHUB_REPOSITORY" --state open --json number,headRefName --jq '.[] | select(.headRefName | startswith("sync/upstream")) | .number' 2>/dev/null || true)
             for PR_NO in $OPEN_SYNC_PRS; do
               echo "自动关闭已解决的冲突 PR #$PR_NO..."
-              gh pr close "$PR_NO" --comment "✅ 上游更新已合入主分支 \`main\`，自动关闭此同步 PR 并清理临时分支。" --delete-branch || true
+              gh pr close -R "$GITHUB_REPOSITORY" "$PR_NO" --comment "✅ 上游更新已合入主分支 \`main\`，自动关闭此同步 PR 并清理临时分支。" --delete-branch || true
             done
 
             # 清理远端残余的 sync/upstream 同步分支
@@ -133,7 +136,7 @@ jobs:
           BRANCH_NAME="sync/upstream"
 
           # 检查是否已有针对该分支打开的冲突 PR
-          EXISTING_PR_JSON=$(gh pr list --head "$BRANCH_NAME" --state open --json number,url --jq '.[0]' 2>/dev/null || true)
+          EXISTING_PR_JSON=$(gh pr list -R "$GITHUB_REPOSITORY" --head "$BRANCH_NAME" --state open --json number,url --jq '.[0]' 2>/dev/null || true)
           EXISTING_PR_NUM=$(echo "$EXISTING_PR_JSON" | jq -r '.number // empty' 2>/dev/null || true)
           EXISTING_PR_URL=$(echo "$EXISTING_PR_JSON" | jq -r '.url // empty' 2>/dev/null || true)
 
@@ -154,7 +157,7 @@ jobs:
           if [ -n "$EXISTING_PR_NUM" ]; then
             echo "更新现有冲突 PR #${EXISTING_PR_NUM}..."
             PR_URL="$EXISTING_PR_URL"
-            gh pr comment "$EXISTING_PR_NUM" --body "🔄 检测到官方上游有新提交，分支 \`$BRANCH_NAME\` 已强制同步更新（最新标签：\`${UPSTREAM_TAG}\`）。请及时合并裁决。" || true
+            gh pr comment -R "$GITHUB_REPOSITORY" "$EXISTING_PR_NUM" --body "🔄 检测到官方上游有新提交，分支 \`$BRANCH_NAME\` 已强制同步更新（最新标签：\`${UPSTREAM_TAG}\`）。请及时合并裁决。" || true
           else
             # 构造 PR Body
             {
@@ -175,7 +178,7 @@ jobs:
               echo "2. 或直接在下方 GitHub 网页点击 **Resolve conflicts** 在线裁决。"
             } > /tmp/pr_body.md
 
-            PR_URL=$(gh pr create --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body-file /tmp/pr_body.md)
+            PR_URL=$(gh pr create -R "$GITHUB_REPOSITORY" --base main --head "$BRANCH_NAME" --title "$PR_TITLE" --body-file /tmp/pr_body.md)
             echo "Pull Request 已创建: $PR_URL"
           fi
 
