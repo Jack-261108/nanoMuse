@@ -49,7 +49,7 @@ jobs:
 
           # 1. 确保并拉取官方上游
           git remote add upstream https://github.com/nano-muse/nanoMuse.git || git remote set-url upstream https://github.com/nano-muse/nanoMuse.git
-          git fetch upstream main --tags
+          git fetch upstream main --tags --force
 
           LOCAL_HASH=$(git rev-parse HEAD)
           UPSTREAM_HASH=$(git rev-parse upstream/main)
@@ -102,7 +102,7 @@ jobs:
           # 2. 尝试自动合并
           if git merge --no-edit upstream/main; then
             echo "自动合并成功，推送到 origin/main..."
-            if ! git push origin main --tags; then
+            if ! git push origin main; then
               echo "::error::推送失败。若上游更新包含工作流文件（.github/workflows/），默认 GITHUB_TOKEN 无权修改 workflow 文件。请在仓库配置拥有 workflow 权限的 Personal Access Token (Secret: SYNC_PAT)，或在本地执行 git merge upstream/main && git push 推送。"
               exit 1
             fi
