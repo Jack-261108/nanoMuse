@@ -874,10 +874,11 @@ export function ModelCard({
         )}
       >
         <div className="flex gap-1.5">
-          {["auto", "native", "prompt"].map((m) => (
+          {TOOL_MODES.map(([m, label]) => (
             <button
               key={m}
               type="button"
+              aria-pressed={toolMode === m}
               onClick={() => setToolMode(m)}
               className={cx(
                 "rounded-full px-3 py-1.5 text-[13px] border",
@@ -886,7 +887,7 @@ export function ModelCard({
                   : "border-border text-muted",
               )}
             >
-              {m}
+              {t(label)}
             </button>
           ))}
         </div>
@@ -955,6 +956,13 @@ export function ModelCard({
     </Card>
   );
 }
+
+/** the `tool_mode` values the runtime accepts, with the word each chip shows (translated) */
+const TOOL_MODES: Array<[string, string]> = [
+  ["auto", "Auto"],
+  ["native", "Native"],
+  ["prompt", "Prompt"],
+];
 
 // ------------------------------------------------------------------ endpoints of one's own (#294)
 /** what a slot is called in an endpoint's "used by" line */
@@ -1794,6 +1802,8 @@ export function SearchCard({
   const info = s.providers.find((p) => p.id === s.provider);
   const chosen = s.providers.find((p) => p.id === provider);
   const needsKey = !!chosen?.needs_key;
+  // You.com: works without a key, a key raises the daily limit; the field shows, as optional
+  const takesKey = needsKey || !!chosen?.optional_key;
   const status = s.configured
     ? { text: t("On"), tone: "ok" }
     : { text: t("Not set up"), tone: "warn" };
@@ -1816,7 +1826,7 @@ export function SearchCard({
       await api.setSearch({
         provider,
         base_url: provider === "searxng" ? baseUrl.trim() : "",
-        api_key: needsKey ? (key ? key : undefined) : "",
+        api_key: takesKey ? (key ? key : undefined) : "",
       });
       setKey("");
       toast(t("Saved"));
@@ -1857,7 +1867,7 @@ export function SearchCard({
     >
       <p className="text-[12.5px] text-muted leading-snug">
         {t(
-          "DuckDuckGo needs nothing, but it is scraped and rate-limits now and then. For searches that always work, use a provider with an API. Whichever you pick, a failed search falls back to DuckDuckGo with a note.",
+          "DuckDuckGo needs nothing, but it is scraped and rate-limits now and then. For searches that always work, use a provider with an API; You.com answers 100 a day without a key. Whichever you pick, a failed search falls back to DuckDuckGo with a note.",
         )}
       </p>
       <Field label={t("Provider")}>
@@ -1874,13 +1884,17 @@ export function SearchCard({
           ))}
         </div>
       </Field>
-      {needsKey && (
+      {takesKey && (
         <Field
-          label={t("API key")}
+          label={needsKey ? t("API key") : t("API key (optional)")}
           hint={
             s.key_source === "vault" && s.provider === provider
               ? t("A key is in the vault. Leave blank to keep it.")
-              : t("Stored encrypted in the vault as SEARCH_API_KEY.")
+              : needsKey
+                ? t("Stored encrypted in the vault as SEARCH_API_KEY.")
+                : t(
+                    "Without a key, 100 searches a day. A key raises the limit; stored encrypted in the vault as SEARCH_API_KEY.",
+                  )
           }
         >
           <input
@@ -3317,6 +3331,24 @@ function PhoneCard({
 }
 
 // ------------------------------------------------------------------ mcp
+/**
+ * `KEY=value` lines typed in the MCP form, as the runtime's `env` block. A line without
+ * `=` or with an empty name is skipped; the value keeps everything after the first `=`.
+ * The runtime moves each value into the vault and keeps a `{{vault:MCP_<SERVER>_<KEY>}}`
+ * reference in app-settings.json; a value typed as a reference already is kept as typed.
+ */
+export function parseEnvLines(text: string): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    if (key) env[key] = line.slice(eq + 1).trim();
+  }
+  return env;
+}
+
 function MCPCard({
   data,
   onChange,
@@ -3331,6 +3363,7 @@ function MCPCard({
   const [name, setName] = useState("");
   const [command, setCommand] = useState("");
   const [url, setUrl] = useState("");
+  const [envText, setEnvText] = useState("");
   const [risk, setRisk] = useState("moderate");
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -3342,12 +3375,14 @@ function MCPCard({
         name: name.trim(),
         command: parts[0] ?? null,
         args: parts.slice(1),
+        env: parseEnvLines(envText),
         url: url.trim() || null,
         risk,
       });
       setName("");
       setCommand("");
       setUrl("");
+      setEnvText("");
       setAdding(false);
       toast(t("Server connected"));
       onChange();
@@ -3427,6 +3462,18 @@ function MCPCard({
                   {t("{n} tools", { n: m.tools })} · {t(m.risk)}
                   {!m.from_app && !m.builtin && ` · ${t("from config.toml")}`}
                 </div>
+                {(m.env?.length ?? 0) > 0 && (
+                  <div className="text-[11.5px] text-muted truncate">
+                    {t("Environment: {names}", { names: (m.env ?? []).map((e) => e.name).join(", ") })}
+                  </div>
+                )}
+                {(m.env ?? []).some((e) => !e.vault) && (
+                  <div className="text-[11.5px] text-amber-700 dark:text-amber-300">
+                    {t("{names} is written as plain text in config.toml; keep it in the vault and write {{vault:NAME}} instead", {
+                      names: (m.env ?? []).filter((e) => !e.vault).map((e) => e.name).join(", "),
+                    })}
+                  </div>
+                )}
               </div>
               {m.from_app && (
                 <button
@@ -3492,6 +3539,21 @@ function MCPCard({
               onChange={(e) => setCommand(e.target.value)}
               className={inputCls}
               placeholder="npx -y @modelcontextprotocol/server-…"
+            />
+          </Field>
+          <Field
+            label={t("Environment")}
+            hint={t(
+              "One KEY=value per line for the command. Each value goes into the vault; the settings file keeps a reference, not the value.",
+            )}
+          >
+            <textarea
+              value={envText}
+              onChange={(e) => setEnvText(e.target.value)}
+              rows={2}
+              className={cx(inputCls, "resize-none font-mono text-[12.5px]")}
+              placeholder={"AMAP_MAPS_API_KEY=…"}
+              spellCheck={false}
             />
           </Field>
           <Field

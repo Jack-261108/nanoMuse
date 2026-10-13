@@ -37,6 +37,7 @@ const zhCN: Record<string, string> = {
   "{name} is working; anything you send now is picked up right away.": "{name} 正在工作，你现在发的消息会马上接着处理。",
   "Working…": "处理中…",
   "On it": "正在处理",
+  "{name} is writing a reply": "{name} 正在写回复",
   "Show the agent's steps": "显示执行步骤",
   "Every tool it uses becomes a chip in the chat. Off, the chat keeps to the conversation and the line under the name says what it is on. This device only.":
     "每用一个工具就在对话里多一个小标签。关闭时对话只保留对话本身，名字下方的一行字说明它正在做什么。仅本设备。",
@@ -157,7 +158,8 @@ const zhCN: Record<string, string> = {
   "Press Enter": "按回车",
   "Open a URL…": "打开一个网址…",
   Go: "前往",
-  "Tap the page to click. If the browser was closed, open a URL first.": "点击画面即可点击网页。如果浏览器已关闭，请先打开一个网址。",
+  "Tap the page to click; with the frame focused, arrow keys scroll it and Enter presses Enter. If the browser was closed, open a URL first.":
+    "点击画面即可点击网页；画面获得焦点后，方向键滚动页面，Enter 键在网页上按下回车。如果浏览器已关闭，请先打开一个网址。",
   Refresh: "刷新",
   "Take over": "接管",
   "This frame is no longer available.": "这一帧画面已不可用。",
@@ -427,6 +429,8 @@ const zhCN: Record<string, string> = {
   "drawn from the picture you attached": "按你附的图片来画",
   "Share my avatar": "分享我的虚拟形象",
   "Pick a card. It goes out through the system share sheet, or saves as a picture where there is none.": "选一张卡片，用系统分享发出去；没有系统分享的浏览器会保存为图片。",
+  "Card {n}": "卡片 {n}",
+  "{name}'s avatar": "{name} 的形象",
   "Hi, I'm {name}, a personal AI agent. Meet nanoMuse: open source, runs on your phone.": "你好，我是你的个人 AI 智能体 {name}。认识一下 nanoMuse：开源，在手机上本地运行。",
   "Your personal AI agent, open source · {repo}": "你的个人 AI 智能体，开源 · {repo}",
   "Later": "以后再说",
@@ -517,7 +521,8 @@ const zhCN: Record<string, string> = {
   at: "于",
   "1 approval waiting for you": "需要你批准",
   "{n} approvals waiting for you": "{n} 项需要你批准",
-  "{n} approval": "{n} 项审批",
+  "1 approval": "1 项审批",
+  "{n} approvals": "{n} 项审批",
 
   // ── Settings ──────────────────────────────────────────────────────────────────────
   You: "你",
@@ -583,6 +588,9 @@ const zhCN: Record<string, string> = {
   "Reply language": "回复语言",
   "What {name} writes in": "{name} 用什么语言回复",
   Auto: "自动",
+  Native: "原生",
+  Prompt: "提示词",
+  Desktop: "桌面",
   "Match mine": "跟随我的语言",
   "App language": "应用语言",
   "Appearance": "外观",
@@ -732,6 +740,12 @@ const zhCN: Record<string, string> = {
   Command: "命令",
   "Run locally over stdio, for example: npx -y @modelcontextprotocol/server-filesystem ./workspace":
     "通过 stdio 在本地运行，例如：npx -y @modelcontextprotocol/server-filesystem ./workspace",
+  Environment: "环境变量",
+  "One KEY=value per line for the command. Each value goes into the vault; the settings file keeps a reference, not the value.":
+    "供命令使用，每行一个 KEY=value。每个值都存入保险库，设置文件里只保留引用，不保留值。",
+  "Environment: {names}": "环境变量：{names}",
+  "{names} is written as plain text in config.toml; keep it in the vault and write {{vault:NAME}} instead":
+    "{names} 在 config.toml 中以明文写入；请存入保险库并改写为 {{vault:NAME}}",
   "or URL": "或 URL",
   "A remote server over Streamable HTTP.": "通过 Streamable HTTP 连接的远程服务器。",
   "Risk of its tools": "其工具的风险级别",
@@ -815,9 +829,12 @@ const zhCN: Record<string, string> = {
   "{provider} needs {what}; searches use DuckDuckGo until then": "{provider}还需要{what}，在此之前搜索走 DuckDuckGo",
   "a key": "一个密钥",
   "an instance URL": "实例地址",
-  "DuckDuckGo needs nothing, but it is scraped and rate-limits now and then. For searches that always work, use a provider with an API. Whichever you pick, a failed search falls back to DuckDuckGo with a note.":
-    "DuckDuckGo 无需任何配置，但它是抓取来的结果，偶尔会被限流。想让搜索始终可用，选一个带 API 的服务。无论选哪个，搜索失败时都会退回 DuckDuckGo 并附上说明。",
+  "DuckDuckGo needs nothing, but it is scraped and rate-limits now and then. For searches that always work, use a provider with an API; You.com answers 100 a day without a key. Whichever you pick, a failed search falls back to DuckDuckGo with a note.":
+    "DuckDuckGo 无需任何配置，但它是抓取来的结果，偶尔会被限流。想让搜索始终可用，选一个带 API 的服务；You.com 不用密钥每天也能答 100 次。无论选哪个，搜索失败时都会退回 DuckDuckGo 并附上说明。",
   "Stored encrypted in the vault as SEARCH_API_KEY.": "加密存入保险库，名为 SEARCH_API_KEY。",
+  "API key (optional)": "API 密钥（可选）",
+  "Without a key, 100 searches a day. A key raises the limit; stored encrypted in the vault as SEARCH_API_KEY.":
+    "不填密钥每天可搜 100 次。填了密钥上限更高；加密存入保险库，名为 SEARCH_API_KEY。",
   "Get a key from {label}": "到 {label} 获取密钥",
   "Instance URL": "实例地址",
   "A SearXNG you run, with the JSON format enabled in its settings.": "你自己运行的 SearXNG，需在其设置中启用 JSON 格式。",
@@ -1080,15 +1097,15 @@ const zhCN: Record<string, string> = {
   "E-mail (or a mainland China phone number)": "邮箱（或中国大陆手机号）",
   "Text-message codes reach mainland-China numbers only. Use an e-mail address instead.": "短信验证码只能发到中国大陆手机号。其他地区请用邮箱登录。",
   "Step-by-step guide": "图文教程",
-  "Invite a friend: +¥{bonus} for you and +¥{bonus} for them, for each new person who signs up with your link.": "邀请朋友：每有一位新用户通过你的链接注册，你 +¥{bonus}，对方也 +¥{bonus}。",
+  "Invite a friend: +¥{bonus} for you and +¥{bonus} for them, once a new person who signed up with your link makes their first request.": "邀请朋友：每有一位新用户通过你的链接注册并发出第一次请求，你 +¥{bonus}，对方也 +¥{bonus}。",
   "Your invite link is under Account": "邀请链接在「账号」页",
   "Try nanoMuse with me, a fully open-source personal agent, free to use. Sign up with my link: {link}": "来和我一起用 nanoMuse，完全开源的个人智能体，免费使用。用我的链接注册：{link}",
   // -- invitations (relay 0.4/0.5) --
   "Invite code (optional)": "邀请码（选填）",
-  "A friend's code counts for a new account: you both get ¥{invite} more allowance.": "朋友的邀请码只对新账号有效：你和对方的额度各 +¥{invite}。",
+  "A friend's code counts for a new account: you both get ¥{invite} after your first request.": "朋友的邀请码只对新账号有效：你发出第一次请求后，你和对方的额度各 +¥{invite}。",
   "Have an invite code?": "有邀请码？",
   "Invite a friend": "邀请朋友",
-  "Each new person who signs up with your code adds ¥{bonus} to your allowance, and ¥{bonus} to theirs. It never expires.": "每有一位新用户用你的邀请码注册，你的额度 +¥{bonus}，对方也 +¥{bonus}，不过期。",
+  "When a friend signs up with your code and makes their first request, you both get ¥{bonus}. It never expires.": "朋友用你的邀请码注册并发出第一次请求后，你们各得 ¥{bonus}，不过期。",
   "Your code": "邀请码",
   "Copied": "已复制",
   "Share the link": "分享链接",
@@ -1587,6 +1604,7 @@ const zhCN: Record<string, string> = {
   "Feed settings": "动态设置",
   "About the feed": "动态版块说明",
   "Your feed is driven by the instruction below. Any edit you make here applies to every post from now on.": "动态由下面这句话来定。在这里改动它，今后的每一条帖子都会照着来。",
+  "Feed instructions": "动态指令",
   "Build me a feed about what I care about. Keep it short and direct, easy to skim, no clickbait.": "给我做一个关于我关心的事的动态。短一点、直接一点，扫一眼就能看完，别搞标题党。",
   "Got it": "知道了",
   "Write it now": "现在写一版",

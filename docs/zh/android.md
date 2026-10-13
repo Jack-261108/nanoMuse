@@ -31,7 +31,7 @@ Play 商店：「设置 → 版本」把已安装的构建和最新版本并排�
 2. 打开它。Android 会问一次，是否允许从你的浏览器或文件管理器安装。
 3. **登录。** 第一屏就是账号：手机号或邮箱，一个验证码，设过密码之后也可以用密码。账号让
    你的设备能连成一体（[hub.md](hub.md)），也带来一个起步用的模型（[cloud.md](cloud.md)：每个
-   账号一份免费额度（写这页时是 ¥10），每邀请一位朋友，你和对方都再得一些；App 会显示中继
+   账号一份免费额度（写这页时是 ¥10），每邀请一位朋友，等对方发出第一次请求后，你和对方都再得一些；App 会显示中继
    当前的数字；之后可以[换自己的 key](own-key.md)）。然后选哪个模型来回答：账号自带的，或者
    你自己的 key（任何 OpenAI 兼容端点，或 App 内置的那几种 OAuth 登录）。设的是四个模型，
    不是一个，都在同一页「**设置 → 模型**」里（设置顶部那张卡片打开它）：**对话**，和你说话
@@ -104,8 +104,11 @@ Play 商店：「设置 → 版本」把已安装的构建和最新版本并排�
 消息输入框始终位于浮动导航胶囊上方，胶囊栏和输入框一样宽（同样的 16 dp 边距；最宽 420 dp，更宽的屏幕上居中），两枚胶囊的边缘对齐。智能体使用工具时，步骤条在输入框上方；
 最新消息和工具小标签都可以完整滚动到它们上方。对话仍会滚过导航胶囊背后，
 保留磨砂模糊效果。输入框展开、工具预览或审批卡片出现时，间距跟着底部区域的实际高度调整。
-查看较早的消息时，输入框上方的渐隐效果一直延伸到它的内边距和圆角背后，不留缝隙。
-工具步骤条、浏览器面板或「轮到你了」操作卡片显示时，这层渐隐会隐藏。键盘弹出时，输入框贴在键盘上，胶囊栏在键盘后面。
+查看较早的消息时，稍淡的渐隐效果沿着输入框的圆角轮廓展开。
+只有当前浏览器操作的步骤条、浏览器面板或「轮到你了」操作卡片显示时，这层渐隐才会隐藏；历史工具小标签和其他工具不会关闭它。
+深色模式下，主要聊天和旁聊的导航胶囊周围为纯黑色，输入框下方的间隙也会被盖住。
+胶囊的玻璃区域仍透出滚动内容，保留实时磨砂模糊效果。其他页面的导航外观保持原样。
+键盘弹出时，输入框贴在键盘上，胶囊栏在键盘后面。
 动态、点子、目标和资源库四个页面的列表也在胶囊栏上方结束，最后一行不会被它挡住。
 
 同一个账号的网页控制台在中继上（`/app`），桌面版见 [desktop.md](desktop.md)；手机、桌面和网页共用
@@ -130,7 +133,11 @@ Claude、Kimi（设备码）和 OpenRouter；「登录」打开同一个表单�
 `OpenRouterOAuthManager`。ChatGPT 那一行附一句话：OpenAI 的条款只允许 ChatGPT 套餐在 OpenAI
 自己的 Codex 里使用，别的 App 曾被切断过这种访问（OpenCode，2026 年 1 月），如果停了，API key
 照样能用。Anthropic 和 Gemini 打开的是 OpenMinis 为它们准备的服务商类型；其他都走 OpenAI
-兼容表单。
+兼容表单。Claude 登录需要 Anthropic 要求放在每个请求开头的一段标识；它在构建时从
+`app/provider-customization.properties` 读入，这个文件不在仓库里，所以发布的 APK 没有它。没有这段
+标识的构建不会列出 Claude 登录（这张卡片上没有，「添加服务商」里没有，`?preset=anthropic:oauth`
+打开的是 API key 表单）；早先版本保存下来的 Claude 登录，每次发送都会得到一句「这个版本不能用
+Claude 账号登录。请改用 API key 添加 Anthropic。」，而不是让 App 退出（`io.github.nanomuse.cloud.ClaudeSignIn`）。
 
 **列表从哪来。** 中继的 `/v1/me` 带着 `spend.guidance`（中继 0.21，[cloud.md](cloud.md)）：这个人所在
 地区的服务商，按中继的顺序，每家覆盖什么、可以登录的套餐以及它们面向哪些客户端、本地服务器、
@@ -178,20 +185,26 @@ model_not_offered` →「打开设置」；`503 service_paused`、`sync_paused`�
 单元测试：`RelayRefusalTest`、`GuidanceTest`。
 
 **设置 → 网络**（`net/OwnProviderProxy.kt`、`ui/net/NetworkScreen.kt`、`minis://settings/network`）。
-给自己的服务商用的 HTTP 代理：主机、端口、可选的用户名和密码，默认关闭，只存在这台手机的
-`SharedPreferences` 里。它在 `MinisApp.onCreate` 中被装为进程默认的 `ProxySelector`，所以每个 OkHttp
+给自己的服务商用的 HTTP 代理：主机、端口、可选的用户名和密码，默认关闭，只存在这台手机上：设置项在
+`SharedPreferences` 里，密码单独放在一个 `EncryptedSharedPreferences` 文件里（`nanomuse_proxy_secrets`，
+和服务商 key 一样的存法；1.0.3 的手机存在普通文件里的密码会在第一次读取时搬过去）。它在
+`MinisApp.onCreate` 中被装为进程默认的 `ProxySelector`，所以每个 OkHttp
 客户端每次请求都会问它；对目录里的主机、`chatgpt.com`、`auth.openai.com` 和服务商实例的自定义
 base URL（从不包括中继的，从不包括局域网地址）它回答代理，对其他所有主机回答系统的设置：hub、
 中继、沙箱镜像都不受影响。服务商客户端带着 `OwnProviderProxy.authenticator`，应付要密码的代理。
 「测试」按填写的代理抓取 `https://chatgpt.com/`，报告状态码和毫秒数。单元测试：`ProviderReachTest`、
 `OwnProviderProxyTest`。
 
+## 语音输入 {#voice-input}
+
+系统语音输入可以优先使用设备端识别。手机没有可用的设备端识别服务时，会改用默认识别服务；默认服务返回的语言错误会显示在语音面板中。已经启动的设备端识别器缺少语言包时，仍会尝试一次默认服务。
+
 ## 隐私与权限 {#privacy-and-permissions}
 
 中继保存账号 id、一个打码的标识、用量计数，以及智能体的名字和外观（让你的设备保持一致）；
 消息内容只以对话同步的形式保存：登录后默认开启，在*数据控制*里关掉（[privacy.md](privacy.md)、
 [sync.md](sync.md)）；第一次对话的第四句话会这么说。在手机上，API key 和账号 key 放在
-`EncryptedSharedPreferences` 里（*设置 → 网络* 的代理密码放在普通偏好里，只在这台手机上）；从 0.1.40 起 App 完全不参与设备备份（`allowBackup="false"`：
+`EncryptedSharedPreferences` 里，*设置 → 网络* 的代理密码也是（1.0.4 起；只在这台手机上）；从 0.1.40 起 App 完全不参与设备备份（`allowBackup="false"`：
 聊天、记忆和 key 从不上传到 Google，重装后从空白开始，账号的聊天通过同步回来；`res/xml/` 下的
 两个规则文件留着，等哪天开关再打开时用）。手需要无障碍服务和悬浮窗权限，两者都可选、都能在
 同一屏撤销（首次运行的「手」那一页在 App 标志下面请求这两项，和登录页一样）；会发送东西的步骤（点「发送」，或在聊天软件的消息框里按回车）一次一次地审批，
@@ -200,7 +213,7 @@ base URL（从不包括中继的，从不包括局域网地址）它回答代理
 「对这台设备总是允许」，可在「权限」里撤销。另一台设备或智能体说出的路径（hub 的 `files`、
 `nanomuse-media`、`nanomuse-pc put`）只在沙箱内解析（`io.github.nanomuse.sandbox.SandboxPaths`）：
 `..` 和指向 rootfs 之外的符号链接都无处可去，App 自己的私有文件始终够不着。对于自己的中继，App 允许直接输入明文 `http://`（公网和内网地址均可）；nanoMuse Cloud 以及到它的 hub 只走 TLS。服务商 URL 字段同样允许直接输入明文 `http://`。App 内的
-web view 不对其他 App 导出。
+web view 不对其他 App 导出。用服务商语音模型做语音输入时，麦克风只在录音期间打开：停止或取消录音都会立刻关掉录音器，取消的那段音频直接丢弃，不会发给服务商。
 
 ## 自己构建 {#building-it-yourself}
 
@@ -212,7 +225,13 @@ bash scripts/android/build-natives.sh   # 只需一次：proot、Alpine rootfs �
 cd android/src/android
 ./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:assembleRelease      # signed with android/keystore.properties when present
+./gradlew :app:testDebugUnitTest --tests 'io.github.nanomuse.*'   # 我们的单元测试
+./gradlew :app:lintDebug            # Android lint；报告在 app/build/reports/lint-results-debug.html
 ```
+
+Lint 用的是比 AGP 8.7.3 自带版本更新的 lint（`gradle.properties` 里的
+`android.experimental.lint.version`）：Compose 和 lifecycle 库自带的检查，自带的那个加载不了。上游树里有
+它自己的 lint 发现；看报告时找 `io.github.nanomuse` 的部分。
 
 `rclone.aar` 用 Go 构建，模块走 Go 自己的默认代理（`https://proxy.golang.org,direct`）；在中国大陆网络下先
 `export GOPROXY=https://goproxy.cn,direct`，`env.sh` 会沿用你导出的值。
@@ -235,7 +254,8 @@ keytool -genkeypair -keystore ~/.nanomuse-release/nanomuse.jks -alias nanomuse \
 这项检查）。版本由 `scripts/release-apk.sh <version>` 从一个标签做出来：它核对版本号与 `rebrand.py`
 和 Gradle 是否一致，用 release 密钥构建 `:app:assembleRelease`，写出
 `dist/nanoMuse-<version>-arm64.apk` 和它的 `.sha256`，加 `--publish` 时打上 `v<version>` 标签，
-并把两者连同 `docs/releases/v<version>.md` 里的说明一起附到 GitHub release 上。debug 签名的 APK
+并把两者连同 `docs/releases/v<version>.md` 里的说明一起附到 GitHub release 上。工作区有未提交的改动，
+或者提交不在 `main` 上，发布会被拒绝。debug 签名的 APK
 永远不进 release，因为正式签名的版本无法覆盖它。`versionName` 必须和标签一致，就像 Python 包的
 版本号那样。
 

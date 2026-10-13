@@ -249,7 +249,7 @@ class EmbeddingsBody(BaseModel):
 
 
 class SearchBody(BaseModel):
-    provider: str | None = None  # duckduckgo | brave | tavily | searxng
+    provider: str | None = None  # duckduckgo | brave | tavily | you | searxng
     api_key: str | None = None  # into the vault; "" removes it; None keeps it
     base_url: str | None = None  # SearXNG instance
 
@@ -947,7 +947,10 @@ def create_app(settings: Settings, service: MuseService | None = None) -> FastAP
     @app.post("/api/llm/models", dependencies=dep)
     async def llm_models(body: LLMModelsBody) -> dict[str, Any]:
         """The models an endpoint offers (its /models, else the preset's catalogue); saves nothing."""
-        return await conn.llm_models(body.model_dump())
+        try:
+            return await conn.llm_models(body.model_dump())
+        except ValueError as exc:  # an address with user:pass@ in it
+            raise HTTPException(400, str(exc)) from exc
 
     # ------------------------------------------------------------------ endpoints (#294)
     @app.post("/api/connections/endpoints", dependencies=dep)

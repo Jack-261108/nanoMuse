@@ -1535,61 +1535,61 @@
         }
       }
     },
-    "A friend who signs up with your code gets %@ of credit, and so do you. %@ invited · %@ earned." : {
+    "When a friend signs up with your code and makes their first request, you both get %@. %@ invited · %@ earned." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Wer sich mit deinem Code registriert, bekommt %@ Guthaben, und du auch. %@ eingeladen · %@ erhalten."
+            "value" : "Wenn sich jemand mit deinem Code registriert und die erste Anfrage stellt, bekommt ihr beide %@. %@ eingeladen · %@ erhalten."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A friend who signs up with your code gets %@ of credit, and so do you. %@ invited · %@ earned."
+            "value" : "When a friend signs up with your code and makes their first request, you both get %@. %@ invited · %@ earned."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un amigo que se registre con tu código recibe %@ de crédito, y tú también. %@ invitados · %@ ganados."
+            "value" : "Cuando un amigo se registra con tu código y hace su primera solicitud, ambos reciben %@. %@ invitados · %@ ganados."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un ami qui s’inscrit avec votre code reçoit %@ de crédit, et vous aussi. %@ invités · %@ gagnés."
+            "value" : "Quand un ami s’inscrit avec votre code et envoie sa première requête, vous recevez chacun %@. %@ invités · %@ gagnés."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "あなたのコードで登録した友だちは %@ のクレジットを受け取り、あなたも同じ額を受け取ります。%@ 人を招待 · %@ を獲得。"
+            "value" : "友だちがあなたのコードで登録して最初のリクエストを送ると、2 人とも %@ を受け取ります。%@ 人を招待 · %@ を獲得。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "내 코드로 가입한 친구는 %@의 크레딧을 받고, 나도 똑같이 받습니다. %@명 초대 · %@ 적립."
+            "value" : "친구가 내 코드로 가입하고 첫 요청을 보내면 두 사람 모두 %@을 받습니다. %@명 초대 · %@ 적립."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Друг, который регистрируется с вашим кодом, получает %@ кредита, и вы тоже. Приглашено: %@ · получено: %@."
+            "value" : "Когда друг регистрируется с вашим кодом и делает первый запрос, вы оба получаете %@. Приглашено: %@ · получено: %@."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "朋友用你的邀请码注册，各得 %1$@ 额度。已邀请 %2$@ 人 · 共获得 %3$@。"
+            "value" : "朋友用你的邀请码注册并发出第一次请求后，你们各得 %1$@。已邀请 %2$@ 人 · 共获得 %3$@。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "朋友用你的邀請碼註冊，各得 %1$@ 額度。已邀請 %2$@ 人 · 共獲得 %3$@。"
+            "value" : "朋友用你的邀請碼註冊並發出第一次請求後，你們各得 %1$@。已邀請 %2$@ 人 · 共獲得 %3$@。"
           }
         }
       }
@@ -6875,61 +6875,61 @@
         }
       }
     },
-    "Invite a friend: +¥%@ for you and +¥%@ for them, for each new person who signs up with your link." : {
+    "Invite a friend: +¥%@ for you and +¥%@ for them, once a new person who signed up with your link makes their first request." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lade jemanden ein: +¥%@ für dich und +¥%@ für die Person, für jede neue Anmeldung über deinen Link."
+            "value" : "Lade jemanden ein: +¥%@ für dich und +¥%@ für die Person, sobald jemand Neues über deinen Link registriert ist und die erste Anfrage stellt."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invite a friend: +¥%@ for you and +¥%@ for them, for each new person who signs up with your link."
+            "value" : "Invite a friend: +¥%@ for you and +¥%@ for them, once a new person who signed up with your link makes their first request."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invita a alguien: +¥%@ para ti y +¥%@ para esa persona, por cada persona nueva que se registre con tu enlace."
+            "value" : "Invita a alguien: +¥%@ para ti y +¥%@ para esa persona, cuando alguien nuevo se registra con tu enlace y hace su primera solicitud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invitez quelqu’un : +¥%@ pour vous et +¥%@ pour la personne, pour chaque nouvelle inscription avec votre lien."
+            "value" : "Invitez quelqu’un : +¥%@ pour vous et +¥%@ pour la personne, dès qu’une nouvelle personne inscrite avec votre lien envoie sa première requête."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "友だちを招待：あなたのリンクから新しく登録した人ごとに、あなたに +¥%@、相手に +¥%@。"
+            "value" : "友だちを招待：あなたのリンクから登録した人が最初のリクエストを送るごとに、あなたに +¥%@、相手に +¥%@。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "친구 초대: 내 링크로 새로 가입하는 사람마다 나에게 +¥%@, 상대에게 +¥%@."
+            "value" : "친구 초대: 내 링크로 가입한 사람이 첫 요청을 보낼 때마다 나에게 +¥%@, 상대에게 +¥%@."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Пригласите друга: +¥%@ вам и +¥%@ ему за каждого нового человека, который зарегистрируется по вашей ссылке."
+            "value" : "Пригласите друга: +¥%@ вам и +¥%@ ему, как только новый человек, зарегистрировавшийся по вашей ссылке, сделает первый запрос."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "邀请朋友：每有一位新用户通过你的链接注册，你 +¥%@，对方 +¥%@。"
+            "value" : "邀请朋友：每有一位新用户通过你的链接注册并发出第一次请求，你 +¥%@，对方 +¥%@。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "邀請朋友：每有一位新用戶透過你的連結註冊，你 +¥%@，對方 +¥%@。"
+            "value" : "邀請朋友：每有一位新用戶透過你的連結註冊並發出第一次請求，你 +¥%@，對方 +¥%@。"
           }
         }
       }
@@ -52786,7 +52786,7 @@
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Estado"
+            "value" : "Salud"
           }
         },
         "fr" : {
@@ -52810,7 +52810,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Состояние"
+            "value" : "Здоровье"
           }
         },
         "zh-Hans" : {
@@ -116690,61 +116690,61 @@
         }
       }
     },
-    "A friend’s code adds %@ for both of you on a first sign-in." : {
+    "A friend’s code on a first sign-in adds %@ for both of you after your first request." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Der Code einer anderen Person bringt euch beiden bei der ersten Anmeldung %@."
+            "value" : "Der Code einer anderen Person bei der ersten Anmeldung bringt euch beiden %@ nach deiner ersten Anfrage."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A friend’s code adds %@ for both of you on a first sign-in."
+            "value" : "A friend’s code on a first sign-in adds %@ for both of you after your first request."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El código de un amigo añade %@ para los dos en el primer inicio de sesión."
+            "value" : "El código de un amigo en el primer inicio de sesión añade %@ para los dos después de tu primera solicitud."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le code d’un ami ajoute %@ pour vous deux à la première connexion."
+            "value" : "Le code d’un ami à la première connexion ajoute %@ pour vous deux après votre première requête."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "友だちのコードを使うと、初回サインイン時にお互いに %@ が加わります。"
+            "value" : "初回サインイン時に友だちのコードを使うと、あなたの最初のリクエストの後にお互いに %@ が加わります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "첫 로그인 때 친구의 코드를 넣으면 두 사람 모두에게 %@이 더해집니다."
+            "value" : "첫 로그인 때 친구의 코드를 넣으면 내 첫 요청 후에 두 사람 모두에게 %@이 더해집니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Код друга добавляет %@ вам обоим при первом входе."
+            "value" : "Код друга при первом входе добавляет %@ вам обоим после вашего первого запроса."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "首次登录时填朋友的邀请码，两人各加 %@。"
+            "value" : "首次登录时填朋友的邀请码，你发出第一次请求后两人各加 %@。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "首次登入時填朋友的邀請碼，兩人各加 %@。"
+            "value" : "首次登入時填朋友的邀請碼，你發出第一次請求後兩人各加 %@。"
           }
         }
       }
@@ -123003,61 +123003,61 @@
         }
       }
     },
-    "In a chat, just ask: “on my Mac, list the downloads folder”, “tell my PC to build the project and send me the log”. A step that needs permission is approved on that device, not here." : {
+    "In a chat, just ask: “on my Mac, list the downloads folder”, “tell my PC to build the project and send me the log”. Approvals show on this phone." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bitte einfach im Chat: „auf meinem Mac den Downloads-Ordner auflisten“, „sag meinem PC, er soll das Projekt bauen und mir das Log schicken“. Ein Schritt, der eine Freigabe braucht, wird auf dem jeweiligen Gerät freigegeben, nicht hier."
+            "value" : "Bitte einfach im Chat: „auf meinem Mac den Downloads-Ordner auflisten“, „sag meinem PC, er soll das Projekt bauen und mir das Log schicken“. Freigaben erscheinen auf diesem Telefon."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "In a chat, just ask: “on my Mac, list the downloads folder”, “tell my PC to build the project and send me the log”. A step that needs permission is approved on that device, not here."
+            "value" : "In a chat, just ask: “on my Mac, list the downloads folder”, “tell my PC to build the project and send me the log”. Approvals show on this phone."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "En un chat, solo pídelo: “en mi Mac, lista la carpeta de descargas”, “dile a mi PC que compile el proyecto y me mande el registro”. Un paso que necesita permiso se aprueba en ese dispositivo, no aquí."
+            "value" : "En un chat, solo pídelo: “en mi Mac, lista la carpeta de descargas”, “dile a mi PC que compile el proyecto y me mande el registro”. Las aprobaciones se muestran en este teléfono."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dans une discussion, demandez simplement : « sur mon Mac, liste le dossier Téléchargements », « dis à mon PC de compiler le projet et de m’envoyer le journal ». Une étape qui demande une autorisation s’approuve sur cet appareil-là, pas ici."
+            "value" : "Dans une discussion, demandez simplement : « sur mon Mac, liste le dossier Téléchargements », « dis à mon PC de compiler le projet et de m’envoyer le journal ». Les approbations s’affichent sur ce téléphone."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "チャットでこう頼むだけです: 「Mac でダウンロードフォルダの一覧を出して」「PC にプロジェクトをビルドさせてログを送って」。許可が要る手順はその端末側で承認します。この端末には表示されません。"
+            "value" : "チャットでこう頼むだけです: 「Mac でダウンロードフォルダの一覧を出して」「PC にプロジェクトをビルドさせてログを送って」。承認はこの端末に表示されます。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "채팅에서 그냥 말하세요. “내 Mac에서 다운로드 폴더 목록 보여 줘”, “내 PC에 프로젝트를 빌드하고 로그를 보내라고 해 줘”. 허가가 필요한 단계는 그 기기에서 승인합니다. 여기에는 표시되지 않습니다."
+            "value" : "채팅에서 그냥 말하세요. “내 Mac에서 다운로드 폴더 목록 보여 줘”, “내 PC에 프로젝트를 빌드하고 로그를 보내라고 해 줘”. 승인은 이 휴대전화에 표시됩니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "В чате просто попросите: «на моём Mac покажи папку загрузок», «скажи моему ПК собрать проект и прислать мне лог». Шаг, которому нужно разрешение, подтверждается на том устройстве, а не здесь."
+            "value" : "В чате просто попросите: «на моём Mac покажи папку загрузок», «скажи моему ПК собрать проект и прислать мне лог». Подтверждения показываются на этом телефоне."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在聊天里直接说就行：「在我 Mac 上列一下下载文件夹」「让电脑把项目编译一遍，把日志发给我」。需要确认的步骤要在那台设备上批准，这里不会弹卡片。"
+            "value" : "在聊天里直接说就行：「在我 Mac 上列一下下载文件夹」「让电脑把项目编译一遍，把日志发给我」。需要确认的事会在这台手机上弹卡片。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在聊天裡直接說就好：「在我的 Mac 上列出下載資料夾」「讓電腦把專案編譯一遍，把日誌傳給我」。需要確認的步驟要在那台裝置上核准，這裡不會跳出卡片。"
+            "value" : "在聊天裡直接說就好：「在我的 Mac 上列出下載資料夾」「讓電腦把專案編譯一遍，把日誌傳給我」。需要確認的事會在這支手機上跳出卡片。"
           }
         }
       }
@@ -128903,61 +128903,61 @@
         }
       }
     },
-    "A routine is a message the agent sends itself at a set time, in its own conversation. On the iPhone it runs when the app is open: when it comes due while the app is asleep, the phone shows a reminder and the run happens as soon as you open it. iOS also wakes the app now and then in the background; when it does, the routine runs there." : {
+    "A routine is a message the agent sends itself at a set time, in its own conversation. On the iPhone it runs only while the app is open: when it comes due while the app is asleep, the phone shows a reminder, and the run happens as soon as you open the app. Nothing runs in the background." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Eine Routine ist eine Nachricht, die sich der Agent zu einer festen Zeit selbst schickt, in einem eigenen Gespräch. Auf dem iPhone läuft sie, wenn die App offen ist: Wird sie fällig, während die App schläft, zeigt das Telefon eine Erinnerung, und der Lauf passiert, sobald du sie öffnest. iOS weckt die App außerdem ab und zu im Hintergrund; dann läuft die Routine dort."
+            "value" : "Eine Routine ist eine Nachricht, die sich der Agent zu einer festen Zeit selbst schickt, in einem eigenen Gespräch. Auf dem iPhone läuft sie nur, solange die App offen ist: Wird sie fällig, während die App schläft, zeigt das Telefon eine Erinnerung, und der Lauf passiert, sobald du die App öffnest. Im Hintergrund läuft nichts."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "A routine is a message the agent sends itself at a set time, in its own conversation. On the iPhone it runs when the app is open: when it comes due while the app is asleep, the phone shows a reminder and the run happens as soon as you open it. iOS also wakes the app now and then in the background; when it does, the routine runs there."
+            "value" : "A routine is a message the agent sends itself at a set time, in its own conversation. On the iPhone it runs only while the app is open: when it comes due while the app is asleep, the phone shows a reminder, and the run happens as soon as you open the app. Nothing runs in the background."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Una rutina es un mensaje que el agente se envía a sí mismo a una hora fija, en su propia conversación. En el iPhone se ejecuta cuando la app está abierta: si llega su hora mientras la app está dormida, el teléfono muestra un recordatorio y la ejecución ocurre en cuanto la abres. iOS también despierta la app de vez en cuando en segundo plano; cuando lo hace, la rutina se ejecuta allí."
+            "value" : "Una rutina es un mensaje que el agente se envía a sí mismo a una hora fija, en su propia conversación. En el iPhone solo se ejecuta mientras la app está abierta: si llega su hora mientras la app está dormida, el teléfono muestra un recordatorio y la ejecución ocurre en cuanto abres la app. Nada se ejecuta en segundo plano."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une routine est un message que l’agent s’envoie à lui-même à heure fixe, dans sa propre conversation. Sur l’iPhone, elle s’exécute quand l’app est ouverte : si l’échéance arrive pendant que l’app dort, le téléphone affiche un rappel et l’exécution a lieu dès que vous l’ouvrez. iOS réveille aussi l’app de temps en temps en arrière-plan ; quand c’est le cas, la routine s’y exécute."
+            "value" : "Une routine est un message que l’agent s’envoie à lui-même à heure fixe, dans sa propre conversation. Sur l’iPhone, elle ne s’exécute que lorsque l’app est ouverte : si l’échéance arrive pendant que l’app dort, le téléphone affiche un rappel et l’exécution a lieu dès que vous ouvrez l’app. Rien ne s’exécute en arrière-plan."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ルーティンとは、エージェントが決まった時刻に自分自身に送るメッセージで、専用の会話の中で動きます。iPhone ではアプリが開いているときに実行されます: アプリが休止中に時刻が来ると、リマインダーが表示され、開いたらすぐに実行されます。iOS は時々バックグラウンドでアプリを起こすこともあり、そのときはそこでルーティンが実行されます。"
+            "value" : "ルーティンとは、エージェントが決まった時刻に自分自身に送るメッセージで、専用の会話の中で動きます。iPhone ではアプリが開いている間だけ実行されます: アプリが休止中に時刻が来ると、リマインダーが表示され、アプリを開いたらすぐに実行されます。バックグラウンドでは何も実行されません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "루틴은 에이전트가 정해진 시간에 자기 대화에서 스스로에게 보내는 메시지입니다. iPhone에서는 앱이 열려 있을 때 실행됩니다. 앱이 잠든 사이 시간이 되면 휴대전화가 알림을 띄우고, 앱을 여는 즉시 실행됩니다. iOS가 이따금 백그라운드에서 앱을 깨우기도 하는데, 그때는 루틴이 거기서 실행됩니다."
+            "value" : "루틴은 에이전트가 정해진 시간에 자기 대화에서 스스로에게 보내는 메시지입니다. iPhone에서는 앱이 열려 있는 동안에만 실행됩니다. 앱이 잠든 사이 시간이 되면 휴대전화가 알림을 띄우고, 앱을 여는 즉시 실행됩니다. 백그라운드에서는 아무것도 실행되지 않습니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Рутина представляет собой сообщение, которое агент отправляет сам себе в заданное время, в отдельном разговоре. На iPhone она выполняется, когда приложение открыто: если время подходит, пока приложение спит, телефон показывает напоминание, и запуск происходит, как только вы его откроете. iOS также время от времени будит приложение в фоне; тогда рутина выполняется там."
+            "value" : "Рутина представляет собой сообщение, которое агент отправляет сам себе в заданное время, в отдельном разговоре. На iPhone она выполняется только пока приложение открыто: если время подходит, пока приложение спит, телефон показывает напоминание, и запуск происходит, как только вы откроете приложение. В фоне ничего не выполняется."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "例程是智能体在设定的时间发给自己的一条消息，在它自己的对话里运行。在 iPhone 上，它在应用打开时运行：如果到点时应用在休眠，手机会弹出提醒，你一打开它就跑。iOS 偶尔也会在后台唤醒应用，那时例程会在后台运行。"
+            "value" : "例程是智能体在设定的时间发给自己的一条消息，在它自己的对话里运行。在 iPhone 上，它只在应用打开时运行：如果到点时应用在休眠，手机会弹出提醒，你一打开应用它就立刻运行。后台不会运行任何东西。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "例程是智慧體在設定的時間發給自己的一條消息，在它自己的對話裡運行。在 iPhone 上，它在應用打開時運行：如果到點時應用在休眠，手機會彈出提醒，你一打開它就跑。iOS 偶爾也會在後臺喚醒應用，那時例程會在後臺運行。"
+            "value" : "例程是智慧體在設定的時間發給自己的一條消息，在它自己的對話裡運行。在 iPhone 上，它只在應用打開時運行：如果到點時應用在休眠，手機會彈出提醒，你一打開應用它就立刻運行。後臺不會運行任何東西。"
           }
         }
       }
@@ -137281,61 +137281,61 @@
         }
       }
     },
-    "Reminders need notification permission; background runs need Background App Refresh for nanoMuse." : {
+    "Reminders need notification permission. With Background App Refresh on, iOS can wake the app for a moment around the due time to post the reminder; the routine itself still waits for you to open the app." : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Erinnerungen brauchen die Berechtigung für Mitteilungen; Läufe im Hintergrund brauchen die Hintergrundaktualisierung für nanoMuse."
+            "value" : "Erinnerungen brauchen die Berechtigung für Mitteilungen. Mit eingeschalteter Hintergrundaktualisierung kann iOS die App um die fällige Zeit herum kurz wecken, um die Erinnerung zu zeigen; die Routine selbst wartet weiter, bis du die App öffnest."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reminders need notification permission; background runs need Background App Refresh for nanoMuse."
+            "value" : "Reminders need notification permission. With Background App Refresh on, iOS can wake the app for a moment around the due time to post the reminder; the routine itself still waits for you to open the app."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Los recordatorios necesitan permiso de notificaciones; las ejecuciones en segundo plano necesitan la actualización en segundo plano para nanoMuse."
+            "value" : "Los recordatorios necesitan permiso de notificaciones. Con la actualización en segundo plano activada, iOS puede despertar la app un momento cerca de la hora prevista para mostrar el recordatorio; la rutina en sí sigue esperando a que abras la app."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les rappels demandent l’autorisation des notifications ; les exécutions en arrière-plan demandent l’actualisation en arrière-plan pour nanoMuse."
+            "value" : "Les rappels demandent l’autorisation des notifications. Avec l’actualisation en arrière-plan activée, iOS peut réveiller l’app un instant autour de l’heure prévue pour afficher le rappel ; la routine elle-même attend toujours que vous ouvriez l’app."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "リマインダーには通知の許可が必要です。バックグラウンドでの実行には nanoMuse の「Appのバックグラウンド更新」が必要です。"
+            "value" : "リマインダーには通知の許可が必要です。「Appのバックグラウンド更新」がオンだと、iOS は時刻の前後にアプリを少しだけ起こしてリマインダーを出せます。ルーティンそのものは、アプリを開くまで実行されません。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "알림에는 알림 권한이 필요하고, 백그라운드 실행에는 nanoMuse의 백그라운드 앱 새로 고침이 필요합니다."
+            "value" : "알림에는 알림 권한이 필요합니다. 백그라운드 앱 새로 고침이 켜져 있으면 iOS가 예정 시각 즈음에 앱을 잠깐 깨워 알림을 보낼 수 있습니다. 루틴 자체는 앱을 열 때까지 기다립니다."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Напоминаниям нужно разрешение на уведомления; фоновым запускам нужно «Обновление контента» для nanoMuse."
+            "value" : "Напоминаниям нужно разрешение на уведомления. При включённом «Обновлении контента» iOS может ненадолго разбудить приложение около назначенного времени, чтобы показать напоминание; сама рутина по-прежнему ждёт, пока вы откроете приложение."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提醒需要通知权限；后台运行需要为 nanoMuse 打开「后台 App 刷新」。"
+            "value" : "提醒需要通知权限。打开「后台 App 刷新」后，iOS 可以在到点前后把应用唤醒片刻来发出提醒；例程本身仍要等你打开应用才运行。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "提醒需要通知權限；後臺運行需要為 nanoMuse 打開「後臺 App 刷新」。"
+            "value" : "提醒需要通知權限。打開「後臺 App 刷新」後，iOS 可以在到點前後把應用喚醒片刻來發出提醒；例程本身仍要等你打開應用才運行。"
           }
         }
       }
@@ -149022,61 +149022,1064 @@
         }
       }
     },
-    "%@ asked for permission for a step and did not get it from here; approve such steps on that device." : {
+    "Allow %@ to delete this?" : {
       "extractionState" : "manual",
       "localizations" : {
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ hat für einen Schritt um Erlaubnis gebeten und sie von hier nicht bekommen; gib solche Schritte auf diesem Gerät frei."
+            "value" : "Darf %@ das löschen?"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ asked for permission for a step and did not get it from here; approve such steps on that device."
+            "value" : "Allow %@ to delete this?"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ pidió permiso para un paso y no lo obtuvo desde aquí; aprueba esos pasos en ese dispositivo."
+            "value" : "¿Permitir que %@ elimine esto?"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ a demandé une permission pour une étape et ne l’a pas obtenue d’ici ; approuvez ce genre d’étapes sur cet appareil."
+            "value" : "Autoriser %@ à supprimer ceci ?"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ があるステップの許可を求めましたが、ここからは与えられませんでした。そうしたステップはそのデバイスで承認してください。"
+            "value" : "%@ にこれを削除させますか？"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@이(가) 어떤 단계의 허가를 요청했지만 여기서는 받지 못했습니다. 이런 단계는 그 기기에서 승인하세요."
+            "value" : "%@이(가) 이것을 삭제하도록 허용할까요?"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ запросил разрешение на шаг и не получил его отсюда; подтверждайте такие шаги на том устройстве."
+            "value" : "Разрешить %@ удалить это?"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 有一步需要许可，这边没有批准；这类步骤请在那台设备上批准。"
+            "value" : "允许 %@ 删除这个吗？"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 有一步需要許可，這邊沒有批准；這類步驟請在那台裝置上批准。"
+            "value" : "允許 %@ 刪除這個嗎？"
+          }
+        }
+      }
+    },
+    "Allow %@ to send this?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Darf %@ das senden?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow %@ to send this?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Permitir que %@ envíe esto?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser %@ à envoyer ceci ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ にこれを送信させますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 이것을 보내도록 허용할까요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить %@ отправить это?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 %@ 发送这个吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許 %@ 傳送這個嗎？"
+          }
+        }
+      }
+    },
+    "Allow %@ to make a payment?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Darf %@ eine Zahlung ausführen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow %@ to make a payment?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Permitir que %@ haga un pago?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser %@ à effectuer un paiement ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ に支払いをさせますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 결제하도록 허용할까요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить %@ провести платёж?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 %@ 付款吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許 %@ 付款嗎？"
+          }
+        }
+      }
+    },
+    "Allow %@ to take this step?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Darf %@ diesen Schritt ausführen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow %@ to take this step?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Permitir que %@ dé este paso?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser %@ à faire cette étape ?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ にこのステップを実行させますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 이 단계를 진행하도록 허용할까요?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить %@ выполнить этот шаг?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许 %@ 执行这一步吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許 %@ 執行這一步嗎？"
+          }
+        }
+      }
+    },
+    "The step runs on %@, not on this phone." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schritt läuft auf %@, nicht auf diesem Telefon."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The step runs on %@, not on this phone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El paso se ejecuta en %@, no en este teléfono."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’étape s’exécute sur %@, pas sur ce téléphone."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このステップは %@ で実行されます。この iPhone ではありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 단계는 이 휴대폰이 아니라 %@에서 실행됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаг выполняется на %@, а не на этом телефоне."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一步在 %@ 上执行，不在这台手机上。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這一步在 %@ 上執行，不在這台手機上。"
+          }
+        }
+      }
+    },
+    "%d more waiting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d weitere warten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d more waiting"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d más en espera"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d autres en attente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他に %d 件が待機中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d개 더 대기 중"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ещё %d в ожидании"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还有 %d 个在等待"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "還有 %d 個在等待"
+          }
+        }
+      }
+    },
+    "No details were given." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Einzelheiten angegeben."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No details were given."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se dieron detalles."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun détail n’a été donné."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "詳細はありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자세한 내용이 없습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подробности не указаны."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有给出细节。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沒有給出細節。"
+          }
+        }
+      }
+    },
+    "The step" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Schritt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The step"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El paso"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’étape"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ステップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "단계"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаг"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这一步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這一步"
+          }
+        }
+      }
+    },
+    "Allow once" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einmal erlauben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow once"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir una vez"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser une fois"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今回のみ許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 번만 허용"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить один раз"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许一次"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允許一次"
+          }
+        }
+      }
+    },
+    "Allow for this chat" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für diesen Chat erlauben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow for this chat"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir en este chat"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser pour cette discussion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このチャットでは許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 채팅에서 허용"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить для этого чата"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在这个聊天里允许"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在這個聊天裡允許"
+          }
+        }
+      }
+    },
+    "Always allow this on %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das auf %@ immer erlauben"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always allow this on %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir siempre esto en %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser ceci sur %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ ではこれを常に許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서 항상 허용"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всегда разрешать это на %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上始终允许这一步"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 上始終允許這一步"
+          }
+        }
+      }
+    },
+    "Deny" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ablehnen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deny"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Denegar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒否"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "거부"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отклонить"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒绝"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拒絕"
+          }
+        }
+      }
+    },
+    "No answer in %d seconds counts as a no." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Antwort in %d Sekunden gilt als Nein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No answer in %d seconds counts as a no."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin respuesta en %d segundos, cuenta como un no."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sans réponse en %d secondes, c’est un non."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒以内に答えがなければ、拒否とみなされます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d초 안에 답이 없으면 거부로 처리됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Без ответа в течение %d секунд считается отказом."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒内没有回答，就算作拒绝。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒內沒有回答，就算作拒絕。"
+          }
+        }
+      }
+    },
+    "Always allow lets this same step run on %@ without asking; Approvals on the agent's page lists it and can take it back." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Immer erlauben“ lässt genau diesen Schritt auf %@ ohne Nachfrage laufen; die Freigaben auf der Seite des Agenten führen ihn auf und können ihn zurücknehmen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always allow lets this same step run on %@ without asking; Approvals on the agent's page lists it and can take it back."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitir siempre deja que este mismo paso se ejecute en %@ sin preguntar; las aprobaciones en la página del agente lo muestran y pueden retirarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser laisse cette même étape s’exécuter sur %@ sans demander ; les approbations sur la page de l’agent la listent et peuvent la retirer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「常に許可」にすると、同じステップは %@ で確認なしに実行されます。エージェントのページの「承認」に表示され、取り消せます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "항상 허용하면 같은 단계가 %@에서 묻지 않고 실행됩니다. 에이전트 페이지의 승인 목록에 표시되며 철회할 수 있습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Всегда разрешать» позволяет этому же шагу выполняться на %@ без вопроса; он отображается в разделе «Подтверждения» на странице агента, где его можно отозвать."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「始终允许」让同一步在 %@ 上不再询问直接执行；智能体页面的「审批」里会列出它，也可以在那里撤销。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「始終允許」讓同一步在 %@ 上不再詢問直接執行；智慧體頁面的「審批」裡會列出它，也可以在那裡撤銷。"
+          }
+        }
+      }
+    },
+    "A payment is answered one at a time." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Zahlung wird jedes Mal einzeln beantwortet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A payment is answered one at a time."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un pago se responde cada vez por separado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un paiement se répond à chaque fois, un par un."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支払いは毎回個別に答えます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "결제는 매번 따로 답합니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Платёж подтверждается каждый раз отдельно."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款每次单独回答。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "付款每次單獨回答。"
+          }
+        }
+      }
+    },
+    "%@ asked for permission for a step and did not get it from here." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hat für einen Schritt um Erlaubnis gebeten und sie von hier nicht bekommen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ asked for permission for a step and did not get it from here."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ pidió permiso para un paso y no lo obtuvo desde aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ a demandé une permission pour une étape et ne l’a pas obtenue d’ici."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ があるステップの許可を求めましたが、ここからは与えられませんでした。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 어떤 단계의 허가를 요청했지만 여기서는 받지 못했습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ запросил разрешение на шаг и не получил его отсюда."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 有一步需要许可，这边没有批准。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 有一步需要許可，這邊沒有批准。"
+          }
+        }
+      }
+    },
+    "A step ran on a standing approval given on this phone; Approvals on the agent's page lists it." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ein Schritt lief auf einer auf diesem Telefon erteilten Dauerfreigabe; die Freigaben auf der Seite des Agenten führen sie auf."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A step ran on a standing approval given on this phone; Approvals on the agent's page lists it."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un paso se ejecutó con una aprobación permanente dada en este teléfono; las aprobaciones en la página del agente la muestran."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une étape s’est exécutée sur une approbation permanente donnée depuis ce téléphone ; les approbations sur la page de l’agent la listent."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "あるステップは、この iPhone で与えた常時承認により実行されました。エージェントのページの「承認」に表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 단계가 이 휴대폰에서 준 상시 승인으로 실행되었습니다. 에이전트 페이지의 승인 목록에 표시됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Шаг выполнен по постоянному подтверждению, выданному на этом телефоне; оно отображается в разделе «Подтверждения» на странице агента."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有一步按这台手机上给过的长期许可执行了；智能体页面的「审批」里列着它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有一步按這台手機上給過的長期許可執行了；智慧體頁面的「審批」裡列著它。"
+          }
+        }
+      }
+    },
+    "Always allowed on other devices" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auf anderen Geräten immer erlaubt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Always allowed on other devices"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permitido siempre en otros dispositivos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autorisé sur d’autres appareils"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "他のデバイスで常に許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 기기에서 항상 허용"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Всегда разрешено на других устройствах"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在其他设备上始终允许"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在其他裝置上始終允許"
           }
         }
       }

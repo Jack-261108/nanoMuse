@@ -748,7 +748,7 @@
     <string name="nm_face_cost_not_now">先不了</string>
     <string name="nm_face_cost_declined">好，形象先保持現在這樣。</string>
     <string name="nm_cloud_invite_title">邀請朋友</string>
-    <string name="nm_cloud_invite_why">每有一位新用戶用你的邀請碼註冊，你的額度 +¥%1$s，對方也 +¥%1$s，不過期。</string>
+    <string name="nm_cloud_invite_why">朋友用你的邀請碼註冊並發出第一次請求後，你們各得 ¥%1$s，不過期。</string>
     <string name="nm_cloud_invite_code">邀請碼</string>
     <string name="nm_cloud_invite_share">分享連結</string>
     <string name="nm_cloud_invite_copy">複製</string>
@@ -786,7 +786,7 @@
     <string name="nm_cap_clips_unavailable">影片需要有影片模型的提供方：阿里雲百煉。</string>
     <string name="nm_cap_hands_unavailable">手需要能看螢幕的模型：百煉、OpenRouter、OpenAI、Anthropic、Gemini，或任何有視覺模型的提供方。</string>
     <string name="nm_cap_chat_unavailable">對話需要有對話模型的提供方：新增一把 key，或登入。</string>
-    <string name="nm_ways_invite_title">邀請朋友：每有一位新用戶透過你的連結註冊，你 +¥%1$s，對方也 +¥%2$s。</string>
+    <string name="nm_ways_invite_title">邀請朋友：每有一位新用戶透過你的連結註冊並發出第一次請求，你 +¥%1$s，對方也 +¥%2$s。</string>
     <string name="nm_ways_invite_share">分享連結</string>
     <string name="nm_ways_invite_copy">複製連結</string>
     <string name="nm_cloud_ev_contribute_on">資料控制：已開啟「協助改進」</string>
@@ -1109,4 +1109,5 @@
     <string name="nm_a11y_liked">已喜歡</string>
     <string name="nm_a11y_not_liked">未喜歡</string>
     <string name="nm_a11y_post_details">貼文詳情</string>
+    <string name="nm_claude_sign_in_unavailable">這個版本不能用 Claude 帳號登入。請改用 API key 新增 Anthropic。</string>
 </resources>

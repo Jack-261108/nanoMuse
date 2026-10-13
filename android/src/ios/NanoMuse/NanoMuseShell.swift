@@ -134,6 +134,8 @@ struct NanoMuseRoot: View {
                     }, onOpenRoutines: nil)
             }
         }
+        // The card for a step another device's Muse asks about, over the shell and the upstream layout alike.
+        .nanoMuseRemoteApprovalPresenter()
         .onAppear {
             NanoMuseProfileSync.shared.start()
             NanoMuseAccountData.shared.start() // C12: whose chat is whose; the reinstall sweep
@@ -364,6 +366,8 @@ struct NanoMuseHomeView: View {
     @State private var showChatFiles = false
     @State private var showDevices = false
     @State private var agentName = NanoMuseHomeView.currentAgentName()
+    /// Reduce Motion on: the bottom bar fades out for the keyboard instead of sliding down.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The agent's name from SOUL.md, "nanoMuse" until it has one.
     static func currentAgentName() -> String {
@@ -388,15 +392,19 @@ struct NanoMuseHomeView: View {
         // the keyboard, then never again"; the sliver of a composer's top edge above the bar in
         // the 0.1.36 screenshot). 0.1.40 made the bar a VStack row under the rooms, plain layout:
         // the chat is as tall as what is left over the bar, and over the keyboard, whether the
-        // bar is there or not. The floating pill keeps that for the chat as bottom padding of
-        // the bar's height, the same layout by another name. The rooms are plain SwiftUI
-        // scroll views with no NavigationStack, so they take the bar's height as a safe-area
-        // inset instead: their content scrolls under the pill and the glass has something to
-        // blur. The pill itself lies over both, aligned to the bottom, inside the safe area.
+        // bar is there or not. The floating pill kept that for the chat as bottom padding of
+        // the bar's height up to 1.0.3, which left a plain canvas behind the glass. Now the chat
+        // gets the bar's height as an environment value instead (`nmBottomOverlay`): the chat
+        // keeps its full height, its composer column stands above the bar and its rows scroll
+        // under the column and the bar (NanoMuseComposerHost), so the pill blurs the transcript
+        // the way it blurs the rooms. The rooms are plain SwiftUI scroll views with no
+        // NavigationStack, so they take the bar's height as a safe-area inset: their content
+        // scrolls under the pill too. The pill itself lies over both, aligned to the bottom,
+        // inside the safe area.
         ZStack(alignment: .bottom) {
             ZStack {
                 chatLayer
-                    .padding(.bottom, bottomBarHidden ? 0 : NanoMuseBottomBar.height)
+                    .environment(\.nmBottomOverlay, bottomBarHidden ? 0 : NanoMuseBottomBar.height)
                     .background(ChatColors.background.ignoresSafeArea())
                     .opacity(tab == .chat ? 1 : 0)
                     .allowsHitTesting(tab == .chat)
@@ -417,7 +425,7 @@ struct NanoMuseHomeView: View {
                     if picked == tab, picked != .chat { return }
                     tab = picked
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.easeOut(duration: 0.2), value: bottomBarHidden)
@@ -539,6 +547,15 @@ struct NanoMuseHomeView: View {
             guard let id = note.userInfo?["sessionId"] as? String, !id.isEmpty else { return }
             openSideChat(id)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
+            // *New Chat* in the ••• menu, ⌘N, the *Context Full* alert and the relay's refusal
+            // cards all post this; upstream's ContentView answers it, and in this layout that view
+            // is only on screen under the classic cover, so the tap did nothing (#392). A fresh
+            // draft side chat here, as the drawer's new chat button opens one; with the classic
+            // cover up, ContentView handles it inside the sheet.
+            guard !showClassic else { return }
+            openSideChat(NanoMuseMainChat.draftPrefix + UUID().uuidString)
+        }
         .onReceive(NanoMuseVoicePrompt.shared.$pending) { request in
             // The Action Button's voice prompt with no chat named (#296): the main chat, on
             // screen, is the one to listen. Aimed at it by id, so a side chat pushed over it
@@ -657,6 +674,8 @@ struct NanoMuseHomeView: View {
                 let draft = id.hasPrefix(NanoMuseMainChat.draftPrefix)
                 AIChatView(sessionId: draft ? nil : id, draftId: draft ? id : nil)
                     .id(id)
+                    // The side chat keeps the system bar, with the main chat's scrim behind it.
+                    .environment(\.nmSystemBarScrim, true)
             }
         }
     }
@@ -805,19 +824,57 @@ private struct NanoMuseClassicCover: View {
     }
 }
 
+// MARK: - The column on a wide window
+
+/// The chat on a regular width (an iPad, a wide Split View pane): the message list, the
+/// composer pill and the bottom bar share one centred column, so the conversation reads as one
+/// column and not as three widths. Up to 1.0.3 the list was capped at 900 pt, the composer with
+/// it and the bar at 420 pt: on an iPad in portrait the composer ran across the window, the bar
+/// sat 420 pt wide under it and the agent's replies stayed in a 340 pt pill at the left edge.
+/// The column is 760 pt, the width the web console gives its chat (`max-w-[760px]` in
+/// `web/src/App.tsx`); the rows keep their 16 pt padding inside it and the two pills are as wide
+/// as the rows' content, so their edges line up with the bubbles'. A compact width (every
+/// iPhone, a narrow pane) is unchanged: the rows and the composer take the window and the bar
+/// keeps its 420 pt cap, which no phone reaches.
+enum NanoMuseColumn {
+    /// The column's outer width, the rows' 16 pt padding included.
+    static let width: CGFloat = 760
+    /// The rows' horizontal padding, the composer's margins and the bar's inset: one number.
+    static let margin: CGFloat = 16
+    /// The composer pill and the bottom bar on a regular width: the column less its margins.
+    static var pillWidth: CGFloat { width - margin * 2 }
+    /// The agent's reply pill on a regular width, the web console's `wide:max-w-[600px]`; on a
+    /// compact one it stays 340 pt, as Android's NmAssistantBubble.
+    static let agentPillWidth: CGFloat = 600
+
+    /// The width of a pill for a size class: the column's on a regular width, `fallback` on a
+    /// compact one (the bar's 420 pt cap; nothing for the composer, which takes the window).
+    static func pillWidth(for sizeClass: UserInterfaceSizeClass?, otherwise fallback: CGFloat?) -> CGFloat? {
+        sizeClass == .regular ? pillWidth : fallback
+    }
+
+    /// The agent's reply pill for a size class.
+    static func agentPillWidth(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+        sizeClass == .regular ? agentPillWidth : 340
+    }
+}
+
 // MARK: - Bottom bar
 
 /// Android's MuseBottomBar: a floating frosted-glass pill a little above the bottom edge, five
 /// glyphs and no labels. The pill is `.ultraThinMaterial` under the shell's surface tone at 55
 /// percent, with a 1 pt hairline; the current tab shows its filled glyph on a soft indicator
 /// capsule that springs across to the tab tapped next, the others stay outlined and muted. The
-/// pill is as wide as the composer above it (the same 16 pt margins), capped on a wide screen.
+/// pill is as wide as the composer above it (the same 16 pt margins): capped at 420 pt on a
+/// compact width, the column's width on a regular one (NanoMuseColumn).
 struct NanoMuseBottomBar: View {
     @Binding var selected: NanoMuseTab
     var onPick: (NanoMuseTab) -> Void
     @Namespace private var indicator
     /// Reduce Motion on: the indicator moves to the tapped tab without the spring.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Regular on an iPad: the pill takes the column's width, the composer's.
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     /// The indicator capsule behind the selected glyph, centred in its slot; the five slots share
     /// the pill's width equally.
@@ -829,10 +886,12 @@ struct NanoMuseBottomBar: View {
     /// The pill's distance from the screen's sides: the composer's margins in the shell
     /// (AIChatView, `nmPill`), so the two capsules stack with one edge.
     static let inset: CGFloat = 16
-    /// A wide screen gets a centred pill of this width, not a bar across the window.
+    /// The pill's cap on a compact width (an iPhone's composer never reaches it); a regular width
+    /// takes `NanoMuseColumn.pillWidth` instead, so the pill is as wide as the composer there too.
     static let maxWidth: CGFloat = 420
-    /// How much of the screen the bar takes above the safe area: what the rooms and the chat
-    /// leave free under their content so nothing lies behind the pill.
+    /// How much of the screen the bar takes above the safe area: the rooms' bottom safe-area
+    /// inset and the chat's `nmBottomOverlay`, so their content scrolls under the pill and stops
+    /// above it at rest; the glass blurs whatever passes behind.
     static var height: CGFloat { tabSize.height + pillPadding * 2 + bottomGap }
 
     var body: some View {
@@ -872,7 +931,7 @@ struct NanoMuseBottomBar: View {
         }
         .overlay(Capsule().strokeBorder(NanoMuseTones.hairline, lineWidth: 1))
         .animation(reduceMotion ? nil : Animation.spring(response: 0.35, dampingFraction: 0.8), value: selected)
-        .frame(maxWidth: Self.maxWidth)
+        .frame(maxWidth: NanoMuseColumn.pillWidth(for: sizeClass, otherwise: Self.maxWidth))
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Self.inset)
         .padding(.bottom, Self.bottomGap)
@@ -1033,6 +1092,8 @@ struct NanoMuseDrawer: View {
     @State private var query = ""
     @State private var dragOffset: CGFloat = 0
     @State private var deleteCandidate: String?
+    /// Reduce Motion on: the panel fades in instead of sliding in from the edge.
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The panel's width: most of the window, at most 320 pt. Measured from the window the
     /// drawer is in rather than the screen, so an iPad window narrower than the screen (Stage
@@ -1050,7 +1111,7 @@ struct NanoMuseDrawer: View {
                     panel
                         .frame(width: width(in: geo.size.width))
                         .offset(x: min(0, dragOffset))
-                        .transition(.move(edge: .leading))
+                        .transition(reduceMotion ? .opacity : .move(edge: .leading))
                         .gesture(
                             DragGesture()
                                 .onChanged { v in dragOffset = v.translation.width }

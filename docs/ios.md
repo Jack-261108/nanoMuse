@@ -8,8 +8,8 @@ the TestFlight pipeline needs, and what is still to be ported from the Android a
 were written on a Linux machine. The app **builds, signs and is on TestFlight**: the first build,
 0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
 passed Apple's beta review, so the public link
-(`https://testflight.apple.com/join/ZHexbDqc`) installs it; 1.0.1 is build 18, 1.0.2 is build 19 and 1.0.3 is build 22, all three submitted to the review (2026-10-10,
-2026-10-11 and 2026-10-12; *Where it stands* below). Builds 20 and 21 (1.0.2) went to the internal testers only. The testers' reports have driven the fixes in the release
+(`https://testflight.apple.com/join/ZHexbDqc`) installed it first; 1.0.1 is build 18 and 1.0.2 is build 19, both through the review
+since 2026-10-12, so the link installs build 19 today; 1.0.3 is build 22, in the review since 2026-10-12, and 1.0.4 is build 26, submitted on 2026-10-13 (*Where it stands* below). Builds 20 and 21 (1.0.2), 23, 24 and 25 (1.0.3 with fixes merged after the tag) went to the internal testers only. The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -96,8 +96,9 @@ Ours, in `NanoMuse/`:
   remains) is tapped into **the agent's page**. A short clip of your own can play as the
   face instead (`NanoMuseOwnClip.swift`: *Your own clip…* under the pen on the agent's page and in
   the avatar studio; MP4 or MOV with H.264 or HEVC video, up to 15 seconds and 30 MB, previewed
-  before it is used, kept on that phone only under `Application Support/nanomuse/avatar/own-clip.mp4`,
-  and *Default face* removes it; the section in [avatar.md](avatar.md) has the fallback rule).
+  before it is used, kept on that phone only under `Application Support/nanomuse/avatar/own-clip.mp4`
+  and left out of the iCloud and computer backups with its still, and *Default face* removes it;
+  the section in [avatar.md](avatar.md) has the fallback rule).
   The drawer holds the sessions, search,
   a new side chat, *Pin as the main chat*, *All chats* and the nanoMuse settings; it opens from
   the round button and, on the main chat, from a swipe in at the left edge
@@ -120,12 +121,14 @@ Ours, in `NanoMuse/`:
   (`NanoMuseAvatarStudio.swift`) uses the same path and lets the image model be picked.
 - **The scheduler (0.1.34)** (`NanoMuseScheduler.swift`): routines (a label, a prompt, a time,
   daily / weekdays / once or every N hours) run as a headless turn in a conversation of their own
-  (`NanoMuseHeadless`). Honestly: the iPhone runs them when the app is open (every due one on
-  becoming active), asks iOS for a `BGAppRefreshTask` (`io.github.nanomuse.app.scheduler`) when
-  it goes to the background and runs what is due if iOS grants it, and posts a local notification
-  at each due time (*Check-in: 〈goal〉. Open to run it*) whose tap opens the conversation. Every
-  piece of copy about routines says so. *Settings → nanoMuse → Scheduled tasks* lists them all,
-  the goal check-ins and the feed's included.
+  (`NanoMuseHeadless`). Honestly: the iPhone runs them only while the app is open (every due
+  one on becoming active, then a check every minute), and posts a local notification at each
+  due time (*Check-in: 〈goal〉. Open to run it*) whose tap opens the conversation. The
+  `BGAppRefreshTask` it asks for when it goes to the background
+  (`io.github.nanomuse.app.scheduler`) never runs a routine: when iOS grants it, the handler
+  posts the reminder for whatever came due and asks for the next slot, nothing more. Every piece
+  of copy about routines says so. *Settings → nanoMuse → Scheduled tasks* lists them all, the
+  goal check-ins and the feed's included.
 - **Goals (0.1.34)** (`NanoMuseGoals.swift`, Android `goals/`): *Create a goal › category* sends
   the opener to the main chat with a system addendum for a few turns; the model's
   ` ```nanomuse-goal ` block becomes the goal and its check-in routine, ` ```nanomuse-goal-update `
@@ -206,6 +209,17 @@ Ours, in `NanoMuse/`:
 - **Data controls** (`NanoMuseDataControls.swift`): the relay's switch, the kept-turns count, the
   privacy page, deletion with a confirmation. **Reach** (`NanoMuseReach.swift`): a sheet per device
   of the account (open a link, send a note, a shell line, a screenshot) over the hub.
+  **A task for another device** (`NanoMuseDeviceMention.swift`, `NanoMuseRemoteApproval.swift`):
+  a message that starts with `@〈device〉` goes to that device's Muse as a hub `task`; when a step
+  there needs a yes, the `approval` event is answered here, where the task was typed
+  ([hub.md](hub.md)), on a card with the Android phone's four answers: *Allow once*, *Allow for
+  this chat* (held in memory for that chat), *Always allow this on 〈device〉* (the same step on
+  that device, kept on this phone under the device's id and listed with *Revoke* under
+  *Approvals* on the agent's page), *Deny*; a payment gets only *Allow once* and *Deny*. No
+  answer within the time the other side names (180 seconds when it names none) is a no, and a
+  question the person at the other device answered first (`approval_result`) leaves the card
+  without an answer from here. The card is a sheet at the root, so one already open (Settings,
+  the studio) covers it until it closes. Up to 1.0.3 the phone declined every such question.
 - **When the provider cannot be reached** (`NanoMuseProviderReach.swift`,
   `NanoMuseProviderReachCard.swift`): a failed turn whose error is the transport's (*Could not
   connect to the server*, *A server with the specified hostname could not be found*, a TLS or
@@ -270,7 +284,10 @@ Ours, in `NanoMuse/`:
   takes the address. No vendor is recommended.
 - **Network** (`NanoMuseProxy.swift`, `NanoMuseNetworkView.swift`, *Settings → nanoMuse →
   Network*): the HTTP proxy for own providers: host, port, optional user name and password, off
-  by default, in `UserDefaults` on this phone only. `URLSession` has no per-host proxy switch, so
+  by default, on this phone only: the address and the user name in `UserDefaults`, the password
+  in the Keychain as a device-only item (`io.github.nanomuse.app.proxy`, the relay key's rules;
+  a password a 1.0.3 build kept in `UserDefaults` moves over at the first read). `URLSession`
+  has no per-host proxy switch, so
   the proxy reaches a session as a proxy auto-configuration script in
   `connectionProxyDictionary` that answers the proxy for the catalogue's hosts, `chatgpt.com`,
   `auth.openai.com` and the provider instances' custom hosts (never the relay's, never a LAN
@@ -287,7 +304,11 @@ Ours, in `NanoMuse/`:
   (`NanoMuseSettingsHomeView`: Image & video models, Avatar, Computers, Appearance (avatar size,
   the model under the name, the steps, the theme), Notifications, Account, Coding, Scheduled
   tasks, Shared folders, Chat files, System files, Version). A `nmOnChange` helper keeps
-  `onChange` on iOS 16, the app's deployment target.
+  `onChange` on iOS 16, the app's deployment target. *New Chat* in the ••• menu, ⌘N, the
+  *Context Full* alert and the refusal cards all post upstream's `.newChatRequested`;
+  `NanoMuseHomeView` answers it with a fresh draft side chat, the same as the drawer's new chat
+  button, since upstream's `ContentView` is not on screen in this layout (1.0.2 had no listener
+  there, so the entry did nothing, #392).
 - **Motion clips (0.1.35)** (`NanoMuseVideoGen.swift`, `NanoMuseAvatarMotion.swift`,
   `NanoMuseMediaModels.swift`; Android `avatar/VideoGen.kt`, `avatar/AvatarMotion.kt`): a drawn
   face gets four 4-second clips (idle, working, waiting, happy) from `wan2.2-i2v-flash`
@@ -322,14 +343,20 @@ Ours, in `NanoMuse/`:
   bottom bar was a `safeAreaInset` on the `NavigationStack`'s ancestor, hidden while the keyboard is
   up; the chat respected that inset at launch and no longer after the bar had left and come back,
   so the whole chat ran under the bar and the composer, bottom-aligned, laid out, healthy by every
-  measure the watchdog had, sat behind it. Since 0.1.40 the **bar is laid out under the chat by
-  plain layout, never as an inset of the chat's ancestor** (a `VStack` row in 0.1.40; since the
-  floating pill bar, below, bottom padding of the bar's height on the chat layer, which is the same
-  layout), and the composer column (the cards, the tool strip, the input bar) is
-  likewise **a row under the message list**: `NanoMuseComposerHost` is a plain `VStack`, the list is
-  passed a bottom inset of 0, the `/` and `@` popup is an overlay of the list's bottom edge and so
-  stands on the column's top edge by layout. Nothing lies over the UIKit list and there is no
-  second host to switch to. The watch stays as the last net (a column that detaches or measures 0
+  measure the watchdog had, sat behind it. Since 0.1.40 the **bar is never an inset of the chat's
+  ancestor** (a `VStack` row in 0.1.40; bottom padding of the bar's height on the chat layer from
+  the floating pill bar to 1.0.3; since then the bar's height reaches the chat as an environment
+  value, `nmBottomOverlay`, and the chat stands its composer that much above the bottom). From
+  0.1.40 to 1.0.3 the composer column (the cards, the tool strip, the input bar) was a row under a
+  shorter message list, which left a plain canvas behind the pill bar's glass; **since 1.0.4 the
+  column is a layer over the list's bottom edge again**: `NanoMuseComposerHost` is a `ZStack`, the
+  list keeps the chat's full height and is passed a bottom inset of the column's measured height
+  plus the bar, so the rows scroll under the column and the bar and the last row stops above the
+  column at rest; the `/` and `@` popup shares a `VStack` with the column and so stands on its top
+  edge by layout. Behind the column, Android's scrolling fade (`nmBottomFade`): once the list is
+  scrolled away from the latest row, a 90 pt gradient of the canvas colour and the solid canvas
+  behind the column, stopping above the bar so the glass keeps its rows. There is no second host to
+  switch to. The watch stays as the last net (a column that detaches or measures 0
   while the chat is on screen is rebuilt through `.id(rebuildTick)`, at most twice per appearance so
   a mis-measured healthy composer cannot take the keyboard away repeatedly), and it keeps what it
   sees: **Settings → Appearance → Composer check** draws a red frame around the column (the probe
@@ -528,9 +555,10 @@ Ours, in `NanoMuse/`:
 - **The bottom bar is a floating pill** (`NanoMuseShell.swift` → `NanoMuseBottomBar`,
   `NanoMuseTones.tabIndicator` / `tabIndicatorGlyph` in `NanoMuseFaces.swift`; Android's
   `MuseBottomBar`, #329 by @Ichiro786): the five tabs sit in a `Capsule` 12 pt above the bottom
-  safe area, as wide as the composer above it (the same 16 pt margins; 420 pt at most, centred on
-  a wider screen), icons only, with the same SF symbols, accessibility labels and selected trait as
-  before. The pill is `.ultraThinMaterial` under the shell's surface tone at 55 percent opacity (the
+  safe area, as wide as the composer above it (the same 16 pt margins; 420 pt at most on a compact
+  width, which no phone reaches; on a regular width, the iPad, it is the chat column's width less
+  the margins, 728 pt, as the composer is, see the column note below), icons only, with the same
+  SF symbols, accessibility labels and selected trait as before. The pill is `.ultraThinMaterial` under the shell's surface tone at 55 percent opacity (the
   tint carries the contrast, the material carries the blur, as Android's 55 percent surface over its
   backdrop blur) with a 1 pt `NanoMuseTones.hairline` edge; the old full-width strip and its hairline
   on top are gone. The five tabs share the pill's width equally, each slot tappable across; the
@@ -540,12 +568,13 @@ Ours, in `NanoMuse/`:
   (`matchedGeometryEffect`; with Reduce Motion on it moves without the spring); the others show
   the outlined symbol in the secondary colour. The bar
   still leaves while the keyboard or the chat's voice panel is up. Layout: the pill lies over the
-  rooms and the chat in a `ZStack` aligned to the bottom. The chat keeps the 0.1.40 rule above
-  (bottom padding of the bar's height, 70 pt: 46 plus 6 above and below plus the 12 pt gap, so the
-  composer sits above the pill and nothing is an inset of the `NavigationStack`'s ancestor); the
-  rooms, plain SwiftUI scroll views, take the same height as a `safeAreaInset`, so their content
-  scrolls under the pill and the glass has something to blur. Written on Linux without a Mac: the
-  iOS check compiles it, and no device has shown it yet.
+  rooms and the chat in a `ZStack` aligned to the bottom. The chat gets the bar's height (70 pt: 46
+  plus 6 above and below plus the 12 pt gap) as the `nmBottomOverlay` environment value, stands its
+  composer that much above the bottom and scrolls its rows under both (the composer note above);
+  nothing is an inset of the `NavigationStack`'s ancestor. The rooms, plain SwiftUI scroll views,
+  take the same height as a `safeAreaInset`. Either way the glass has the transcript or the room
+  behind it to blur; up to 1.0.3 the chat was padded above the bar instead, and over the plain
+  canvas the pill read as a white one (seen on the iPad on 1.0.3).
 - **The chat is monochrome** (`NanoMuseTones.ink` / `onInk` / `agentPill` in `NanoMuseFaces.swift`,
   `NanoMuseHeaderScrim` in `NanoMuseHeader.swift`, `NanoMuseComposer.swift`,
   `NanoMuseChatCards.swift`, and `// nanoMuse:` lines in `Views/Chat/ChatMessageViews.swift` and
@@ -567,9 +596,28 @@ Ours, in `NanoMuse/`:
   `safeAreaInset` background, bound to the main chat's `isNearBottom` the way the header binds
   its mood). A queued message keeps upstream's dashed outline and grey text, the *From {device}*
   caption and the attachments stay outside the pill, and the long-press preview is the opaque
-  card it was. Side chats pushed from the drawer keep the system bar on its material; the rooms
-  keep their canvas. Written on Linux without a Mac: the iOS check compiles it, and no device
-  has shown it yet.
+  card it was. Side chats pushed from the drawer keep the system bar for the back button and
+  the title, but since 1.0.4 the bar's own background and hairline are hidden and the same
+  scrim stands behind it (`NavBarStyleModifier` in `AIChatView.swift`, switched on by the
+  `nmSystemBarScrim` environment value the shell sets on the pushed chat; up to 1.0.3 the bar sat
+  on `.ultraThinMaterial`). The rooms since 1.0.4 stand on the chat's canvas, white and black,
+  as Android's tabs and [design.md](design.md): Ideas as plain rows with a hairline under each,
+  Goals with its cards outlined by a hairline, Library as a plain list; only the Feed keeps the
+  grey page its white cards sit on, as Android's FeedTab does. Written on Linux without a Mac:
+  the iOS check compiles it, and no device has shown it yet.
+- **The iPad's chat is one column** (`NanoMuseColumn` in `NanoMuseShell.swift`; the
+  `maxContentWidth` line and the composer's frame in `AIChatView.swift`, the agent's pill in
+  `NanoMuseChatCards.swift`). 1.0.3 on an iPad in portrait showed three widths: upstream caps
+  the message list and the composer at 900 pt on a regular width, so the composer ran across
+  the 768 pt window, the pill bar sat 420 pt wide under it, and the agent's replies stayed in
+  their 340 pt pill at the left edge. On a regular width size class the list, the composer and
+  the pill bar now share one centred column of 760 pt, the web console's chat column
+  (`max-w-[760px]`); the rows keep their 16 pt padding inside it, the composer and the pill bar
+  are both the column less the margins, 728 pt, so their edges meet the bubbles' and each other's,
+  and the agent's pill grows to 600 pt, the web's wide value. A compact width, every iPhone and
+  a narrow Split View pane, is unchanged. The cells of the message list are hosted by
+  `UIHostingConfiguration`, which does not carry our environment objects but does carry the
+  size class from the cell's traits; the agent's pill reads it from there.
 
 ## Voice prompts from the Action Button
 
@@ -667,7 +715,7 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
   delivered before); build 17, 1.0.0 with the fixes merged after the tag, went to the internal
   testers only. **Build 18 (1.0.1)** was added to *nanoMuse Beta* and submitted to the review on
-  2026-10-10, **build 19 (1.0.2)** on 2026-10-11 and **build 22 (1.0.3)** on 2026-10-12; the link installs build 16 until one passes. The public link delivers a build only
+  2026-10-10 and **build 19 (1.0.2)** on 2026-10-11; both passed on 2026-10-12, so the link installs build 19. **Build 22 (1.0.3)** was submitted on 2026-10-12 and **build 26 (1.0.4)** on 2026-10-13; builds 23, 24 and 25 (1.0.3 with fixes merged after the tag) went to the internal testers only. The public link delivers a build only
   once a review has passed, and each new version repeats the step (the review is per version;
   later builds of an approved version need none).
   Nothing towards the App Store: the app is not going there.

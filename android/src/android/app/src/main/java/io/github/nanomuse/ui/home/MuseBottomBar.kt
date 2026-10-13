@@ -29,11 +29,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.hazeEffect
+import io.github.nanomuse.ui.chat.NM_CHAT_COMPOSER_BOTTOM_GAP
 
 /**
  * nanoMuse's bottom bar: a floating frosted-glass pill, five glyphs, icons only. The pill blurs
@@ -57,6 +63,8 @@ fun MuseBottomBar(
     val nmDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val nmSelectedBg = if (nmDark) Color.White else Color.Black
     val nmSelectedFg = if (nmDark) Color.Black else Color.White
+    val window = LocalConfiguration.current
+    val surroundExtent = maxOf(window.screenWidthDp, window.screenHeightDp).dp
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -74,6 +82,15 @@ fun MuseBottomBar(
                 // pins the constraints and the cap has nothing to shrink.
                 .widthIn(max = PILL_MAX_WIDTH)
                 .fillMaxWidth()
+                // Keep the chat surround outside the glass and its blur source.
+                .then(
+                    if (nmDark && selected == HomeTab.CHAT) {
+                        Modifier.amoledNavPillSurround(
+                            extent = surroundExtent,
+                            topGap = NM_CHAT_COMPOSER_BOTTOM_GAP,
+                        )
+                    } else Modifier,
+                )
                 // Clip first: it must wrap the haze drawing, otherwise the
                 // blurred rect paints unclipped and the pill's ends look square.
                 .clip(CircleShape)
@@ -109,6 +126,9 @@ fun MuseBottomBar(
                     modifier = Modifier
                         .weight(1f)
                         .height(TAB_HEIGHT)
+                        // a tab for TalkBack, with its state: the glyph alone would read as a
+                        // plain button and the current one as any other
+                        .semantics { role = Role.Tab; this.selected = isSelected }
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,

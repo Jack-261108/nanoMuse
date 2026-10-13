@@ -94,10 +94,11 @@ def is_major(version: str) -> bool:
 def edit_issue_form(text: str, old: str, new: str, code: str) -> tuple[str, int]:
     """An issue form's example versions moved to the new version, and how many lines moved.
 
-    ``<old> (<any code>)`` becomes ``<new> (<code>)`` and ``desktop <old>`` becomes
-    ``desktop <new>``; anything else that names the old version is left alone."""
+    ``<old> (<any code>)`` becomes ``<new> (<code>)`` and ``desktop <old>`` (or its Chinese
+    twin ``桌面版 <old>``) becomes ``desktop <new>``; anything else that names the old version
+    is left alone."""
     out, n1 = re.subn(rf"{re.escape(old)} \(\d+\)", f"{new} ({code})", text)
-    out, n2 = re.subn(rf"desktop {re.escape(old)}(?![\d.])", f"desktop {new}", out)
+    out, n2 = re.subn(rf"(desktop|桌面版) {re.escape(old)}(?![\d.])", rf"\1 {new}", out)
     return out, n1 + n2
 
 
@@ -131,7 +132,15 @@ def version_code() -> str:
     return m.group(1)
 
 
+def usage() -> str:
+    """The two usage lines of the module docstring."""
+    return "\n".join(line[4:] for line in __doc__.strip().splitlines()[2:4])
+
+
 def main(argv: list[str]) -> int:
+    if argv in (["-h"], ["--help"]):
+        print(__doc__.strip())
+        return 0
     dry_run = "--dry-run" in argv
     argv = [a for a in argv if a != "--dry-run"]
     roadmap: dict[str, str] = {}
@@ -146,8 +155,12 @@ def main(argv: list[str]) -> int:
     if len(roadmap) == 1:
         print("--roadmap and --roadmap-zh go together (one row per language)", file=sys.stderr)
         return 2
+    unknown = [a for a in argv if a.startswith("-")]
+    if unknown:
+        print(f"unknown option {' '.join(unknown)} (try --help)", file=sys.stderr)
+        return 2
     if len(argv) != 5:
-        print(__doc__.strip().splitlines()[2].strip(), file=sys.stderr)
+        print(usage(), file=sys.stderr)
         return 2
     old, new, oldname, newname, date = argv
     if not Path("pyproject.toml").is_file():

@@ -175,8 +175,10 @@ html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-ob-pager { top: 48p
    giving up their width (that rule sets the bar's top padding outright; the harness's own is 0).
    The harness's bars are found by its data-* hooks; the two schedule rules also rely on its
    data-testid and a class-name stem (_pageHeading) as of dsh 0.2.0-rc.2, which
-   harness/desktop/scripts/prepare-dsh.mjs installs by exact version with no lock file: check them
-   when that version moves. */
+   harness/desktop/scripts/prepare-dsh.mjs installs by exact version with no lock file.
+   harness/desktop/scripts/check-hooks.mjs reads every data-* hook, test id and class stem out of
+   this file and looks for each in the staged dsh; the desktop and harness workflows run it, so a
+   version that renamed one fails the build instead of leaving a rule that matches nothing. */
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) { --nm-caption-inset: max(0px, 100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)); --nm-caption-height: env(titlebar-area-height, 0px); }
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-room-head:not(.nm-split *) { padding-inline-end: calc(40px + var(--nm-caption-inset)); }
 html[data-nm-platform='win32']:not([data-nm-fullscreen]) .nm-lib-main .nm-room-head:not(.nm-split *) { padding-inline-end: calc(32px + var(--nm-caption-inset)); }
@@ -1280,6 +1282,7 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-fr-top { height: 6
 .nm-cd-glyph-cursor { background: linear-gradient(135deg, #334155, #0f172a); }
 .nm-cd-glyph-codex { background: linear-gradient(135deg, #10b981, #0f766e); }
 .nm-cd-glyph-claude { background: linear-gradient(135deg, #fb923c, #d97706); }
+.nm-cd-glyph-dsh { background: linear-gradient(135deg, #6366f1, #3730a3); }
 .nm-cd-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .nm-cd-section-head h2 { flex: 1; }
 .nm-cd-link { display: inline-flex; align-items: center; gap: 2px; border: 0; padding: 0; background: none; color: var(--nm-blue); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }

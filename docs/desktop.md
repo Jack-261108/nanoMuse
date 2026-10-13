@@ -45,8 +45,10 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   read through the host's pass-through routes (`/nanomuse/cloud/me`, `/sessions`,
   `/account-events`, `/password`, `/sign-out-all`, `/delete-account`, `/config`);
 - **a clip of your own as the face**: *Your own clip…* under the pen on the agent's page
-  and in the avatar studio takes an MP4 or MOV with H.264 video of up to 15 seconds and
-  30 MB, previews it in the face's round frame, and plays it muted in a loop for every mood;
+  and in the avatar studio takes an MP4 or MOV of up to 15 seconds and 30 MB, with H.264
+  video, or HEVC when this computer can decode it (Windows and macOS have the decoder, most
+  Linux builds do not; a clip the preview cannot play is refused there), previews it in the
+  face's round frame, and plays it muted in a loop for every mood;
   it stays on this computer as `$DSH_HOME/nanomuse/avatar/own-clip.mp4`, is never sent to
   nanoMuse Cloud, and *Default face* removes it (the fallback rule is in
   [avatar.md](avatar.md));
@@ -73,9 +75,9 @@ speaking as nanoMuse through the `nanomuse` preset, with:
   `device_notify` and `delegate` for the phone and the other computers; the phone's
   `delegate` landing here as a dsh session "From <device>" with its approvals relayed
   back; remote control (`shell`, `files`, `open`, `screen`) behind a switch;
-- **Coding agents**: *Settings → Coding agents*, with this computer's Cursor, Codex and
-  Claude Code chats (read from disk, a message starts the agent's own CLI, the run
-  streams in with its tools, *Stop* ends it) and then the account's other computers',
+- **Coding agents**: *Settings → Coding agents*, with this computer's Cursor, Codex,
+  Claude Code and DeepSeek Harness chats (read from disk, a message starts the agent's own
+  CLI, the run streams in with its tools, *Stop* ends it) and then the account's other computers',
   over the `coding.*` hub actions this computer announces too; a device card's *Coding
   agents* chip opens the page on that computer ([coding-agents.md](coding-agents.md)).
 - **Network** (Settings → nanoMuse Cloud → Network): one proxy for what the app sends out
@@ -116,7 +118,7 @@ show, under the turn that did not run, in the chat:
   the *Step-by-step guide* ([own-key.md](own-key.md));
 - **a plan you already pay for**: the ChatGPT sign-in, right there, with the relay's caveat
   about it;
-- **invite a friend**: the bonus for each of you and *Copy the link*;
+- **invite a friend**: the bonus for each of you, paid after the friend's first request, and *Copy the link*;
 - a star on GitHub, once, when the nudge policy allows it: the card's title and buttons are
   the app's; its sentence is the app's too unless the relay's policy carries one (`star.text`,
   `star.text_zh`, up to 200 characters; a Chinese UI takes `text_zh`, else `text`;

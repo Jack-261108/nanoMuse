@@ -175,7 +175,7 @@ the key in `hello` instead).
 Close codes: `4000` hello expected (no hello within 15 s, or a frame that is
 not a hello first; a binary frame counts), `4001` bad key (reason `bad_key`
 or `account_deleted`; `account_gone` when the account was deleted or disabled
-under a live socket; from the relay release after 0.24.2 also `bad_key`
+under a live socket; from relay 0.25.0 also `bad_key`
 under a live socket whose key was just revoked, by *Sign out everywhere*
 from another device, a
 session revoked on the account page or the device's own sign-out, so a lost
@@ -266,7 +266,8 @@ computer's own hands) is in [every-device.md](every-device.md).
   the console under [`cloud/nanomuse_cloud/console/`](../cloud/nanomuse_cloud/console/).
 - Android: `io.github.nanomuse.hub`: `HubClient` (OkHttp, reconnect),
   `Hub` (state, prefs, `call`/`find`), `HubActions` (what the phone does for
-  others, including `task` through the headless chat runner), `HubService`
+  others, including `task` through the headless chat runner, its `language`
+  honoured), `HubService`
   (foreground, `remoteMessaging`). `nanomuse-pc` (`io.github.nanomuse.reach`)
   reaches the hub devices from the phone's sandbox shell.
 - nanoMuse Desktop: [`harness/dsh-nanomuse/src/hub.ts`](../harness/dsh-nanomuse/src/hub.ts)
@@ -277,6 +278,11 @@ computer's own hands) is in [every-device.md](every-device.md).
   refused (`no_screen`), the shell and files actions with `not_supported`. A step of a
   `task` that needs approval is not sent back as an `event`: with nanoMuse in front the
   phone shows its own card, in the background the step is declined and the answer says so.
+  The other way round, a `task` the phone sends (`@〈device〉`,
+  [`NanoMuseDeviceMention.swift`](../android/src/ios/NanoMuse/NanoMuseDeviceMention.swift))
+  has its `approval` events answered on the phone's card
+  ([`NanoMuseRemoteApproval.swift`](../android/src/ios/NanoMuse/NanoMuseRemoteApproval.swift))
+  and `approve` sent back; `approval_result` closes the card.
 - Runtime (`nanomuse serve`): [`nanomuse/cloud.py`](../nanomuse/cloud.py)
   (the account), [`nanomuse/hub/client.py`](../nanomuse/hub/client.py) (the
   socket, reconnect), [`nanomuse/hub/actions.py`](../nanomuse/hub/actions.py)

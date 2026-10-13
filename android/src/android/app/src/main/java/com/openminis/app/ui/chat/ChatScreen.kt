@@ -116,7 +116,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.focusRequester
@@ -134,8 +133,11 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
@@ -3316,9 +3318,27 @@ fun ChatScreen(
             else if (nmBarLingers) { kotlinx.coroutines.delay(1_500); nmBarLingers = false }
         }
         val nmToolBarShown = nmShowSteps && (isStreaming || nmBarLingers) && lastToolBlocks.isNotEmpty()
-        // nanoMuse: browser/tool controls take priority over the composer's top fade.
+        // nanoMuse: only live browser controls suppress the scrolling fade.
         val nmBrowserHandOver by io.github.nanomuse.browser.BrowserHandOver.pending.collectAsState()
-        val nmComposerFadeSuppressed = nmToolBarShown || showBrowserSheet || nmBrowserHandOver != null
+        val nmBrowserToolMenuShown =
+            nmToolBarShown && lastToolBlocks.lastOrNull()?.toolName == "browser_use"
+        val nmComposerFadeSuppressed =
+            nmBrowserToolMenuShown || showBrowserSheet || nmBrowserHandOver != null
+
+        // nanoMuse: the composer and scrolling fade share one rounded outline.
+        val nmRecState by com.openminis.app.speech.SpeechRecognitionManager.state.collectAsState()
+        val nmRecording = nmRecState == com.openminis.app.speech.RecognitionState.RECORDING ||
+            nmRecState == com.openminis.app.speech.RecognitionState.STARTING ||
+            nmRecState == com.openminis.app.speech.RecognitionState.FINISHING
+        val editingId by viewModel.editingMessageId.collectAsState()
+        val nmPill = nmHome != null &&
+            !com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive &&
+            !nmRecording && editingId == null
+        val nmComposerCorner = if (nmPill) 26.dp else 20.dp
+        val nmComposerShape = RoundedCornerShape(nmComposerCorner)
+        val nmComposerHorizontalInset = if (nmPill) 16.dp else 12.dp
+        val nmComposerTopPadding = 2.dp
+        val nmComposerBottomPadding = io.github.nanomuse.ui.chat.NM_CHAT_COMPOSER_BOTTOM_GAP
 
         // nanoMuse: measure the whole footer before the list, while keeping the
         // list full-size behind the pill for Haze. No asynchronous height feedback.
@@ -4632,7 +4652,7 @@ fun ChatScreen(
                 }
 
                 // nanoMuse: fade into the canvas above the composer while reading
-                // older messages. Browser/tool controls hide it immediately, even
+                // older messages. Live browser controls hide it immediately, even
                 // if a scroll animation or the alpha tween is still in progress.
                 val nmEdgeFade = ChatColors.background
                 val nmScrolledUp = listState.firstVisibleItemIndex > 0 ||
@@ -4645,24 +4665,22 @@ fun ChatScreen(
                 if (!nmComposerFadeSuppressed) {
                     val nmFadeHeight = 90.dp
                     val nmFooterHeight = (bottomChromeHeight - nmBottomOverlay).coerceAtLeast(0.dp)
-                    // nanoMuse: the gradient ends at the footer's top, then its
-                    // solid canvas continues behind the composer padding and
-                    // rounded corners. Stop above the nav pill to retain its blur.
-                    Box(
+                    // nanoMuse: a rounded halo fades into the composer and
+                    // away before the navigation glass, without square edges.
+                    io.github.nanomuse.ui.chat.NmComposerVignette(
+                        color = nmEdgeFade,
+                        opacity = nmBottomFadeAlpha,
+                        spread = nmFadeHeight,
+                        cornerRadius = nmComposerCorner,
+                        horizontalInset = nmComposerHorizontalInset,
+                        topPadding = nmComposerTopPadding,
+                        bottomPadding = nmComposerBottomPadding,
+                        maxContentWidth = CHAT_MAX_CONTENT_WIDTH,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .padding(bottom = nmBottomOverlay)
-                            .height(nmFadeHeight + nmFooterHeight)
-                            .graphicsLayer { alpha = nmBottomFadeAlpha }
-                            .background(
-                                Brush.verticalGradient(
-                                    0f to Color.Transparent,
-                                    1f to nmEdgeFade,
-                                    endY = with(LocalDensity.current) { nmFadeHeight.toPx() },
-                                    tileMode = TileMode.Clamp,
-                                ),
-                            ),
+                            .height(nmFadeHeight + nmFooterHeight),
                     )
                 }
 
@@ -4871,19 +4889,6 @@ fun ChatScreen(
             // back by the slash / mention popups below so they line up with it.
             var composerWidthPx by remember { mutableStateOf(0) }
 
-            // nanoMuse: in the home shell the composer is Muse's one-row
-            // pill — "+", the text, the mic (a send arrow once there is
-            // something to send) — on a grey capsule with no shadow. Voice,
-            // recording and message editing fall back to OpenMinis' two-row
-            // card. Decided here so the card's shell and its rows agree.
-            val nmRecState by com.openminis.app.speech.SpeechRecognitionManager.state.collectAsState()
-            val nmRecording = nmRecState == com.openminis.app.speech.RecognitionState.RECORDING ||
-                nmRecState == com.openminis.app.speech.RecognitionState.STARTING ||
-                nmRecState == com.openminis.app.speech.RecognitionState.FINISHING
-            val editingId by viewModel.editingMessageId.collectAsState()
-            val nmPill = nmHome != null &&
-                !com.openminis.app.ui.chat.voice.VoiceModePrefs.isVoiceActive &&
-                !nmRecording && editingId == null
             // ─── Input area (iOS-style: rounded box with text + buttons below) ───
             // nanoMuse: the footer places the composer above the pill.
             Column(
@@ -4916,8 +4921,9 @@ fun ChatScreen(
                         if (nmBottomOverlay > 0.dp) Modifier
                         else Modifier.navigationBarsPadding()
                     )
-                    .padding(horizontal = if (nmPill) 16.dp else 12.dp) // nanoMuse: Muse's 16dp margins
-                    .padding(top = 2.dp, bottom = 8.dp),
+                    // nanoMuse: match the fade and the nav surround's upper edge.
+                    .padding(horizontal = nmComposerHorizontalInset)
+                    .padding(top = nmComposerTopPadding, bottom = nmComposerBottomPadding),
             ) {
                 // T13 banner moved INSIDE the LazyColumn so it renders at the
                 // visual end of the message list (mirrors iOS — see the
@@ -5339,16 +5345,6 @@ fun ChatScreen(
                     }
                 }
 
-                // Input box: iOS-style floating card — no visible border, separated
-                // from the backdrop by a symmetric soft shadow painted by hand
-                // (Android's Modifier.shadow only casts downward).
-                val inputBgArgb = ChatColors.inputBg.toArgb()
-                val shadowPaint = remember(inputBgArgb) {
-                    android.graphics.Paint().apply {
-                        color = inputBgArgb
-                        isAntiAlias = true
-                    }
-                }
                 // T185: Move-to-session capsule mirrors iOS
                 // AIChatView.swift:1816 (.overlay(alignment: .topTrailing))
                 // on the input card. We render it as the first child of the
@@ -5448,38 +5444,20 @@ fun ChatScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        // nanoMuse: Muse's capsule — flat grey, no shadow.
-                        .then(
-                            if (nmPill) Modifier
-                                .clip(RoundedCornerShape(26.dp))
-                                .background(io.github.nanomuse.ui.home.MuseTones.bubble)
-                            else Modifier,
+                        // nanoMuse: fill, clip and soft shadow follow the same outline.
+                        .shadow(
+                            elevation = 4.dp,
+                            shape = nmComposerShape,
+                            clip = false,
+                            ambientColor = Color.Black.copy(alpha = 0.06f),
+                            spotColor = Color.Black.copy(alpha = 0.12f),
                         )
-                        .drawBehind {
-                            if (nmPill) return@drawBehind
-                            val radiusPx = 20.dp.toPx()
-                            val canvas = drawContext.canvas.nativeCanvas
-                            // Pass 1: symmetric ambient halo — small blur, low alpha.
-                            shadowPaint.setShadowLayer(
-                                6.dp.toPx(), 0f, 0f,
-                                android.graphics.Color.argb(22, 0, 0, 0),
-                            )
-                            canvas.drawRoundRect(
-                                0f, 0f, size.width, size.height,
-                                radiusPx, radiusPx,
-                                shadowPaint,
-                            )
-                            // Pass 2: soft downward shadow (spot light).
-                            shadowPaint.setShadowLayer(
-                                10.dp.toPx(), 0f, 3.dp.toPx(),
-                                android.graphics.Color.argb(24, 0, 0, 0),
-                            )
-                            canvas.drawRoundRect(
-                                0f, 0f, size.width, size.height,
-                                radiusPx, radiusPx,
-                                shadowPaint,
-                            )
-                        }
+                        .clip(nmComposerShape)
+                        .background(
+                            color = if (nmPill) io.github.nanomuse.ui.home.MuseTones.bubble
+                            else ChatColors.inputBg,
+                            shape = nmComposerShape,
+                        )
                         .padding(top = if (attachments.isNotEmpty()) 8.dp else if (nmPill) 0.dp else 4.dp), // nanoMuse: pill composer
                 ) {
                     // T185: Move-to capsule lives INSIDE the composer card,
@@ -7192,6 +7170,18 @@ fun ChatScreen(
                 } else {
                     viewModel.selectGroup(groupId)
                     showModelPicker = false
+                    // nanoMuse: a group picked here is the default for new chats too, and the
+                    // main chat follows it (ModelSlots.followPick, with the member the
+                    // view-model resolved); the same line as for a model says so.
+                    viewModel.activeEntryId.value?.let { resolved ->
+                        val sticks = io.github.nanomuse.models.ModelSlots.followPick(context, resolved, groupId)
+                        val name = group?.name?.takeIf { it.isNotBlank() } ?: entryById(resolved)?.model?.displayName ?: resolved
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(if (sticks) R.string.nm_model_switched_sticky else R.string.nm_model_switched, name),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
             },
             onSelectGroupEntry = { groupId, entryId ->
@@ -7207,6 +7197,16 @@ fun ChatScreen(
                 } else {
                     viewModel.selectGroupEntry(groupId, entryId)
                     showModelPicker = false
+                    // nanoMuse: as for a group pick, the default for new chats and the main chat follow
+                    if (entry != null) {
+                        val name = entry.model.displayName.ifBlank { entry.model.id }
+                        val sticks = io.github.nanomuse.models.ModelSlots.followPick(context, entryId, groupId)
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(if (sticks) R.string.nm_model_switched_sticky else R.string.nm_model_switched, name),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
             },
             onSelectEntry = { entryId ->

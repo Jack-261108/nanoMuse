@@ -38,8 +38,8 @@ update*) and offers the download.
 3. **Sign in.** The first screen is the account: a phone number or an e-mail address,
    a code, or a password once you have set one. It is what lets your devices work as one
    ([hub.md](hub.md)) and brings a model to start with ([cloud.md](cloud.md): a free pool per
-   account (¥10 at the time of writing) and more for each friend invited, and for them;
-   the app prints the relay's current figures; then [your own key](own-key.md)). Then choose which model answers: the account's
+   account (¥10 at the time of writing) and more for each friend invited, and for them,
+   once the friend makes a first request; the app prints the relay's current figures; then [your own key](own-key.md)). Then choose which model answers: the account's
    own, or a key of your own (any OpenAI-compatible endpoint, or the OAuth sign-ins the
    app ships with). Four models are set, not one, and they live on one page, **Settings →
    Models** (the card at the top of Settings opens it): **Chat**, the model that talks with
@@ -132,9 +132,11 @@ capsules stack with one edge. While the agent uses tools,
 the step bar sits above the composer; the latest message and tool pills can scroll fully
 above both. The conversation still scrolls behind the navigation pill for its frosted blur.
 The spacing follows the actual footer height when the composer expands or a tool preview
-or approval card appears. When reading older messages, the fade above the composer
-continues behind its padding and rounded corners without a gap. It stays hidden while
-the tool step bar, browser panel or browser hand-over controls are visible. With the keyboard
+or approval card appears. When reading older messages, a slightly lighter fade follows
+the composer's rounded outline. Live browser controls hide it; historical tool pills and
+other tools keep it. In dark-mode home and side chats, pure black surrounds the navigation
+pill and fills the gap below the composer. Its glass stays open to the scrolling content
+for live frosted blur. Other tabs keep their navigation appearance. With the keyboard
 open the composer sits on the keyboard and the pill is behind it. The Feed, Ideas, Goals and
 Library lists end above the pill as well, so their last row is never under it.
 
@@ -164,7 +166,13 @@ Kimi (a device code) and OpenRouter; *Sign in* opens the same form on the sign-i
 OpenAI's terms cover a ChatGPT plan inside OpenAI's own Codex, that other apps have had this
 access cut off before (OpenCode, January 2026), and that an API key works if it stops.
 Anthropic and Gemini open on OpenMinis' own provider types for them; everything else on the
-OpenAI-compatible form.
+OpenAI-compatible form. The Claude sign-in needs an identifier Anthropic expects at the start
+of every request; it is read at build time from `app/provider-customization.properties`, which
+is not in this repository, so the published APK does not have it. A build without it does not
+list the Claude sign-in (not on this card, not under *Add a provider*, and `?preset=anthropic:oauth`
+opens the API key form), and a Claude sign-in saved by an earlier build answers each send with
+*This build cannot use a Claude sign-in. Add Anthropic with an API key instead.* rather than
+closing the app (`io.github.nanomuse.cloud.ClaudeSignIn`).
 
 **Where the list comes from.** The relay's `/v1/me` carries `spend.guidance` (relay 0.21,
 [cloud.md](cloud.md)): the providers for the person's region in the relay's order, each with
@@ -226,7 +234,10 @@ now, not used up* and that what is left stays as it is. The sentences are
 
 **Settings → Network** (`net/OwnProviderProxy.kt`, `ui/net/NetworkScreen.kt`,
 `minis://settings/network`). The HTTP proxy for own providers: host, port, optional user name
-and password, off by default, in `SharedPreferences` on this phone only. It is installed in
+and password, off by default, on this phone only: the settings in `SharedPreferences`, the
+password in an `EncryptedSharedPreferences` file of its own (`nanomuse_proxy_secrets`, the way
+the provider keys are kept; a password a 1.0.3 phone saved in the plain file is moved over on
+the first read). It is installed in
 `MinisApp.onCreate` as the process's default `ProxySelector`, so every OkHttp client asks it per
 request; it answers the proxy for the catalogue's hosts, `chatgpt.com`, `auth.openai.com` and
 the custom base URLs of the provider instances (never the relay's, never a LAN address), and the
@@ -235,14 +246,21 @@ Provider clients carry `OwnProviderProxy.authenticator` for a proxy that asks fo
 *Test* fetches `https://chatgpt.com/` through the proxy as entered and reports the status and the
 milliseconds. Unit tests: `ProviderReachTest`, `OwnProviderProxyTest`.
 
+## Voice input
+
+System voice input can prefer on-device recognition. If the phone has no usable on-device
+service, it falls back to the default recognition service. A language error from that
+default service is shown in the voice panel. A running on-device recognizer whose language
+pack is unavailable still falls back once to the default service.
+
 ## Privacy and permissions
 
 The relay keeps an account id, a masked identifier, usage counts and the agent's name and
 look (so your devices match), and message content only as conversation sync, on by default
 when signed in and switched off under *Data controls* ([privacy.md](privacy.md),
 [sync.md](sync.md)); the first conversation says so in its fourth line. On the phone, API keys and the account key
-are in `EncryptedSharedPreferences` (the proxy password of *Settings → Network* is in plain
-preferences, on this phone only); since 0.1.40 the app takes no part in
+are in `EncryptedSharedPreferences`, and so is the proxy password of *Settings → Network*
+(since 1.0.4; on this phone only); since 0.1.40 the app takes no part in
 the device backup at all (`allowBackup="false"`: chats, memory and keys never go to Google,
 a reinstall starts empty and the account's chats come back through sync; the two rule files
 under `res/xml/` are kept for the day the switch is turned on again). Hands needs the accessibility service
@@ -259,7 +277,9 @@ symlink out of the rootfs lead nowhere, so the app's own private files stay out 
 The app allows plain `http://` for a relay of your own as entered (public and private addresses alike);
 nanoMuse Cloud and the hub to it are TLS only. Provider URL fields also accept plain `http://` addresses
 as entered. The in-app web view is not exported
-to other apps.
+to other apps. Voice input through a provider's speech model keeps the microphone open only
+while a recording is on: stopping or cancelling the recording closes the recorder at once, and a
+cancelled recording's audio is dropped, never sent to the provider.
 
 ## Building it yourself
 
@@ -271,7 +291,13 @@ bash scripts/android/build-natives.sh   # once: proot, the Alpine rootfs and rcl
 cd android/src/android
 ./gradlew :app:assembleDebug        # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:assembleRelease      # signed with android/keystore.properties when present
+./gradlew :app:testDebugUnitTest --tests 'io.github.nanomuse.*'   # our unit tests
+./gradlew :app:lintDebug            # Android lint; the report is app/build/reports/lint-results-debug.html
 ```
+
+Lint runs on a newer lint than AGP 8.7.3 bundles (`android.experimental.lint.version` in
+`gradle.properties`): the Compose and lifecycle libraries ship checks the bundled one cannot
+load. The upstream tree carries lint findings of its own; read the report for `io.github.nanomuse`.
 
 `rclone.aar` is built with Go, which fetches its modules through Go's default proxy
 (`https://proxy.golang.org,direct`); on a mainland-China network set
@@ -299,7 +325,8 @@ and put its four values in `android/keystore.properties` (git-ignored: `storeFil
 Gradle, builds `:app:assembleRelease` with the release key, writes
 `dist/nanoMuse-<version>-arm64.apk` and its `.sha256`, and with `--publish` tags
 `v<version>` and attaches both to the GitHub release with the notes from
-`docs/releases/v<version>.md`. A debug-signed APK never goes on a release, because it
+`docs/releases/v<version>.md`. Publishing refuses a working tree with uncommitted changes
+and a commit that is not on `main`. A debug-signed APK never goes on a release, because it
 could not be updated by a properly signed one. The `versionName` must match the tag,
 like the Python package's version does.
 

@@ -304,7 +304,7 @@ enum NanoMuseCloud {
             "code": trimmed(code),
             "device": deviceName,
         ]
-        // A friend's code: both get credit on a first sign-in (relay 0.12+); older relays ignore it.
+        // A friend's code on a first sign-in (relay 0.12+): both get credit once this account makes its first request; older relays ignore it.
         if !trimmed(invite).isEmpty { body["invite"] = trimmed(invite).uppercased() }
         let reply = try await call("POST", "/v1/auth/verify", body: body, token: nil)
         return try await adopt(reply)
@@ -398,6 +398,7 @@ enum NanoMuseCloud {
         }
         await MainActor.run { NanoMuseHub.shared.restart() } // the new key joins the hub
         NanoMuseSync.shared.accountChanged() // C10: another account's conversations are not this one's to show or push
+        NanoMuseProfileSync.shared.pull() // C8: the account's name and face land now, not at the next cold start
         return parsed
     }
 

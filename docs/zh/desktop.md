@@ -39,7 +39,8 @@ harness 构建以 *nanoMuse Harness* 的名字另放在旁边；从 0.1.30 起�
   读出来（`/nanomuse/cloud/me`、`/sessions`、`/account-events`、`/password`、`/sign-out-all`、
   `/delete-account`、`/config`）；
 - **一段你自己的视频当形象**：智能体页面钢笔菜单和形象工作室里的「你自己的视频…」接受一段
-  MP4 或 MOV（H.264 视频，最长 15 秒、最大 30 MB），先在形象的圆形框里预览，再在所有状态下
+  MP4 或 MOV（最长 15 秒、最大 30 MB；H.264 视频，或这台电脑能解码的 HEVC：Windows 和 macOS
+  带解码器，多数 Linux 构建没有，预览放不出来的视频会在那里被拒绝），先在形象的圆形框里预览，再在所有状态下
   静音循环播放；视频只保存在这台电脑的 `$DSH_HOME/nanomuse/avatar/own-clip.mp4`，不会发给
   nanoMuse Cloud，「默认形象」可移除（回退规则见 [avatar.md](avatar.md)）；
 - **手（Hands）**，在这台电脑上：自带运行时的 `nanomuse mcp` 走 stdio，运行时的
@@ -60,8 +61,8 @@ harness 构建以 *nanoMuse Harness* 的名字另放在旁边；从 0.1.30 起�
   `device_screen`、`device_shell`、`device_files`、`device_open`、`device_notify` 和 `delegate`
   这些工具面向手机和其他电脑；手机发来的 `delegate` 在这里落成一段「来自 <device>」的 dsh
   会话，它的审批被转回手机；远程控制（`shell`、`files`、`open`、`screen`）在一个开关后面；
-- **编程助手**：「设置 → 编程助手」，这台电脑上的 Cursor、Codex 和 Claude Code 聊天
-  （从磁盘读取，发一条消息就启动助手自己的 CLI，运行连同它的工具一边跑一边显示，「停止」
+- **编程助手**：「设置 → 编程助手」，这台电脑上的 Cursor、Codex、Claude Code 和 DeepSeek Harness
+  聊天（从磁盘读取，发一条消息就启动助手自己的 CLI，运行连同它的工具一边跑一边显示，「停止」
   结束它），之后是账号下其他电脑的，走这台电脑同样声明的 `coding.*` hub 动作；设备卡片上的
   「编程助手」标签打开那台电脑的这一页（[coding-agents.md](coding-agents.md)）。
 - **网络**（设置 → nanoMuse Cloud → 网络）：给这个应用对外请求用的一个代理（`http://host:port`、
@@ -93,7 +94,7 @@ harness 构建以 *nanoMuse Harness* 的名字另放在旁边；从 0.1.30 起�
   这份清单是中继随拒绝和 `/v1/me` 一起发来的（`spend.guidance`，[cloud.md](cloud.md#allowance)），
   不是写死在应用里的，还有「图文教程」（[own-key.md](own-key.md)）；
 - **你已经在付费的套餐**：ChatGPT 登录就在这里，附上中继对它的提醒；
-- **邀请朋友**：你们各得的奖励，和「复制链接」；
+- **邀请朋友**：朋友发出第一次请求后你们各得的奖励，和「复制链接」；
 - 请你在 GitHub 上点一颗 star，只出现一次，且只在提示策略允许时：卡片的标题和按钮是应用
   自己的；那句话也是应用自己的，除非中继的策略带了一句（`star.text`、`star.text_zh`，最多
   200 个字符；中文界面取 `text_zh`，没有就取 `text`；[cloud.md](cloud.md)）；
