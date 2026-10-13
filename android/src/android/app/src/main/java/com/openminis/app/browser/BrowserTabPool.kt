@@ -899,7 +899,15 @@ class BrowserTabPool(private val context: Context) {
     private fun handleNewWindow(resultMsg: Message) {
         val currentTabs = _tabs.value.toMutableList()
         if (currentTabs.size >= MAX_TABS) {
-            Log.w(TAG, "window.open rejected: max tabs reached")
+            // nanoMuse: if max tabs reached, fallback to loading the window in the current tab instead of dropping it
+            Log.w(TAG, "window.open fallback to current tab: max tabs reached")
+            val current = currentTabs.find { it.id == _selectedTabId.value } ?: currentTabs.firstOrNull()
+            if (current != null) {
+                current.manager.markLoading()
+                val transport = resultMsg.obj as? WebView.WebViewTransport
+                transport?.webView = current.manager.webView
+                resultMsg.sendToTarget()
+            }
             return
         }
         val id = nextTabId++
@@ -918,6 +926,7 @@ class BrowserTabPool(private val context: Context) {
         manager.onNewWindow = { msg -> handleNewWindow(msg) }
         manager.onCloseWindow = { handleCloseWindow(manager) }
         wireDownloadHandlers(manager)
+        manager.markLoading() // nanoMuse: mark as loading so BrowserSheet mounts the WebView immediately
 
         val tab = Tab(id = id, manager = manager)
         currentTabs.add(tab)

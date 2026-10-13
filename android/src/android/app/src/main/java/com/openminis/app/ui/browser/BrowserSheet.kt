@@ -306,14 +306,16 @@ fun BrowserSheet(
                     .fillMaxWidth()
                     .nestedScroll(webViewScrollGuard),
             ) {
-                if (selectedTab != null && currentURL.isNotEmpty()) {
-                    // Only mount the WebView once there's something to display.
-                    // Mounting an empty WebView (no URL loaded) corrupts the
-                    // OpenGL swap behavior for the hosting ModalBottomSheet —
-                    // sibling Compose UI (top nav, URL bar, tab chips) draws
-                    // blank white on the first-open case until the WebView
-                    // has real content. Keep it out of the hierarchy until
-                    // the user navigates somewhere.
+                // Only mount the WebView once there's something to display.
+                // Mounting an empty WebView (no URL loaded) corrupts the
+                // OpenGL swap behavior for the hosting ModalBottomSheet —
+                // sibling Compose UI (top nav, URL bar, tab chips) draws
+                // blank white on the first-open case until the WebView
+                // has real content. Keep it out of the hierarchy until
+                // the user navigates somewhere.
+                // nanoMuse: also mount when isLoading is true so newly created
+                // tabs from window.open / target=_blank don't stay blank
+                if (selectedTab != null && (currentURL.isNotEmpty() || isLoading)) {
                     BrowserWebView(
                         webView = selectedTab.manager.webView,
                         modifier = Modifier.fillMaxSize(),

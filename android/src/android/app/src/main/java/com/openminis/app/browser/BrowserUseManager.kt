@@ -103,6 +103,7 @@ class BrowserUseManager(
                 useWideViewPort = true
                 builtInZoomControls = false
                 setSupportMultipleWindows(true)
+                javaScriptCanOpenWindowsAutomatically = true // nanoMuse: allow window.open / target=_blank to open windows
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 val ua = customUA ?: profile.userAgentString
                 if (ua != null) userAgentString = ua
@@ -171,6 +172,10 @@ class BrowserUseManager(
 
     /** Deferred for awaiting navigation completion. */
     private var navigationDeferred: CompletableDeferred<Unit>? = null
+
+    // nanoMuse: handler + runnable for markLoading() safety timeout
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var markLoadingTimeout: Runnable? = null
 
     /** Screenshots directory. */
     private val screenshotsDir: File by lazy {
@@ -375,7 +380,21 @@ class BrowserUseManager(
                     )
             }
 
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                // nanoMuse: cancel markLoading timeout; real navigation has started
+                markLoadingTimeout?.let { mainHandler.removeCallbacks(it) }
+                markLoadingTimeout = null
+                // nanoMuse: sync URL and loading state as soon as navigation starts so the tab never stays blank
+                _isLoading.value = true
+                if (!url.isNullOrEmpty() && url != "about:blank") {
+                    _currentURL.value = url
+                }
+            }
+
             override fun onPageFinished(view: WebView, url: String?) {
+                // nanoMuse: clear any pending markLoading timeout
+                markLoadingTimeout?.let { mainHandler.removeCallbacks(it) }
+                markLoadingTimeout = null
                 _isLoading.value = false
                 _currentURL.value = url ?: ""
                 _pageTitle.value = view.title ?: ""
@@ -407,6 +426,9 @@ class BrowserUseManager(
                 view: WebView, request: WebResourceRequest, error: WebResourceError
             ) {
                 if (request.isForMainFrame) {
+                    // nanoMuse: clear any pending markLoading timeout on main frame error
+                    markLoadingTimeout?.let { mainHandler.removeCallbacks(it) }
+                    markLoadingTimeout = null
                     _isLoading.value = false
                     Log.e(TAG, "Navigation error: ${error.description}")
                     navigationDeferred?.complete(Unit)
@@ -1415,7 +1437,22 @@ class BrowserUseManager(
         var normalized = urlString
         if (!normalized.contains("://")) normalized = "https://$normalized"
         _isLoading.value = true
+        _currentURL.value = normalized // nanoMuse: update current URL immediately
         webView.loadUrl(normalized)
+    }
+
+    // nanoMuse: mark tab as loading before new window transport arrives
+    fun markLoading() {
+        _isLoading.value = true
+        markLoadingTimeout?.let { mainHandler.removeCallbacks(it) }
+        val runnable = Runnable {
+            if (_isLoading.value) {
+                Log.w(TAG, "markLoading timeout: no page lifecycle callback fired, resetting")
+                _isLoading.value = false
+            }
+        }
+        markLoadingTimeout = runnable
+        mainHandler.postDelayed(runnable, NAVIGATION_TIMEOUT_MS)
     }
 
     // -- JS Evaluation Helpers --
