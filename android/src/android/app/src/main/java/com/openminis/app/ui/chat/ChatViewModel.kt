@@ -6466,13 +6466,81 @@ class ChatViewModel(
         // nanoMuse: "change your avatar to …" (and a pick while the options are
         // up) is handled in the app, not by the model.
         if (nmInterceptAvatar(text)) { nmCountableTurn = false; return }
-        // nanoMuse: "@Mac …" opens a turn for that device — the mention comes out of the text,
-        // a one-turn note sends the work there through nanomuse-pc (contract C7, rule 8).
-        val nmText = io.github.nanomuse.sync.DeviceMention.apply(context, realSessionId.ifEmpty { sessionId }, text)
+        // nanoMuse: "@<device> …" hands the turn to that device directly through the hub (contract C7, rule 8).
+        if (nmHandleDeviceMention(text)) { nmCountableTurn = false; return }
         // nanoMuse: during the first conversation the text goes to the model as
         // it is; the model says what it meant in a `nanomuse-naming` block and
         // nmAfterTurn moves the phase (see FirstConversation).
-        sendMessage(nmText, skipContextCheck = false)
+        sendMessage(text, skipContextCheck = false)
+    }
+
+    // nanoMuse: direct Hub task dispatch for "@<device> ..." (contract C7, rule 8).
+    // Bypasses the local model completely — hands work straight to the target device's Muse.
+    private fun nmHandleDeviceMention(text: String): Boolean {
+        val targets = io.github.nanomuse.hub.Hub.others(context)
+            .filter { it.name.isNotBlank() && it.kind != "web" }
+            .map { io.github.nanomuse.sync.DeviceMention.Target(it.id, it.name) }
+        val m = io.github.nanomuse.sync.DeviceMention.parse(text, targets) ?: return false
+        val device = io.github.nanomuse.hub.Hub.others(context).firstOrNull { it.id == m.target.id } ?: return false
+        val task = m.text.ifBlank { text }
+
+        streamJob = viewModelScope.launch {
+            val sid = ensureSession()
+            nmAppendUserLine(sid, text)
+            if (!device.online) {
+                nmAppendAssistantLine(sid, context.getString(R.string.nm_mention_device_not_online, device.name))
+                return@launch
+            }
+            _isStreaming.value = true
+            var declinedCount = 0
+            try {
+                val uiLang = (context.resources.configuration.locales[0] ?: java.util.Locale.getDefault()).toLanguageTag()
+                val args = org.json.JSONObject().apply {
+                    put("text", task)
+                    put("from", io.github.nanomuse.hub.Hub.name(context))
+                    put("language", uiLang)
+                }
+                val reply = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    io.github.nanomuse.hub.Hub.call(
+                        to = device.id,
+                        action = "task",
+                        args = args,
+                        timeoutMs = 600_000L,
+                        onEvent = { event ->
+                            if (event.optString("stage") == "approval") {
+                                val id = event.optString("approval_id")
+                                if (id.isNotBlank()) {
+                                    declinedCount++
+                                    runCatching {
+                                        io.github.nanomuse.hub.Hub.call(
+                                            to = device.id,
+                                            action = "approve",
+                                            args = org.json.JSONObject().put("approval_id", id).put("allow", false),
+                                            timeoutMs = 30_000L,
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+                var answer = reply.optString("text").ifBlank { reply.optString("answer") }.trim()
+                if (answer.isEmpty()) answer = context.getString(R.string.nm_mention_done)
+                if (declinedCount > 0) {
+                    answer += "\n\n" + context.getString(R.string.nm_mention_device_step_declined, device.name)
+                }
+                nmAppendAssistantLine(sid, context.getString(R.string.nm_mention_device_answered, device.name) + "\n\n" + answer)
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                // User cancelled the stream
+            } catch (e: Exception) {
+                val reason = (e as? io.github.nanomuse.hub.HubException)?.message ?: e.message ?: e.javaClass.simpleName
+                nmAppendAssistantLine(sid, context.getString(R.string.nm_mention_device_did_not_answer, device.name, reason))
+            } finally {
+                _isStreaming.value = false
+                io.github.nanomuse.sync.ConversationSync.turnEnded(sid)
+            }
+        }
+        return true
     }
 
     // ─── nanoMuse: changing the face from the chat ─────────────────────────

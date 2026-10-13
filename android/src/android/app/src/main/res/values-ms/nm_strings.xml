@@ -1140,4 +1140,13 @@
     <string name="nm_a11y_not_liked">Belum disukai</string>
     <string name="nm_a11y_post_details">Butiran kiriman</string>
     <string name="nm_claude_sign_in_unavailable">Binaan ini tidak boleh menggunakan log masuk Claude. Tambah Anthropic dengan kunci API sebagai ganti.</string>
+    <!-- nanoMuse: @<device> mention suggestions -->
+    <string name="nm_mention_device_online">Runs this there and reports back</string>
+    <string name="nm_mention_device_offline">Offline</string>
+    <string name="nm_mention_device_target">This goes to %1$s.</string>
+    <string name="nm_mention_device_not_online">%1$s is not online right now.</string>
+    <string name="nm_mention_device_answered">%1$s answered:</string>
+    <string name="nm_mention_device_did_not_answer">%1$s did not answer: %2$s</string>
+    <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
+    <string name="nm_mention_done">Done</string>
 </resources>

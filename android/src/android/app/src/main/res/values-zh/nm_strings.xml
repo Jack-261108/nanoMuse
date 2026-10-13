@@ -900,6 +900,15 @@
     <string name="nm_devices_none">还没有其他设备。在电脑上安装 nanoMuse 桌面版并用同一账号登录，几秒后就会出现在这里。</string>
     <string name="nm_devices_online">在线</string>
     <string name="nm_devices_offline">离线</string>
+    <!-- nanoMuse: @<device> mention suggestions -->
+    <string name="nm_mention_device_online">在那台设备上执行并汇报结果</string>
+    <string name="nm_mention_device_offline">离线</string>
+    <string name="nm_mention_device_target">这条会发给 %1$s。</string>
+    <string name="nm_mention_device_not_online">%1$s 现在不在线。</string>
+    <string name="nm_mention_device_answered">%1$s 回答：</string>
+    <string name="nm_mention_device_did_not_answer">%1$s 没有回答：%2$s</string>
+    <string name="nm_mention_device_step_declined">%1$s 请求确认某一步操作，但这里无法批准；请在那台设备上确认。</string>
+    <string name="nm_mention_done">完成</string>
     <string name="nm_devices_web">网页控制台</string>
     <string name="nm_devices_web_sub">在任何浏览器里打开 %1$s，用同一账号登录，就能在网页上指挥你的设备。</string>
     <string name="nm_devices_web_copy">复制链接</string>

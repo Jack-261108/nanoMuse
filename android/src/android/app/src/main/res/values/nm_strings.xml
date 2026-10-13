@@ -924,6 +924,15 @@
     <string name="nm_devices_none">No other device yet. On your computer, install nanoMuse Desktop and sign in with the same account; it appears here within seconds.</string>
     <string name="nm_devices_online">online</string>
     <string name="nm_devices_offline">offline</string>
+    <!-- nanoMuse: @<device> mention suggestions -->
+    <string name="nm_mention_device_online">Runs this there and reports back</string>
+    <string name="nm_mention_device_offline">Offline</string>
+    <string name="nm_mention_device_target">This goes to %1$s.</string>
+    <string name="nm_mention_device_not_online">%1$s is not online right now.</string>
+    <string name="nm_mention_device_answered">%1$s answered:</string>
+    <string name="nm_mention_device_did_not_answer">%1$s did not answer: %2$s</string>
+    <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
+    <string name="nm_mention_done">Done</string>
     <string name="nm_devices_web">Web console</string>
     <string name="nm_devices_web_sub">Open %1$s in any browser, sign in with the same account, and drive your devices from there.</string>
     <string name="nm_devices_web_copy">Copy link</string>

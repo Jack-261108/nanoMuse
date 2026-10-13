@@ -914,6 +914,15 @@
     <string name="nm_devices_none">還沒有其他裝置。在電腦上安裝 nanoMuse 桌面版並用同一帳號登入，幾秒後就會出現在這裡。</string>
     <string name="nm_devices_online">在線上</string>
     <string name="nm_devices_offline">離線</string>
+    <!-- nanoMuse: @<device> mention suggestions -->
+    <string name="nm_mention_device_online">在那台裝置上執行並回報結果</string>
+    <string name="nm_mention_device_offline">離線</string>
+    <string name="nm_mention_device_target">這則會傳給 %1$s。</string>
+    <string name="nm_mention_device_not_online">%1$s 現在不在線上。</string>
+    <string name="nm_mention_device_answered">%1$s 回答：</string>
+    <string name="nm_mention_device_did_not_answer">%1$s 沒有回答：%2$s</string>
+    <string name="nm_mention_device_step_declined">%1$s 請求確認某一步操作，但這裡無法批准；請在那台裝置上確認。</string>
+    <string name="nm_mention_done">完成</string>
     <string name="nm_devices_web">網頁主控台</string>
     <string name="nm_devices_web_sub">在任何瀏覽器開啟 %1$s，用同一帳號登入，就能在網頁上指揮你的裝置。</string>
     <string name="nm_devices_web_copy">複製連結</string>

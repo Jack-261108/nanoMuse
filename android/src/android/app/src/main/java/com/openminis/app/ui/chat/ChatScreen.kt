@@ -5155,7 +5155,17 @@ fun ChatScreen(
                 val mentionEntries by viewModel.mentionEntries.collectAsState()
                 val isMentionScanning by viewModel.isMentionScanning.collectAsState()
                 val mentionSelectedIndex by viewModel.mentionSelectedIndex.collectAsState()
-                if (showMentionMenu) {
+
+                // nanoMuse: @<device> mention suggestions (contract C7, rule 8)
+                val nmHubDevices by io.github.nanomuse.hub.Hub.devices.collectAsState()
+                val nmDeviceSuggestions = remember(inputText, nmHubDevices) {
+                    io.github.nanomuse.sync.DeviceMention.suggestions(inputText, io.github.nanomuse.hub.Hub.others(context))
+                }
+                val nmDeviceTarget = remember(inputText, nmHubDevices) {
+                    io.github.nanomuse.sync.DeviceMention.target(inputText, io.github.nanomuse.hub.Hub.others(context))
+                }
+
+                if (showMentionMenu && inputFocused) {
                     androidx.compose.ui.window.Popup(
                         popupPositionProvider = remember {
                             object : androidx.compose.ui.window.PopupPositionProvider {
@@ -5206,7 +5216,7 @@ fun ChatScreen(
                                 .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
                                 .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
                         ) {
-                            if (mentionEntries.isEmpty()) {
+                            if (mentionEntries.isEmpty() && nmDeviceSuggestions.isEmpty()) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -5243,7 +5253,10 @@ fun ChatScreen(
                                 LaunchedEffect(mentionSelectedIndex, mentionEntries.size) {
                                     val idx = mentionSelectedIndex
                                     if (idx in mentionEntries.indices) {
-                                        mentionListState.animateScrollToItem(idx)
+                                        val deviceOffset = if (nmDeviceSuggestions.isNotEmpty()) {
+                                            nmDeviceSuggestions.size + (if (mentionEntries.isNotEmpty()) 3 else 1)
+                                        } else 0
+                                        mentionListState.animateScrollToItem(idx + deviceOffset)
                                     }
                                 }
                                 LazyColumn(
@@ -5266,6 +5279,24 @@ fun ChatScreen(
                                         )
                                         .verticalScrollbar(mentionListState),
                                 ) {
+                                    // nanoMuse: devices section above files (contract C7, rule 8)
+                                    io.github.nanomuse.ui.chat.NmDeviceMentionView.renderSection(
+                                        scope = this,
+                                        suggestions = nmDeviceSuggestions,
+                                        hasFiles = mentionEntries.isNotEmpty(),
+                                        onSelectDevice = { d ->
+                                            val newText = "@${d.name} "
+                                            viewModel.setInputText(newText)
+                                            inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                                text = newText,
+                                                selection = androidx.compose.ui.text.TextRange(newText.length),
+                                            )
+                                            viewModel.dismissMentionMenu()
+                                        },
+                                    )
+                                    if (nmDeviceSuggestions.isNotEmpty() && mentionEntries.isNotEmpty()) {
+                                        io.github.nanomuse.ui.chat.NmDeviceMentionView.renderFileHeader(this)
+                                    }
                                     itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
                                         val isSelected = i == mentionSelectedIndex
                                         Row(
@@ -5549,6 +5580,13 @@ fun ChatScreen(
                                 }
                             }
                         }
+                    }
+                    // nanoMuse: indicator when the message addresses another device (contract C7, rule 8)
+                    if (nmDeviceTarget != null && nmDeviceSuggestions.isEmpty()) {
+                        io.github.nanomuse.ui.chat.NmDeviceTargetBadge(
+                            target = nmDeviceTarget,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                        )
                     }
                     // Attachment thumbnails inside the box (iOS: 64×64 squares)
                     // [T-android-paste-placeholder] One chip per folded paste,

@@ -1144,4 +1144,13 @@
     <string name="nm_a11y_not_liked">Beğenilmedi</string>
     <string name="nm_a11y_post_details">Gönderi ayrıntıları</string>
     <string name="nm_claude_sign_in_unavailable">Bu sürüm Claude ile oturum açmayı kullanamaz. Bunun yerine Anthropic’i bir API anahtarıyla ekleyin.</string>
+    <!-- nanoMuse: @<device> mention suggestions -->
+    <string name="nm_mention_device_online">Runs this there and reports back</string>
+    <string name="nm_mention_device_offline">Offline</string>
+    <string name="nm_mention_device_target">This goes to %1$s.</string>
+    <string name="nm_mention_device_not_online">%1$s is not online right now.</string>
+    <string name="nm_mention_device_answered">%1$s answered:</string>
+    <string name="nm_mention_device_did_not_answer">%1$s did not answer: %2$s</string>
+    <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
+    <string name="nm_mention_done">Done</string>
 </resources>
