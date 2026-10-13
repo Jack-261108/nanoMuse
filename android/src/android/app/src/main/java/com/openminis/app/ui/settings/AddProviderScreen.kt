@@ -873,6 +873,8 @@ private fun ColumnScope.OAuthConfigSection(
                         Text(signInLabel)
                     }
                 }
+                // nanoMuse: a proxy or VPN can swallow the localhost callback; after ten seconds the person can paste the address (#441).
+                io.github.nanomuse.oauth.OAuthCallbackRescue(active = isAuthenticating, providerType = providerType)
                 if (errorMessage != null) {
                     Spacer(Modifier.height(8.dp))
                     Text(

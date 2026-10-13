@@ -9,7 +9,7 @@ were written on a Linux machine. The app **builds, signs and is on TestFlight**:
 0.1.31 (2), went through the *iOS · TestFlight* workflow on 2026-10-03; 1.0.0 is build 16, which
 passed Apple's beta review, so the public link
 (`https://testflight.apple.com/join/ZHexbDqc`) installed it first; 1.0.1 is build 18 and 1.0.2 is build 19, both through the review
-since 2026-10-12, so the link installs build 19 today; 1.0.3 is build 22, in the review since 2026-10-12, and 1.0.4 is build 26, submitted on 2026-10-13 (*Where it stands* below). Builds 20 and 21 (1.0.2), 23, 24 and 25 (1.0.3 with fixes merged after the tag) went to the internal testers only. The testers' reports have driven the fixes in the release
+since 2026-10-12; 1.0.3 is build 22 and 1.0.4 is build 26, both through the review since 2026-10-13, so the link installs build 26 today; 1.0.5 is build 28, submitted on 2026-10-14 (*Where it stands* below). Builds 20 and 21 (1.0.2), 23, 24 and 25 (1.0.3 with fixes merged after the tag) and 27 (1.0.4 the same way) went to the internal testers only. The testers' reports have driven the fixes in the release
 notes (the composer, onboarding, sign-out); the Devices section and notifications from other
 devices still have the fewest hours on a real device. The first archive taught the pipeline
 that automatic signing wants a registered device, which is why it signs manually now.
@@ -91,7 +91,9 @@ Ours, in `NanoMuse/`:
   `tool_title` (the model's own words for the step, *打开携程网站*), then *writing the reply*,
   then *On it: 〈brief〉*, and the model's name when idle; while a new face is being drawn it
   reads the avatar flow's line. The face (`NanoMuseFaces.swift`, the drawn face from Application
-  Support or the dragon from the bundle, five moods with the breath, bob, tilt, pop and shake of
+  Support, else an emoji on its colour when the desktop or the web console set one (kept in
+  `avatar/emoji.json`, rendered as a still; the phone has no picker for it yet), else the dragon
+  from the bundle, five moods with the breath, bob, tilt, pop and shake of
   the other clients; with Reduce Motion on the still keeps still and only the mood's crossfade
   remains) is tapped into **the agent's page**. A short clip of your own can play as the
   face instead (`NanoMuseOwnClip.swift`: *Your own clip…* under the pen on the agent's page and in
@@ -617,7 +619,54 @@ Ours, in `NanoMuse/`:
   and the agent's pill grows to 600 pt, the web's wide value. A compact width, every iPhone and
   a narrow Split View pane, is unchanged. The cells of the message list are hosted by
   `UIHostingConfiguration`, which does not carry our environment objects but does carry the
-  size class from the cell's traits; the agent's pill reads it from there.
+  size class from the cell's traits; the agent's pill reads it from there. In 1.0.4 the
+  agent's rows alone padded outside the column, so their pill began 16 pt left of the
+  composer's edge; the three assistant cells in `CollectionViewMessageListV3.swift` (header,
+  block, footer) now pad inside it, as the user's rows always did.
+- **The rows pass under the header.** The shell measures its Muse header and hands the height
+  to the chat as the `nmTopOverlay` environment value (`NanoMuseChatModifiers.swift`); the
+  message list ignores the container safe area at its top and keeps its rows down by that much
+  (`topOverlay` on `CollectionViewMessageListV3`, added to `contentInset.top`), the way it
+  already runs under the composer and the pill bar. So the rows scroll under the face and the
+  scrim behind the header fades them, as on Android. 1.0.3 and 1.0.4 had the header as a
+  `safeAreaInset` and nothing more, which is enough for a SwiftUI `ScrollView` but shortens a
+  UIKit view: the list ended under the header and the rows were cut at a hard edge there,
+  with the scrim fading nothing. A pushed side chat, which keeps the system bar, has the value
+  at 0 and instead runs its content up under the bar the way upstream's iOS 26 layout does
+  (`NavBarStyleModifier`); the bar is UIKit's, so the list's own inset adjustment keeps the
+  first row below it, and its rows fade under the scrim behind the bar too.
+- **The feed is written quietly, and a routine speaks first** (`NanoMuseRoutineWakes.swift`;
+  `NanoMuseSync.shows`, `NanoMuseHeadless.run`, the `nmRoutine` spots of `ChatModels.swift`,
+  `AIChatViewModel.swift`, `AIChatViewModel+Persistence.swift` and `ChatMessageViews.swift`).
+  Up to 1.0.4 the daily feed was a conversation titled *Feed* in the drawer, with *Write
+  today's feed.* as a bubble in the person's voice and the model's answer under it, and every
+  routine the person set up began its turn the same way. The feed's conversation is the agent's
+  working room now and the lists leave it out (`shows` says no to it, as it does to another
+  account's chats); the posts arrive in the Feed room as before. A routine's turn is marked as the
+  routine's: the row that carried its prompt is one quiet line, *Routine · 〈label〉 · 08:00*
+  (`NanoMuseRoutineWakeRow`, kept under the row's id so it stays after a reload), and the model
+  gets a one-turn addendum (`NanoMuseSessionAddenda`) saying the person did not type it, so it
+  opens with the result instead of thanking them for asking. The prompt's text is unchanged, so
+  the turn runs as it did.
+- **The fourth audit (1.0.x)** (`*.lproj/AppShortcuts.strings`, `NanoMuseChrome.swift`,
+  `NanoMuseShell.swift`, `NanoMuseAgentPage.swift`, `NanoMuseHub.swift`,
+  `NanoMuseBackgroundSettings.swift`, `Localizable.xcstrings`): the Siri phrases are in all nine
+  languages (they were in English and the two Chinese tables; a phone in Japanese, Korean, German,
+  Spanish, French or Russian got the English ones). The Muse pages' titles and the agent's name in
+  the drawer and on the agent's page follow Dynamic Type, capped at 1.35 times their base as the
+  header's lines are (`NanoMuseHeaderMetrics`); before, they were fixed at 17 and 24 pt. *Create
+  routine* on an idea opens the routine's editor as it was meant to: the shell owns that sheet
+  now, where before the Goals room was asked to open it and that room is not on screen while the
+  Ideas room is, so the routine was made at the idea's time and nothing opened. *Background &
+  notifications* says what the phone does: a notification is a routine's reminder or a note from
+  another device, and Background App Refresh lets iOS post the reminder, never run the routine
+  (the page used to say the app got slots to finish a routine). A failure from the hub or a
+  computer (*Coding agents*, the Reach sheet, an `@device` message) is one sentence in the phone's
+  language from the hub's code, as Android's `HubErrors.describe` (`NanoMuseHubErrors`): *That
+  computer is offline.*, *The computer did not answer in time.*, *The computer runs an older
+  nanoMuse that does not know this action.*; before, the English line the relay or the runtime
+  sent was shown as it came. The Library's and the account page's segmented pickers and the •••
+  menus of a goal, a routine and a feed post carry a VoiceOver label.
 
 ## Voice prompts from the Action Button
 
@@ -643,8 +692,8 @@ transcription stack; the transcript reaches `inputText` the way it always does. 
 than 30 seconds is dropped. iOS gives an App Intent no way to take free-form speech, which is
 why this is a voice entry rather than "ask nanoMuse something" in one breath, and why the app
 opens: a microphone running with nothing on screen would read as a fault. The Siri phrases are
-in the three `AppShortcuts.strings` tables (English, 简体中文, 繁體中文), the intent's own strings
-in `Localizable.xcstrings` (#296, #298).
+in the nine `AppShortcuts.strings` tables (one per `<lang>.lproj`, legacy `.strings` because the
+deployment target is iOS 16), the intent's own strings in `Localizable.xcstrings` (#296, #298).
 
 ## Building on a Mac
 
@@ -715,7 +764,7 @@ Set up on 2026-10-03, all of it under the account holder's developer account (te
   2026-10-09 and passed it, so the public link installs it (build 14, 0.1.41, was what the link
   delivered before); build 17, 1.0.0 with the fixes merged after the tag, went to the internal
   testers only. **Build 18 (1.0.1)** was added to *nanoMuse Beta* and submitted to the review on
-  2026-10-10 and **build 19 (1.0.2)** on 2026-10-11; both passed on 2026-10-12, so the link installs build 19. **Build 22 (1.0.3)** was submitted on 2026-10-12 and **build 26 (1.0.4)** on 2026-10-13; builds 23, 24 and 25 (1.0.3 with fixes merged after the tag) went to the internal testers only. The public link delivers a build only
+  2026-10-10 and **build 19 (1.0.2)** on 2026-10-11; both passed on 2026-10-12, so the link installs build 19. **Build 22 (1.0.3)** was submitted on 2026-10-12 and **build 26 (1.0.4)** on 2026-10-13; both passed on 2026-10-13, so the link installs build 26. **Build 28 (1.0.5)** was submitted on 2026-10-14; builds 23, 24 and 25 (1.0.3 with fixes merged after the tag) and 27 (1.0.4 the same way) went to the internal testers only. The public link delivers a build only
   once a review has passed, and each new version repeats the step (the review is per version;
   later builds of an approved version need none).
   Nothing towards the App Store: the app is not going there.

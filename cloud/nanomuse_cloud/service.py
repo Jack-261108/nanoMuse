@@ -731,10 +731,7 @@ class Cloud:
         self._refuse_if_signups_closed(ident)
         self._refuse_if_domain_limited(ident)
         account = self.db.account_by_hash(ident.hash(self.s.hmac_key))
-        if account is not None and account["disabled"]:
-            # the same answer the code would get at /v1/auth/verify, given before an SMS or
-            # a mail is paid for; a disabled account has nothing to sign in to
-            raise CloudError(403, "account_disabled", "This account is disabled")
+        disabled = account is not None and bool(account["disabled"])
         t = now()
         if self.db.codes_recent_for(ident.hash(self.s.hmac_key), t - 600) >= self.s.code_per_identifier_10m:
             raise CloudError(429, "code_too_often", "Too many codes for this address; wait a few minutes")
@@ -746,6 +743,15 @@ class Cloud:
         self.db.insert_code(ident.hash(self.s.hmac_key), _code_hash(self.s.hmac_key, code), ip, self.s.code_ttl_s)
         if review:
             log.info("review sign-in: a code request for the reviewer's address; nothing sent")
+            return
+        if disabled:
+            # Refused quietly: the row above is written and the answer is the same 204 as
+            # anyone's, so this route tells a stranger nothing about the number (not that it
+            # has an account, not that the operator switched it off) and the per-identifier
+            # and per-address limits behave exactly as they do for an enabled account. No
+            # SMS or mail is paid for; the code itself goes nowhere, and whoever holds the
+            # account hears `403 account_disabled` at /v1/auth/verify, as before.
+            log.info("code request for a disabled account; nothing sent")
             return
         try:
             self.sender.send(ident, code)
@@ -1013,8 +1019,6 @@ class Cloud:
             self._note_login_failure(ip)
             self.db.add_event("", "sign_in.failed", ident.channel)
             raise CloudError(401, "bad_credentials", "That address and password do not match")
-        if account["disabled"]:
-            raise CloudError(403, "account_disabled", "This account is disabled")
         locked_until = account["locked_until"]
         if locked_until and int(locked_until) > now():
             raise CloudError(429, "locked", "Too many wrong passwords; wait a while or sign in with a code")
@@ -1027,6 +1031,10 @@ class Cloud:
             if left == 0:
                 raise CloudError(429, "locked", "Too many wrong passwords; wait a while or sign in with a code")
             raise CloudError(401, "bad_credentials", "That address and password do not match")
+        if account["disabled"]:
+            # Only the holder of the right password hears that the account is disabled; a
+            # probe with a guessed password gets the same answer as for any wrong password.
+            raise CloudError(403, "account_disabled", "This account is disabled")
         self.db.login_succeeded(account["id"])
         key, caller = self._issue_key(account["id"], device, via="password")
         self.db.add_event(account["id"], "sign_in.password", device)
@@ -2683,19 +2691,34 @@ class Cloud:
             )
         return out
 
-    def ledger_page(self, account_id: str, limit: int = 100, before_id: int = 0) -> dict:
+    def ledger_page(
+        self,
+        account_id: str,
+        limit: int = 100,
+        before_id: int = 0,
+        kinds: tuple[str, ...] | None = None,
+        q: str = "",
+    ) -> dict:
         """One page of an account's statement, newest first, with the count of the whole
-        — the operator's page reads it to the first line, page by page."""
-        rows = [self._ledger_row(r) for r in self.db.recent_ledger(account_id, limit=limit, before_id=before_id)]
-        return {"rows": rows, "total": self.db.ledger_count(account_id)}
+        — the operator's page reads it to the first line, page by page. `kinds` and `q`
+        (0.26) are the page's filter; the count is of what matches, so the pager is honest."""
+        rows = [self._ledger_row(r) for r in self.db.recent_ledger(account_id, limit, before_id, kinds, q)]
+        return {"rows": rows, "total": self.db.ledger_count(account_id, kinds, q)}
 
-    def events_page(self, account_id: str, limit: int = 100, before_id: int = 0) -> dict:
+    def events_page(
+        self,
+        account_id: str,
+        limit: int = 100,
+        before_id: int = 0,
+        kinds: tuple[str, ...] | None = None,
+        q: str = "",
+    ) -> dict:
         rows = []
-        for r in self.db.events_for(account_id, limit, before_id):
+        for r in self.db.events_for(account_id, limit, before_id, kinds, q):
             d = dict(r)
             d["platform"] = platform_of(d.get("ua") or "")
             rows.append(d)
-        return {"rows": rows, "total": self.db.event_count(account_id)}
+        return {"rows": rows, "total": self.db.event_count(account_id, kinds, q)}
 
     def admin_address(self, ip: str) -> dict:
         """One address: the accounts seen from it — for the operator checking whether two
@@ -2714,8 +2737,8 @@ class Cloud:
         ]
         return {"ip": ip, "accounts": rows}
 
-    def admin_events(self, limit: int = 200, kinds: tuple[str, ...] | None = None) -> list[dict]:
-        rows = self.db.events_recent(max(1, min(limit, 1000)), kinds)
+    def admin_events(self, limit: int = 200, kinds: tuple[str, ...] | None = None, before_id: int = 0) -> list[dict]:
+        rows = self.db.events_recent(max(1, min(limit, 1000)), kinds, max(0, before_id))
         hints, _ = self._labels([r["account_id"] for r in rows if r["account_id"]], decrypt=False)
         out = []
         for r in rows:
