@@ -1808,6 +1808,17 @@ class ChatViewModel(
     // mentionMenuUp / mentionMenuDown / executeSelectedMention / selectMention
     // moved to ChatViewModelMentionExt.kt as ChatViewModel extension functions.
 
+    // nanoMuse: dispatch built-in slash command action (compact/memory/thinking/clear)
+    private fun executeBuiltinSlashAction(cmd: SlashCommand) {
+        when (cmd.id) {
+            "compact" -> compactAll()
+            "memory" -> toggleMemoryEnabled()
+            "thinking" -> toggleThinking()
+            "clear" -> _clearChatConfirmRequested.value = true
+            else -> AppLogger.info(TAG, "[Slash] unrecognized id=${cmd.id} — no dispatch")
+        }
+    }
+
     /**
      * Execute a slash command. Returns the text the composer should hold
      * afterward (caret via [pendingCaret] when relevant).
@@ -1825,26 +1836,18 @@ class ChatViewModel(
      */
     fun executeSlashCommand(cmd: SlashCommand, currentInput: String = ""): String {
         val saved = savedInputBeforeSlash
-        // [T-skill-slash a88ea8f9] Skill rows aren't directly executable —
-        // they're a typing aid. Fill the composer with the literal slash
-        // command; the user then taps Send and the model handles the skill via
-        // the existing SKILL.md fragment injection in runAgentLoop.
-        if (cmd.isSkill) {
+        // nanoMuse: Skill and MCP rows are typing aids — fill the composer with the literal slash command
+        if (cmd.isSkill || cmd.isMcp) {
             AppLogger.info(TAG, "[Slash] tap skill id=${cmd.id} title=${cmd.title} → composer fill only")
             savedInputBeforeSlash = null
             _showSlashMenu.value = false
             _slashMenuSelectedIndex.value = -1
             val prefix = "/${cmd.title} "
-            // [T-android-slash-menu-align-ios-prepend] iOS parity: over-content
-            // (saved != null) → PREPEND "/<skill> " to the original, so the
-            // composer reads "/<skill> <original>" with the original as args,
-            // caret right after the prefix (before the original). Typed-"/"
-            // (saved == null) → just "/<skill> " (the input WAS the partial
-            // command). Trailing space lets the user type "/<skill> <args>".
             return if (saved != null) {
                 _pendingCaret.value = prefix.length
                 prefix + saved
             } else {
+                _pendingCaret.value = prefix.length
                 prefix
             }
         }
@@ -1853,21 +1856,19 @@ class ChatViewModel(
         _showSlashMenu.value = false
         _slashMenuSelectedIndex.value = -1
 
-        when (cmd.id) {
-            "compact" -> compactAll()
-            "memory" -> toggleMemoryEnabled()
-            "thinking" -> toggleThinking()
-            "clear" -> _clearChatConfirmRequested.value = true
-            else -> AppLogger.info(TAG, "[Slash] unrecognized id=${cmd.id} — no dispatch")
-        }
-        // [T-android-slash-menu-align-ios-prepend] Action command: restore the
-        // saved ORIGINAL (stripping the injected "/ " prefix) so the body text
-        // survives — never the live "/ <original>". Typed-"/" path → clear.
+        // nanoMuse: if opened over existing text (via "/" button), run action and restore the draft
         if (saved != null) {
+            executeBuiltinSlashAction(cmd)
             _pendingCaret.value = saved.length
             return saved
         }
-        return ""
+
+        // nanoMuse: typed-slash autocomplete mode — fill "/<command> " into the composer,
+        // the user presses Enter to execute (consistent with skill/mcp completion UX)
+        val cmdName = cmd.title.lowercase()
+        val prefix = "/$cmdName "
+        _pendingCaret.value = prefix.length
+        return prefix
     }
 
     /** Toggle memory writes on/off, persist to DB, and append a system-info message. */
@@ -1960,7 +1961,8 @@ class ChatViewModel(
         val name = trimmed.drop(1).lowercase()
         val cmd = availableSlashCommands.firstOrNull { it.title.lowercase() == name }
             ?: return false
-        executeSlashCommand(cmd)
+        // nanoMuse: execute built-in slash command action when sent
+        executeBuiltinSlashAction(cmd)
         return true
     }
 

@@ -34,6 +34,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- **Slash command completion preserves the draft and syncs the cursor.** Selecting a skill, MCP tool or built-in slash command from the popup menu now updates the composer text and cursor immediately, refocuses the input field and displays the keyboard so arguments can be typed without an extra tap. Dismissing the popup when a command is already chosen no longer wipes the composer, and built-in action commands complete as `/<command> ` when typed.
+
 - **Leaving the app from the root chat asks for a second back press.** Pressing the system back button while in the main chat with the drawer closed now shows a brief prompt ("Press back again to exit") instead of immediately quitting the app, and leaves the app when pressed again within two seconds.
 
 - **Per-mood avatar clips.** The avatar studio now accepts an optional local video for each of the five moods. Moods without a video keep the existing single-video or built-in animation.
