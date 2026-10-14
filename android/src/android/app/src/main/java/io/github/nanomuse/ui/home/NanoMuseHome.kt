@@ -323,11 +323,22 @@ fun NanoMuseHome(
     }
     fun closeDrawer() = scope.launch { drawerState.close() }
 
-    // Back: close the drawer → leave a non-chat tab → leave a side chat → (system) leave the app.
+    // Back: close the drawer → leave a non-chat tab → leave a side chat → double press to leave the app.
     val homeShown = phase == HomePhase.HOME
     BackHandler(enabled = homeShown && drawerState.isOpen) { closeDrawer() }
     BackHandler(enabled = homeShown && !drawerState.isOpen && tab != HomeTab.CHAT) { tab = HomeTab.CHAT }
     BackHandler(enabled = homeShown && !drawerState.isOpen && tab == HomeTab.CHAT && !isMainChat && mainSessionId != null) { showMain() }
+    var lastBackPressMs by remember { mutableStateOf(0L) }
+    val isRootChat = homeShown && !drawerState.isOpen && tab == HomeTab.CHAT && (isMainChat || mainSessionId == null)
+    BackHandler(enabled = isRootChat) {
+        val now = System.currentTimeMillis()
+        if (now - lastBackPressMs < 2000L) {
+            (context as? android.app.Activity)?.finish()
+        } else {
+            lastBackPressMs = now
+            Toast.makeText(context, R.string.nm_press_back_again_to_exit, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // The drawer + tab shell, as a local composable so it can share every piece of state above
     // and still be one branch of the phase switch below.

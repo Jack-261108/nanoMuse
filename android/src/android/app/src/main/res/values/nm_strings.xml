@@ -1149,4 +1149,5 @@
     <string name="nm_font_scale_medium">Medium</string>
     <string name="nm_font_scale_large">Large</string>
     <string name="nm_font_scale_extra_large">XL</string>
+    <string name="nm_press_back_again_to_exit">Press back again to exit</string>
 </resources>

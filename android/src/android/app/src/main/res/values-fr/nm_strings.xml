@@ -1171,4 +1171,5 @@
     <string name="nm_mention_device_did_not_answer">%1$s did not answer: %2$s</string>
     <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
     <string name="nm_mention_done">Done</string>
+    <string name="nm_press_back_again_to_exit">Appuyez à nouveau pour quitter</string>
 </resources>
