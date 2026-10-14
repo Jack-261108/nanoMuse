@@ -6872,10 +6872,12 @@ fun ChatScreen(
                         val hasContent = hasText || attachments.isNotEmpty()
                         val showStop = isStreaming && !hasContent
                         if (showStop) {
+                            // nanoMuse: match the monochrome send button (black disc with
+                            // white square in light theme, inverted in dark, matching iOS).
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
-                                    .background(Color(0xFFFF3B30), CircleShape)
+                                    .background(ChatColors.sendButton, CircleShape)
                                     .clip(CircleShape)
                                     .clickable { viewModel.cancelStream() },
                                 contentAlignment = Alignment.Center,
@@ -6883,7 +6885,7 @@ fun ChatScreen(
                                 Icon(
                                     Icons.Default.Stop,
                                     contentDescription = "Stop",
-                                    tint = Color.White,
+                                    tint = ChatColors.background,
                                     modifier = Modifier.size(20.dp),
                                 )
                             }
