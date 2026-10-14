@@ -3844,7 +3844,16 @@ fun ChatScreen(
                     enabled = slashMenuOpen || mentionMenuOpenForSpy
                 ) {
                     if (slashMenuOpen) {
-                        viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                        // nanoMuse: sync inputFieldValue synchronously when dismissing via back press
+                        val dismissed = viewModel.dismissSlashMenu(inputText)
+                        val caret = viewModel.consumePendingCaret()?.coerceIn(0, dismissed.length)
+                            ?: dismissed.length
+                        inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                            text = dismissed,
+                            selection = androidx.compose.ui.text.TextRange(caret),
+                            composition = null,
+                        )
+                        viewModel.setInputText(dismissed)
                     }
                     if (mentionMenuOpenForSpy) {
                         viewModel.dismissMentionMenu()
@@ -4973,7 +4982,18 @@ fun ChatScreen(
                             }
                         },
                         onDismissRequest = {
-                            viewModel.setInputText(viewModel.dismissSlashMenu(inputText))
+                            // nanoMuse: only dismiss and clear if the slash menu is still actively open
+                            if (showSlashMenu) {
+                                val dismissed = viewModel.dismissSlashMenu(inputText)
+                                val caret = viewModel.consumePendingCaret()?.coerceIn(0, dismissed.length)
+                                    ?: dismissed.length
+                                inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                    text = dismissed,
+                                    selection = androidx.compose.ui.text.TextRange(caret),
+                                    composition = null,
+                                )
+                                viewModel.setInputText(dismissed)
+                            }
                         },
                         properties = androidx.compose.ui.window.PopupProperties(
                             focusable = false,
@@ -5062,31 +5082,41 @@ fun ChatScreen(
                                         .let {
                                             if (!isThinking) {
                                                 it.clickable {
-                                                    // [T-android-slash-menu-clears-input] Pass the
-                                                    // LIVE input so an action command keeps the
-                                                    // user's body text instead of wiping it.
-                                                    viewModel.setInputText(viewModel.executeSlashCommand(cmd, inputText))
-                                                    // For Skill rows, "/<name> "
-                                                    // is a typing aid — the user
-                                                    // still needs to type
-                                                    // arguments. Bring the IME
-                                                    // back up + grab focus so
-                                                    // they can keep typing
-                                                    // without an extra tap on
-                                                    // the composer.
-                                                    if (cmd.isSkill) {
-                                                        try {
-                                                            inputFocusRequester.requestFocus()
-                                                        } catch (_: IllegalStateException) {
-                                                            // FocusRequester not attached yet.
-                                                        }
-                                                        keyboardController?.show()
+                                                    // nanoMuse: execute or fill slash command and synchronously sync inputFieldValue
+                                                    val newText = viewModel.executeSlashCommand(cmd, inputText)
+                                                    val caret = viewModel.consumePendingCaret()?.coerceIn(0, newText.length)
+                                                        ?: newText.length
+                                                    inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                                        text = newText,
+                                                        selection = androidx.compose.ui.text.TextRange(caret),
+                                                        composition = null,
+                                                    )
+                                                    viewModel.setInputText(newText)
+                                                    try {
+                                                        inputFocusRequester.requestFocus()
+                                                    } catch (_: IllegalStateException) {
+                                                        // FocusRequester not attached yet.
                                                     }
+                                                    keyboardController?.show()
                                                 }
                                             } else if (thinkingSupported) {
                                                 it.clickable {
-                                                    val newLevel = if (thinkingLevelState.isEnabled) ThinkingLevel.OFF else ThinkingLevel.MEDIUM
-                                                    viewModel.setThinkingLevel(newLevel)
+                                                    // nanoMuse: fill /thinking or toggle thinking level
+                                                    val newText = viewModel.executeSlashCommand(cmd, inputText)
+                                                    val caret = viewModel.consumePendingCaret()?.coerceIn(0, newText.length)
+                                                        ?: newText.length
+                                                    inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
+                                                        text = newText,
+                                                        selection = androidx.compose.ui.text.TextRange(caret),
+                                                        composition = null,
+                                                    )
+                                                    viewModel.setInputText(newText)
+                                                    try {
+                                                        inputFocusRequester.requestFocus()
+                                                    } catch (_: IllegalStateException) {
+                                                        // FocusRequester not attached yet.
+                                                    }
+                                                    keyboardController?.show()
                                                 }
                                             } else it
                                         }
@@ -6073,15 +6103,14 @@ fun ChatScreen(
                                     ) {
                                         val first = filteredSlashCommands.firstOrNull()
                                         if (first != null) {
+                                            // nanoMuse: tab autocomplete fills slash command and syncs caret
                                             val newText = viewModel.executeSlashCommand(first, inputText)
+                                            val caret = viewModel.consumePendingCaret()?.coerceIn(0, newText.length)
+                                                ?: newText.length
                                             viewModel.setInputText(newText)
-                                            // Caret to the end: executeSlashCommand
-                                            // leaves "/<name> " for a Skill, and the
-                                            // point of completing is to keep typing
-                                            // arguments right after it.
                                             inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
                                                 text = newText,
-                                                selection = androidx.compose.ui.text.TextRange(newText.length),
+                                                selection = androidx.compose.ui.text.TextRange(caret),
                                             )
                                             return@onKeyEvent true
                                         }

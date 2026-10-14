@@ -257,6 +257,8 @@ internal fun ChatViewModel.showSlashMenuOverInput(currentInput: String): String 
  * an empty string (if opened by typing "/").
  */
 internal fun ChatViewModel.dismissSlashMenu(currentInput: String): String {
+    // nanoMuse: if menu is already closed (e.g. command selected), do not wipe composer
+    if (!_showSlashMenu.value) return currentInput
     // [T-android-slash-menu-align-ios-prepend] iOS parity:
     // - Over-content (saved != null): restore the saved ORIGINAL, stripping
     //   the "/ " prefix showSlashMenuOverInput injected. We restore `saved`,

@@ -91,6 +91,22 @@ class SlashSendClearsInputTest {
             showSlashMenu = false
             if (saved != null) text = saved
         }
+
+        /** nanoMuse: executeSlashCommand selection when clicking a command in the popup */
+        fun selectSlashCommand(title: String, isSkill: Boolean = false, isMcp: Boolean = false) {
+            val saved = savedInputBeforeSlash
+            savedInputBeforeSlash = null
+            showSlashMenu = false
+            if (isSkill || isMcp) {
+                text = if (saved != null) "/$title $saved" else "/$title "
+                return
+            }
+            if (saved != null) {
+                text = saved
+                return
+            }
+            text = "/${title.lowercase()} "
+        }
     }
 
     @Test
@@ -150,5 +166,49 @@ class SlashSendClearsInputTest {
         // dismissSlashMenu restores the saved original
         val saved = c.savedInputBeforeSlash
         assertEquals("keep me", saved)
+    }
+
+    @Test
+    fun `typing slash and selecting a skill fills the command and does not clear`() {
+        val c = Composer(withFix = true)
+        c.text = "/"
+        c.onTextChanged("/")
+        assertEquals(true, c.showSlashMenu)
+        c.selectSlashCommand("weather", isSkill = true)
+        assertEquals("the input box must contain the skill command", "/weather ", c.text)
+        assertEquals(false, c.showSlashMenu)
+    }
+
+    @Test
+    fun `typing slash and selecting an mcp tool fills the command and does not clear`() {
+        val c = Composer(withFix = true)
+        c.text = "/"
+        c.onTextChanged("/")
+        assertEquals(true, c.showSlashMenu)
+        c.selectSlashCommand("github", isMcp = true)
+        assertEquals("the input box must contain the mcp command", "/github ", c.text)
+        assertEquals(false, c.showSlashMenu)
+    }
+
+    @Test
+    fun `typing slash and selecting a builtin command fills the command and does not clear`() {
+        val c = Composer(withFix = true)
+        c.text = "/c"
+        c.onTextChanged("/c")
+        assertEquals(true, c.showSlashMenu)
+        c.selectSlashCommand("Compact")
+        assertEquals("the input box must contain the completed command", "/compact ", c.text)
+        assertEquals(false, c.showSlashMenu)
+    }
+
+    @Test
+    fun `selecting a skill over drafted text prepends the command to the draft`() {
+        val c = Composer(withFix = true)
+        c.text = "check Beijing"
+        c.tapSlashButton()
+        assertEquals("/ check Beijing", c.text)
+        c.selectSlashCommand("weather", isSkill = true)
+        assertEquals("/weather check Beijing", c.text)
+        assertEquals(false, c.showSlashMenu)
     }
 }
