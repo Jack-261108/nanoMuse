@@ -12,15 +12,52 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Web
 
+- **Each Feed section showed its own load error and retry.** Posts, activity, Next up and calendar requests kept their last successful content when a refresh failed; retrying one section no longer refetched the others.
+
 ### Desktop
 
+- **Synced turns from another computer stay above a newer local prompt and arrive without a reload.** On the desktop, a hub `sync` frame that arrived while a pull was already running was dropped until the next minute tick, and a remote bubble inserted before this computer's first prompt or from a device with a skewed clock stayed below the new local prompt until the window was reloaded. An in-flight pull now runs a follow-up pull when a newer `sync` frame arrives, reconnecting the hub socket or bringing the window back to the front pulls as well, and remote bubbles record when they were received locally and reposition inside the chat flow as new prompts mount. For #395.
+
+- **Windows installed ready updates on a normal user quit and stayed closed.** Quit reused the restart update's integrity check and work protection, while restart still reopened the app. Without a ready update, the normal protected exit was unchanged. Closing to the tray, idling, a crash or system shutdown did not request installation, and a failed installer launch kept the app running.
+
+- **Windows downloaded updates automatically on known unmetered networks.** The saved Settings switch defaulted to on; metered or unknown connections kept checking and offered a manual download without changing the switch. Failed downloads retried after one and five minutes at most, rechecking the switch and network each time, then waited for a manual retry or the next six-hour check. Turning the switch off stopped new automatic starts without interrupting a download already running.
+
+- **Windows gained downloads and protected restart updates in the corner menu.** The app checked stable releases on startup and every six hours, showed download progress and verification, retried manually after failure, and reused complete packages only after electron-updater's integrity check. The mirror was tried before GitHub for the same candidate. Settings shared the menu's state and offered a manual check; restarting waited for confirmed work to end and kept new work out during installation handoff. An installer that failed to start left the app running instead of completing the library's queued quit.
+
+- **Custom videos for each avatar mood.** The avatar studio can assign a separate local clip to idle, working, waiting, happy or error, preview and replace it, and remove each override without changing the other clips or the original single-video setting.
+
+- **Mac packaging selected the requested architecture and stopped on failed checks.** Building with both Intel and Apple silicon bundles present no longer put the wrong app in a named installer; inner signing and app, helper and disk-image verification failures returned an error instead of continuing.
+
+- **The bundled-runtime build check stopped hanging on startup logs or timeouts.** It captures logs without filling an unread pipe, waits for the checked process to stop, and chooses a free loopback port so an existing service on port 8765 cannot make a broken bundle pass.
+
+- **The bundled runtime kept its library links.** Staging the PyInstaller output preserved relative library aliases and macOS framework links instead of copying their targets into duplicate files and directories.
+
 ### Android
+
+- **Per-mood avatar clips.** The avatar studio now accepts an optional local video for each of the five moods. Moods without a video keep the existing single-video or built-in animation.
+
+- **Continuous system dictation kept its next segment's audio.** A delayed write failure from a retired recognition pipe previously cleared the replacement pipe, leaving the new recognizer without audio. Failed writes now retire only the stream they used.
+
+- **Quiet provider voice sessions returned to idle.** A silent session limit or an expired tiny utterance previously stopped the microphone without ending the voice panel's recording state. Both now finish quietly, while a pending transcription keeps its final result.
+
+- **Voice input released the recorder when capture could not start.** A recorder allocated before a cancelled capture task began, or whose startup failed, is now released on every exit path instead of being left allocated. Errors in a capture callback cannot skip that cleanup.
+
+- Chat-only x86_64 builds excluded cached arm64 sandbox assets, so switching from a phone build no longer bundled the unusable proot and root filesystem payloads.
+
+- **Replacing avatar candidates no longer lets an old result change the new set.** Ownership is checked together with publication, including a late retry. PNG encoding and decoding use private temporary files outside the replacement lock, so Again does not wait for an old picture write and an old writer cannot overwrite the new candidate files. For #337.
+
+- Leaving sign-in or Network also cancelled requests while response bodies were arriving, instead of waiting for the read timeout (For #336).
 
 - **A single assistant markdown turn stays in one bubble, and the stop button matches the send disc.** A reply turn containing lists, headings, paragraphs and code blocks now stays inside one assistant bubble on Android as it does on iOS instead of splitting into separate sibling bubbles per markdown block, while text before and after a tool call and separate messages remain distinct bubbles. While a reply is streaming, the stop button in the composer uses the monochrome ink disc (`ChatColors.sendButton` with the inner square in `ChatColors.background`, black with a white square in light and inverted in dark) instead of a red circle.
 
 ### iOS
 
+- **Per-mood avatar clips.** The avatar studio can choose and remove a separate local video for each mood without changing other moods or the existing single-video setting.
+
 - **The composer halo and the bottom pill-bar icons match Android.** `NanoMuseComposerHost` now draws a rounded vignette (`NanoMuseComposerVignette`) following the composer pill's 26 pt contour and soft shadow instead of a full-width opaque rectangular strip behind the composer column. The five bottom pill-bar tabs use the same icon shapes as Android's `MuseBottomBar`: single chat bubble (`bubble.left`), document with lines (`doc.text`), lightbulb (`lightbulb`), checked square (`checkmark.square`) and the three-shape category glyph for Library.
+- **A side chat's long-press preview stays inside the drawer.** Holding a chat in the drawer lifted a preview wider than the drawer, cut off at its edge with the conversation showing through; the preview is now the row at the drawer's width on the drawer's background.
+- **The composer's text lines up with its plus and mic.** One line of text sat about 6 pt below the two buttons; it now sits on their centre line, and a longer text keeps them level with its last line.
+- **The step bar above the composer lines up with it.** In the Muse layout the bar no longer has a terminal or page thumbnail standing out above it: a glyph for the kind of step (terminal, file, page, picture, memory) sits inside the bar, which takes the composer's width and colour. Tapping it opens the live view as before; the *Tool Preview Window* setting is hidden there, since it no longer applies. Android is unchanged.
 
 ### Project
 
