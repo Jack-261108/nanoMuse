@@ -2240,6 +2240,7 @@ def test_triggers_start_work_from_mail_events_and_webhooks(
         "mail": False,
         "event": False,
         "hook": True,
+        "device": False,
     }
     assert client.get("/api/upcoming").json()["triggers"]["items"] == []
 
@@ -2533,3 +2534,160 @@ def test_static_app_caching_headers(server):
     # the app's own routes, not the HTML, answer a wrong API path
     r = plain.get("/api/no-such-thing")
     assert r.status_code == 404 and "no such endpoint" in r.json()["detail"]
+
+
+# --------------------------------------------------------------------- the data export (#488)
+def test_data_export_is_the_agent_data_as_a_zip(server):
+    """*Download your agent data* for the web (parity note 37): the runtime answers the
+    token with the zip itself, and a credential is never inside it."""
+    import io
+    import zipfile
+
+    client, service, _ = server
+    service.app.triggers.create("mail", "summarise it", match="landlord")
+
+    r = client.get("/api/data/export")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/zip"
+    assert 'attachment; filename="nanomuse-data-' in r.headers["content-disposition"]
+    assert "no-store" in r.headers["cache-control"]  # who you are is in it: never cached
+
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        names = z.namelist()
+        readme = z.read("README.txt").decode()
+    assert "README.txt" in names and "triggers.db" in names
+    # the chats go in as the runtime keeps them, index first (written at startup)
+    assert "threads/index.json" in names
+    # a credential is never in the file, and neither are the logs or the person's own files
+    for secret in ("vault.enc", "vault.key", "server_token", "push-vapid.json"):
+        assert secret not in names
+    assert not [n for n in names if n.startswith(("logs/", "workspace/"))]
+    assert "triggers.db" in readme and "vault.enc" in readme  # the README names what is left out
+
+    # the chats go in once there are any
+    (service.settings.data_dir / "threads").mkdir(parents=True, exist_ok=True)
+    (service.settings.data_dir / "threads" / "main.json").write_text('{"messages": []}', "utf-8")
+    with zipfile.ZipFile(io.BytesIO(client.get("/api/data/export").content)) as z:
+        assert "threads/main.json" in z.namelist()
+
+    # the token is the credential for this as for everything else
+    assert TestClient(client.app).get("/api/data/export").status_code == 401
+
+
+def test_data_export_does_not_follow_symlinks(tmp_path: Path):
+    """An allowed name cannot smuggle an excluded key or another directory into the zip."""
+    import io
+    import zipfile
+
+    from nanomuse.server.data_export import agent_data_zip
+
+    data = tmp_path / "data"
+    outside = tmp_path / "outside"
+    data.mkdir()
+    outside.mkdir()
+    secret = outside / "secret"
+    secret.write_text("not for export", "utf-8")
+    try:
+        (data / "memory.db").symlink_to(secret)
+        (data / "threads").symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"this platform cannot create symlinks: {exc}")
+
+    with zipfile.ZipFile(io.BytesIO(agent_data_zip(data))) as z:
+        assert z.namelist() == ["README.txt"]
+
+
+# --------------------------------------------------------------------- the fourth kind (#486)
+def test_a_device_coming_online_reaches_the_feed(server):
+    """A device of the account coming online runs the standing instruction in the chat it
+    was set from, once per arrival, with one entry in the Feed."""
+    from nanomuse.cloud import CLOUD_KEY
+
+    client, service, llm = server
+    assert service.app.trigger_kinds()["device"] is False
+    with pytest.raises(ValueError, match="hub"):
+        service.create_trigger("device", "tell me")
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    assert service.app.trigger_kinds()["device"] is True
+    trig = service.create_trigger("device", "tell me when the phone is back", match="pixel")
+    assert trig.kind == "device" and trig.thread == "main"
+    llm.script.append(LLMResponse(content="The phone is back online."))
+
+    fired = client.portal.call(
+        lambda: service.device_came_online({"id": "phone-1", "name": "Pixel", "kind": "phone"})
+    )
+    assert [t.id for t in fired] == [trig.id]
+    wait_idle(service, "main")
+    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
+    assert notice and notice[-1]["text"] == "Device online: Pixel"
+    said = events_of(client, "main", "assistant")[-1]
+    assert said["about"] == "Device online: Pixel" and "back online" in said["text"]
+    # who is around is private data, like the inbox: the thread is tainted for egress
+    assert service.app.sentinel.tainted_for("main")
+    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+
+    # a device that does not match the words fires nothing at all
+    assert (
+        client.portal.call(
+            lambda: service.device_came_online({"id": "tab-1", "name": "Tab", "kind": "tablet"})
+        )
+        == []
+    )
+    wait_idle(service, "main")
+
+    # and without the hub there is nothing to watch: the kind is refused, by the API and
+    # by the tool the agent uses
+    service.settings.hub.enabled = False
+    assert service.app.trigger_kinds()["device"] is False
+    with pytest.raises(ValueError, match="hub"):
+        service.create_trigger("device", "tell me")
+
+
+def test_device_trigger_shows_in_the_triggers_view(server):
+    from nanomuse.cloud import CLOUD_KEY
+
+    client, service, _ = server
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    service.create_trigger("device", "tell me", match="pixel")
+    view = client.get("/api/triggers").json()
+    assert view["available"]["device"] is True
+    item = view["items"][0]
+    assert item["kind"] == "device" and item["lead_minutes"] == 0 and item["secret"] == ""
+
+
+def test_the_hub_devices_frame_fires_them(server):
+    """The hub's `devices` frame, as the hub client hands it over: what was already online
+    when it arrived is not an arrival; the drop and the return are. A reconnect gets a new
+    baseline, so devices that came online while this runtime was away do not fire."""
+    from nanomuse.cloud import CLOUD_KEY
+
+    client, service, llm = server
+    service.app.vault.set(CLOUD_KEY, "cloud-key-for-the-test")
+    trig = service.create_trigger("device", "tell me when the phone is back", match="pixel")
+    me = {"id": service.hub.device_id, "name": "Desk", "kind": "computer", "online": True}
+    phone = {"id": "phone-1", "name": "Pixel", "kind": "phone", "online": True}
+
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))  # the welcome frame
+    assert service.app.triggers.get(trig.id).fired == 0  # type: ignore[union-attr]
+
+    client.portal.call(lambda: service.hub._on_devices([me, {**phone, "online": False}]))
+    assert service.app.triggers.get(trig.id).fired == 0  # type: ignore[union-attr]
+
+    llm.script.append(LLMResponse(content="The phone is back online."))
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))
+    wait_idle(service, "main")
+    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+
+    # A connection drop loses the transitions while this runtime is away. Its next welcome
+    # frame is a baseline, not a claim that every currently-online device just arrived.
+    client.portal.call(lambda: service.hub._on_devices([me, {**phone, "online": False}]))
+    service.hub._hub_state_changed("connecting", "")
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))
+    wait_idle(service, "main")
+    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]
+    notice = [e for e in events_of(client, "main", "notice") if e.get("source") == "trigger"]
+    assert notice and notice[-1]["text"] == "Device online: Pixel"
+    # an unchanged frame brings nothing
+    client.portal.call(lambda: service.hub._on_devices([me, phone]))
+    wait_idle(service, "main")
+    assert service.app.triggers.get(trig.id).fired == 1  # type: ignore[union-attr]

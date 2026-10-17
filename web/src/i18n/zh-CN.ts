@@ -473,6 +473,8 @@ const zhCN: Record<string, string> = {
   "{n} min before {what}": "{what}开始前 {n} 分钟",
   "webhook “{match}”": "Webhook“{match}”",
   webhook: "Webhook",
+  "device “{match}” coming online": "上线的设备“{match}”",
+  "any device coming online": "任何设备上线",
   "Nothing yet. Tell {name} “when the landlord writes back, summarise it and draft a reply” or “half an hour before any review, brief me”.":
     "还没有。告诉 {name}“房东回信时，帮我总结并起草回复”或“任何评审开始前半小时，给我一份简报”。",
   "fired {n}×": "触发 {n} 次",
@@ -491,11 +493,14 @@ const zhCN: Record<string, string> = {
   Copy: "复制",
   "New mail": "新邮件",
   "Before an event": "日程开始前",
+  "Device online": "设备上线",
   Webhook: "Webhook",
   "Connect a mailbox under Connections first.": "请先在“连接”里接入邮箱。",
   "Add a calendar under Connections first.": "请先在“连接”里添加日历。",
+  "Join the hub under Devices first.": "请先在“设备”里加入 Hub。",
   "Words in the sender or subject (empty: any mail)": "发件人或主题中的词（留空：任何邮件）",
   "Words in the title or place (empty: any event)": "标题或地点中的词（留空：任何日程）",
+  "Words in the device name or kind (empty: any device)": "设备名称或类型中的词（留空：任何设备）",
   "A name for this hook": "给这个 Webhook 起个名字",
   "Minutes before": "提前分钟数",
   "min before": "分钟前",
@@ -1023,6 +1028,9 @@ const zhCN: Record<string, string> = {
   "Report a bug or ask for a feature": "反馈问题 / 提需求",
   // -- data controls (relay 0.9): the one switch over what the relay keeps --
   "Data controls": "数据控制",
+  "Download your agent data": "下载你的智能体数据",
+  "A zip of what this runtime keeps about you: the memory, the goals, the reminders, the triggers, the address book and the chats. It never contains the keys themselves.":
+    "这个运行时为你保存的内容打成一个 zip：记忆、目标、提醒、触发器、通讯录和聊天记录。里面绝不会有密钥本身。",
   "Help improve nanoMuse's AI models": "帮助改进 nanoMuse 的 AI 模型",
   "While this is on, the text of your chats with the nanoMuse Cloud models (what you wrote, what it answered and the tools it chose to call) is kept on the relay to train the community's own open model. Not your memory or SOUL (the system prompt), not what tools returned, not pictures, and never next to who you are. Your own API key never passes through the relay.":
     "开启后，你与 nanoMuse Cloud 模型对话的文字（你写的、它回答的，以及它选择调用的工具）会保存在中继上，用来训练社区自己的开源模型。不保存你的记忆和 SOUL（系统提示）、工具返回的内容和图片，也不和你的身份放在一起。用自己的 API key 时，对话不经过中继。",

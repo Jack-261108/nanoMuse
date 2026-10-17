@@ -18,11 +18,19 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - **Newly stored facts stay in the recalled set and surface on the opening turn of a later conversation.** `MemoryStore.relevant` and `MemoryStore.relevant_async` now backfill from `COALESCE(NULLIF(updated_at, ''), created_at) DESC, rowid DESC` so memories stored or updated within the same second keep their insertion order, and `MemoryStore._fill` reserves a slot for the newest memory when `limit >= 2` even if earlier memories filled the query matches. On the first turn of a conversation (`turns <= 1`), `build_system_prompt` appends `MEMORY_OPENING_NOTE` so the agent brings up in one sentence any remembered date, trip, deadline or promise that matters right now without repeating the nudge on later turns. For #477.
 
+- **The web can take its data out: *Download your agent data* under Data controls.** `GET /api/data/export` (parity note 37) builds the zip in memory (`nanomuse/server/data_export.py`: the profile, the Feed, the ideas, memory, goals, reminders, triggers, the address book, the approvals, the caches, the audit log, `threads/`, `sessions/` and a README naming every part) and answers with the file itself, `Cache-Control: private, no-store`, so a browser on another machine gets it and nothing is written to the runtime's disk. `vault.enc`, `vault.key`, `server_token`, `push-vapid.json`, the settings file, `logs/` and `workspace/` are never inside, a file over 64 MB is skipped as the desktop skips it, and the web console has the row in *Settings → Data controls* with 简体中文 strings. For #488.
+
+- **A fourth trigger kind: a device of the account coming online.** `KINDS` gains `device`, matched against the device's name and kind, gated on the hub the way `mail` is gated on the mailbox. `triggers.arrivals()` seeds the first `devices` frame from the hub and fires only on a real offline to online transition (never for this computer, never for what was already online when the app started); `MuseService.device_came_online` runs each matching trigger in the chat it was set from with the `Device online: …` label and the same sentinel taint as mail and events, so that thread's egress needs an approval. The `triggers` tool, `nanomuse triggers add`, the app's Upcoming form and the `available` view all know the kind, with 简体中文 strings, docs and tests. For #486.
+
 ### Web
 
 - **Each Feed section showed its own load error and retry.** Posts, activity, Next up and calendar requests kept their last successful content when a refresh failed; retrying one section no longer refetched the others.
 
 ### Desktop
+
+- **Going back no longer returns to the starting screen.** The window opened on the starting screen and then loaded the app, so a back press, a mouse's side button included, went back to that screen, which stayed on *Starting* until the app was restarted. The starting screen is now dropped from the window's history once the app has loaded. For #491.
+
+- **The chat composer keeps a clear gap above the bottom of the window.** The Muse look hid the harness dock below the composer but also lost the space that row provided, leaving an active chat's input pill almost against the window edge. Active chats now keep the dock's spacing while its controls remain hidden; the empty-chat layout keeps its existing padding. For [#494](https://github.com/nano-muse/nanoMuse/issues/494).
 
 - **Synced turns from another computer stay above a newer local prompt and arrive without a reload.** On the desktop, a hub `sync` frame that arrived while a pull was already running was dropped until the next minute tick, and a remote bubble inserted before this computer's first prompt or from a device with a skewed clock stayed below the new local prompt until the window was reloaded. An in-flight pull now runs a follow-up pull when a newer `sync` frame arrives, reconnecting the hub socket or bringing the window back to the front pulls as well, and remote bubbles record when they were received locally and reposition inside the chat flow as new prompts mount. For #395.
 
@@ -73,6 +81,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **The step bar above the composer lines up with it.** In the Muse layout the bar no longer has a terminal or page thumbnail standing out above it: a glyph for the kind of step (terminal, file, page, picture, memory) sits inside the bar, which takes the composer's width and colour. Tapping it opens the live view as before; the *Tool Preview Window* setting is hidden there, since it no longer applies. Android is unchanged.
 
 ### Project
+
+- **The bug report form is back on the new-issue chooser.** GitHub accepts a form's top-level `description` only between 3 and 200 characters and hides the form silently when it is longer, so the bilingual rewrite took *Bug report / 问题报告* to 245 and it disappeared from the chooser: desktop, runtime, web, iPhone, relay and showcase reports went to the Android form, whose own text pointed at the missing one. The description fits again in both languages, and a test checks every form has its `name` and `description`, that the three forms are on disk and that the length stays inside 3-200, so a form cannot be lost without a word again. For [#495](https://github.com/nano-muse/nanoMuse/issues/495).
 
 ## [1.0.5] - 2026-10-14 · Lookout
 
