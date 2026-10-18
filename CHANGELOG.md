@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A final reply from another device no longer disappears after desktop sync state is partly cleared.** When the main chat still had its saved conversation mapping but its cached conversation metadata was empty, the desktop treated the reply as a side-chat row, skipped it and advanced the cursor. The existing main-chat mapping now identifies the row before that filter runs. For [#499](https://github.com/nano-muse/nanoMuse/issues/499).
+
 - **Going back no longer returns to the starting screen.** The window opened on the starting screen and then loaded the app, so a back press, a mouse's side button included, went back to that screen, which stayed on *Starting* until the app was restarted. The starting screen is now dropped from the window's history once the app has loaded. For #491.
 
 - **The chat composer keeps a clear gap above the bottom of the window.** The Muse look hid the harness dock below the composer but also lost the space that row provided, leaving an active chat's input pill almost against the window edge. Active chats now keep the dock's spacing while its controls remain hidden; the empty-chat layout keeps its existing padding. For [#494](https://github.com/nano-muse/nanoMuse/issues/494).
@@ -76,6 +78,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A single assistant markdown turn stays in one bubble, and the stop button matches the send disc.** A reply turn containing lists, headings, paragraphs and code blocks now stays inside one assistant bubble on Android as it does on iOS instead of splitting into separate sibling bubbles per markdown block, while text before and after a tool call and separate messages remain distinct bubbles. While a reply is streaming, the stop button in the composer uses the monochrome ink disc (`ChatColors.sendButton` with the inner square in `ChatColors.background`, black with a white square in light and inverted in dark) instead of a red circle.
 
 ### iOS
+
+- **The `@` menu offers your other devices.** Typing `@` at the start of a message lists the account's online phones and computers above the files, filtered by what follows; picking one writes `@〈name〉 ` so the message goes to that device. Before, a device could only be addressed by typing its name in full or from *Settings → Devices*. For [#505](https://github.com/nano-muse/nanoMuse/issues/505).
 
 - **Responses API requests no longer failed on repeated tool-call ids in accumulated or restored history.** Later copies receive deterministic request-unique suffixes while every tool output remains paired with its call. For [#501](https://github.com/nano-muse/nanoMuse/issues/501).
 
