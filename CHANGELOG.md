@@ -10,6 +10,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- **Responses API requests kept repeated tool calls paired in accumulated or restored request history.** When history contains the same provider `call_id` more than once, the first call keeps it and later calls use deterministic suffixes that remain unique across the request; each tool output follows its call's rewritten id instead of the provider rejecting the next turn with `400 Duplicate call_id`. For [#501](https://github.com/nano-muse/nanoMuse/issues/501).
+
 - **Serply is a keyed web search provider for Google results.** `provider = "serply"` under `[connectors.search]`, or the Serply chip under *Connections → Web search*, queries `https://api.serply.io/v1/search` with `X-Api-Key` (`SEARCH_API_KEY`), passes the country from `region` as `gl`, caps `num` at 10 and falls back to DuckDuckGo with a note on error. Proposed by @googio ([#483](https://github.com/nano-muse/nanoMuse/issues/483)).
 
 - **Standard Compute is in the own-key catalogue.** An OpenAI-compatible gateway at `https://api.stdcmpt.com/v1`, a key from [standardcompute.com/dashboard/api-keys](https://standardcompute.com/dashboard/api-keys), on a fixed monthly plan whose compute budget stops requests with 402 once it is used. The default `standardcompute` is a router that picks a model per request from the ones the account enabled; any id from its public `/v1/models` list can be set instead. Chat only: the router declares no picture input there, so the hands are not claimed. `providers.json` lists twenty-one providers now, and the desktop, the phones, the relay and the web console carry the same file.
@@ -50,6 +52,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- **Responses API requests no longer failed on repeated tool-call ids in accumulated or restored history.** Later copies receive deterministic request-unique suffixes while every tool output remains paired with its call. For [#501](https://github.com/nano-muse/nanoMuse/issues/501).
+
+- **Memory and date changes no longer invalidate the agent's static prompt prefix.** Safety and phone-operation instructions now stay ahead of a deterministic suffix containing skills, MCP metadata, model/device state, conversation addenda, memory and `USER.md`, with runtime context last, preserving provider prefix-cache hits across memory writes and day changes. For #502.
+
 - **Slash command completion preserves the draft and syncs the cursor.** Selecting a skill, MCP tool or built-in slash command from the popup menu now updates the composer text and cursor immediately, refocuses the input field and displays the keyboard so arguments can be typed without an extra tap. Dismissing the popup when a command is already chosen no longer wipes the composer, and built-in action commands complete as `/<command> ` when typed.
 
 - **Leaving the app from the root chat asks for a second back press.** Pressing the system back button while in the main chat with the drawer closed now shows a brief prompt ("Press back again to exit") instead of immediately quitting the app, and leaves the app when pressed again within two seconds.
@@ -70,6 +76,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A single assistant markdown turn stays in one bubble, and the stop button matches the send disc.** A reply turn containing lists, headings, paragraphs and code blocks now stays inside one assistant bubble on Android as it does on iOS instead of splitting into separate sibling bubbles per markdown block, while text before and after a tool call and separate messages remain distinct bubbles. While a reply is streaming, the stop button in the composer uses the monochrome ink disc (`ChatColors.sendButton` with the inner square in `ChatColors.background`, black with a white square in light and inverted in dark) instead of a red circle.
 
 ### iOS
+
+- **Responses API requests no longer failed on repeated tool-call ids in accumulated or restored history.** Later copies receive deterministic request-unique suffixes while every tool output remains paired with its call. For [#501](https://github.com/nano-muse/nanoMuse/issues/501).
+
+- **Memory, time and model-count changes no longer invalidate the agent's static prompt prefix.** The base instructions now precede a deterministic suffix containing model capabilities, skills, MCP metadata, memory, `USER.md`, session steering and runtime context, and fallback models rebuild that same order. For #502.
 
 - **A picked avatar clip keeps its preview open.** The photo picker finishes closing before the clip preview opens, and the preview no longer deletes the pending video when SwiftUI briefly removes the sheet. Use and Cancel remain the explicit ways to finish the choice.
 
