@@ -30,6 +30,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- **A search box in the settings dialog.** The desktop's settings dialog has a search field under the title of its nav. Typing highlights the words that match on the page you are on and lists them under the box, pages whose title matches are highlighted in the list, *Enter* opens the first matching page and *Escape* clears the box. For [#522](https://github.com/nano-muse/nanoMuse/issues/522).
+
 - **A task from the phone streams its text back while the model writes it.** When the asking device sends `stream: true` with a `task`, the desktop follows the live model stream and sends the text of the message being written as `text {partial: true}` events, at most every 250 ms, then the finished message as before. Callers that do not ask, such as Android's `nanomuse-pc task`, get each message once as before. For [#514](https://github.com/nano-muse/nanoMuse/issues/514).
 
 - **A final reply from another device no longer disappears after desktop sync state is partly cleared.** When the main chat still had its saved conversation mapping but its cached conversation metadata was empty, the desktop treated the reply as a side-chat row, skipped it and advanced the cursor. The existing main-chat mapping now identifies the row before that filter runs. For [#499](https://github.com/nano-muse/nanoMuse/issues/499).
@@ -80,6 +82,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **A single assistant markdown turn stays in one bubble, and the stop button matches the send disc.** A reply turn containing lists, headings, paragraphs and code blocks now stays inside one assistant bubble on Android as it does on iOS instead of splitting into separate sibling bubbles per markdown block, while text before and after a tool call and separate messages remain distinct bubbles. While a reply is streaming, the stop button in the composer uses the monochrome ink disc (`ChatColors.sendButton` with the inner square in `ChatColors.background`, black with a white square in light and inverted in dark) instead of a red circle.
 
 ### iOS
+
+- **A task sent to another device with `@〈device〉` shows its progress.** The reply appears at once with "〈device〉 is working…", then each step that device takes as a capsule, running and then done or failed, and what its Muse says as it arrives; a step whose result never came shows as failed after a timeout or a lost connection, as cancelled after Stop, and never as done; the answer lands in place at the end. The composer's stop button ends the task on that device too, and a message queued meanwhile goes when it ends. Before, the chat showed nothing until the whole task was done. For [#512](https://github.com/nano-muse/nanoMuse/issues/512).
 
 - **The `@` menu offers your other devices.** Typing `@` at the start of a message lists the account's online phones and computers above the files, filtered by what follows; picking one writes `@〈name〉 ` so the message goes to that device. Before, a device could only be addressed by typing its name in full or from *Settings → Devices*. For [#505](https://github.com/nano-muse/nanoMuse/issues/505).
 
