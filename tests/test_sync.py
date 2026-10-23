@@ -401,6 +401,9 @@ def test_the_second_main_adopts_the_accounts_id(synced) -> None:
 # ----------------------------------------------------------------------------- pull
 def test_pull_makes_threads_and_history_and_tombstones_remove(synced) -> None:
     client, service, llm, relay = synced
+    # launch pulls and then pushes (and pulls again): let that chain land before seeding, or
+    # its pull takes the rows below and this explicit one finds nothing left to apply
+    wait_for(lambda: settled(service) and service.sync.cursor == relay.seq)
     cid = str(uuid.uuid4())
     relay.add_conversation(cid, "side", "Dinner plans", device="phone-1")
     m1 = relay.add_message(cid, "user", "book a table", created_at=1738000050)
