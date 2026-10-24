@@ -441,6 +441,23 @@ class Settings:
     chat_concurrency: int = field(default_factory=lambda: _int("CHAT_CONCURRENCY", 12))
     chat_retries: int = field(default_factory=lambda: _int("CHAT_RETRIES", 2))
     chat_retry_base_s: float = field(default_factory=lambda: float(_env("CHAT_RETRY_BASE_S", "0.5")))
+    # 0.28: how long the per-request telemetry rows (`calls`: timings, how a request ended,
+    # its shape — never its words) are kept for the console's live page and drill-downs.
+    calls_keep_days: int = field(default_factory=lambda: _int("CALLS_KEEP_DAYS", 90))
+    # how long the timelines' lines (`events`: sign-ins, devices joining, errors, refusals;
+    # never content) are kept; the `account.deleted` lines stay, the statistics count them.
+    # The ledger is the account's money and is never swept.
+    events_keep_days: int = field(default_factory=lambda: _int("EVENTS_KEEP_DAYS", 365))
+    # 0.29: the record (record.py) — every chat turn in full, with its pictures as files
+    # under MEDIA_DIR (next to the database when unset). RECORD_TURNS=0 keeps none of it;
+    # RECORD_KEEP_DAYS=0 keeps a turn until the person deletes it; past MEDIA_MAX_GB the
+    # files least recently used go first and their turns keep a reference to nothing.
+    # BLOB_MAX_BYTES caps one file a client puts up (PUT /v1/blobs: a clip, a picture).
+    record_turns: bool = field(default_factory=lambda: _env("RECORD_TURNS", "1") in ("1", "true", "yes"))
+    record_keep_days: int = field(default_factory=lambda: _int("RECORD_KEEP_DAYS", 0))
+    media_dir: str = field(default_factory=lambda: _env("MEDIA_DIR", ""))
+    media_max_gb: float = field(default_factory=lambda: float(_env("MEDIA_MAX_GB", "50")))
+    blob_max_bytes: int = field(default_factory=lambda: _int("BLOB_MAX_BYTES", 32 * 1024 * 1024))
     # Pictures: DashScope allows an account only a couple of image tasks at a time and
     # answers 429 past that, so the relay draws at most IMAGE_CONCURRENCY pictures at once
     # for everyone together (the rest queue) and, on a 429 or 5xx, tries again up to

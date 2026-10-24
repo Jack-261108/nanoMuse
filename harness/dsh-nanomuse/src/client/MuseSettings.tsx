@@ -23,13 +23,13 @@ import { IconArchive, IconChevronLeft, IconChevronRight, IconClose, IconCpu, Ico
 import { openShortcutsReference } from './keys.ts'
 import { useLive } from './live.ts'
 import type { RenderSlot } from './MuseSidebar.tsx'
-import { REPO_URL } from './panels.ts'
+import { DATA_SECTION, REPO_URL } from './panels.ts'
 import { AppBehaviorRows, ConversationRows, DeveloperRows, HotkeyField } from './Sections.tsx'
 import { clearMarks, filterPages, hitLabel, markMatches, queryWords } from './settings-search.ts'
 
 /** The pages that make up the everyday group, in Muse's order; the rest are Advanced. */
 export const COMPUTER_SECTION = 'nanomuse-computer'
-export const DATA_SECTION = 'nanomuse-data'
+export { DATA_SECTION }
 export const HELP_SECTION = 'nanomuse-help'
 export const LEGAL_SECTION = 'nanomuse-legal'
 export const WALLET_SECTION = 'nanomuse-wallet'
@@ -125,7 +125,7 @@ function SettingsPanel({ t, rows, renderSlot, activeId, from, onSelect, onBack, 
   const searching = queryWords(query).length > 0
   // the pages whose title answers the query, in the order the nav lists them
   const pageHits = filterPages([...primary, ...advanced], query)
-  const matching = new Set(pageHits.map((row) => row.id))
+  const matching = new Set(searching ? pageHits.map((row) => row.id) : [])
 
   // the query on the page that is open: the words that match are marked where they
   // stand and listed under the field, so a setting is found by its own words

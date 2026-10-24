@@ -341,12 +341,14 @@ class ContactsSettings(BaseModel):
 
 class SearchSettings(BaseModel):
     """Who answers ``web_search``. DuckDuckGo needs nothing and is the default; Brave,
-    Tavily and Serply want a key, You.com takes one or goes without (100 searches a day),
-    SearXNG wants the URL of an instance. A failed search falls back to DuckDuckGo once,
+    Tavily and Serply want a key, You.com and Parallel take one or go without, SearXNG
+    wants the URL of an instance. A failed search falls back to DuckDuckGo once,
     with a note, so a lapsed key does not stop a task."""
 
-    provider: Literal["duckduckgo", "brave", "tavily", "serply", "you", "searxng"] = "duckduckgo"
-    # Brave / Tavily / Serply, You.com optionally. May be a vault placeholder — the app
+    provider: Literal["duckduckgo", "brave", "tavily", "serply", "you", "parallel", "searxng"] = (
+        "duckduckgo"
+    )
+    # Brave / Tavily / Serply, You.com and Parallel optionally. May be a vault placeholder — the app
     # stores it as {{vault:SEARCH_API_KEY}}.
     api_key: str = ""
     # SearXNG: your instance, e.g. "http://127.0.0.1:8080".
@@ -508,10 +510,39 @@ class MCPServerSettings(BaseModel):
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None  # Streamable-HTTP / SSE endpoint
     risk: RiskLevel = RiskLevel.MODERATE
-    egress: bool = False
+    # Whether a call sends data off this machine. Unset, it is read from the address: a
+    # `url` on another host does (every argument travels there), a command or a loopback
+    # address does not. Set it to say otherwise.
+    egress: bool | None = None
     reads_private_data: bool = False
     # per-tool overrides, by the tool's own name on the server
     tools: dict[str, MCPToolPolicy] = Field(default_factory=dict)
+    # seconds the handshake (connect, initialize, the tool list) and one call may take; a
+    # server that stops answering is skipped at start, or its call fails, instead of
+    # holding the runtime
+    connect_timeout_s: float = 30.0
+    call_timeout_s: float = 120.0
+
+    @property
+    def remote_host(self) -> str | None:
+        """The host a `url` points at when it is not this machine, else None."""
+        if not self.url:
+            return None
+        from urllib.parse import urlsplit
+
+        host = (urlsplit(self.url).hostname or "").lower()
+        if (
+            not host
+            or host in ("localhost", "127.0.0.1", "::1", "0.0.0.0")
+            or host.startswith("127.")
+        ):
+            return None
+        return host
+
+    @property
+    def sends_out(self) -> bool:
+        """`egress` as set, else whether the address is on another host."""
+        return self.egress if self.egress is not None else self.remote_host is not None
 
 
 class MCPSettings(BaseModel):
@@ -927,6 +958,7 @@ def apply_app_settings(settings: Settings, data: dict[str, Any]) -> None:
             "tavily",
             "serply",
             "you",
+            "parallel",
             "searxng",
         ):
             web.provider = search["provider"]

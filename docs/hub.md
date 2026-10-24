@@ -166,7 +166,9 @@ JSON text frames over `WS /v1/hub`, `Authorization: Bearer nm_…` (browsers put
 the key in `hello` instead).
 
 ```
-→ hello    {device:{id,name,kind,os,version,actions[]}}     kind: phone | computer | web
+→ hello    {device:{id,name,kind,os,version,actions[],llm?}}   kind: phone | computer | web
+           llm (relay 0.28, optional): {provider, model} — the ids the device runs its model under ("cloud",
+           "openrouter", a model id); plain ids only, never a key or a URL; kept on the device row for the operator
 ← welcome  {device_id, devices:[…], server:{version,frame_limit,time}}
 ← devices  {devices:[{id,name,kind,os,version,actions[],online,last_seen,controllable,ip}]}
 
@@ -174,7 +176,7 @@ the key in `hello` instead).
 ← call     {id, from:{id,name,kind}, action, args}          (delivered to the target)
 → event    {id, body}          ← event  {id, from, body}    progress, approvals, images
 → result   {id, ok, body | error, message}                  ← result (to the caller)
-← error    {code, message, id?}   device_offline · not_controllable · self_call · unknown_call · timeout
+← error    {code, message, id?}   device_offline · not_controllable · self_call · duplicate_call · unknown_call · timeout
                                   too_large · rate_limited · bad_frame · device_online · bad_key · bad_device
 
 → devices  {}        → rename {name}        → forget {device_id}        → ping  ← pong
@@ -266,6 +268,15 @@ field; credentials never leave the device that signed in. The other devices
 list those entries under the connectors catalogue as *Connected on \<device\>;
 sign in here to use it on this device*, and the usual local sign-in is the
 action.
+
+Since relay 0.29 the profile can also name the drawn face's **clips**: the
+device that animated the face puts each clip up as a file (`PUT
+/v1/blobs/{sha256}`, [cloud.md](cloud.md#the-record)) and writes `clips:
+{mood: {sha256, mime, bytes}}`; the other devices, told by the same `profile`
+frame, download the clips from `GET /v1/blobs/{sha256}` instead of rendering
+their own. The clips go with the face: `clips: null`, another avatar or
+`DELETE /v1/me/profile` clears them. The apps of 1.0.6 and earlier ignore the
+field.
 
 Since 0.1.36 the **conversations** travel too, by a different road: their text
 goes to the relay's sync store over REST (`/v1/sync/*`, [cloud.md](cloud.md#conversation-sync)),

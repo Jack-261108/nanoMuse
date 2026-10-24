@@ -45,7 +45,8 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Tin mới
 
-- `2026-10-13` ⭐ 1.000 sao trên GitHub, mười tám ngày sau bản phát hành đầu tiên, với bốn ngày trong danh sách Swift của GitHub Trending trên đường đi ([Trendshift](https://trendshift.io/repositories/286894): hạng bảy ngày 7 tháng 10, hạng tư ngày 10 tháng 10). Cảm ơn mỗi lần dùng thử, mỗi báo cáo lỗi và mỗi pull request. Chúng tôi tiếp tục: vài ngày một phiên bản, và [lộ trình](../roadmap.md) cho biết điều gì tiếp theo.
+- `2026-10-21` ⭐ 2.000 sao trên GitHub và đứng đầu danh sách Swift của GitHub Trending ([Trendshift](https://trendshift.io/repositories/286894): hạng ba ngày 20 tháng 10, hạng nhất ngày 21 tháng 10), hai mươi sáu ngày sau bản phát hành đầu tiên. Cảm ơn mỗi lần dùng thử, mỗi báo cáo lỗi và mỗi pull request; chúng tôi tiếp tục: vài ngày một phiên bản, và [lộ trình](../roadmap.md) cho biết điều gì tiếp theo.
+- `2026-10-13` ⭐ 1.000 sao trên GitHub, mười tám ngày sau bản phát hành đầu tiên.
 - `2026-10-09` 🚀 Phiên bản [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) đã ra mắt, cho điện thoại, máy tính và trình duyệt; cài đè lên bản trước mà vẫn giữ dữ liệu của bạn, và ghi chú phát hành liệt kê mọi thay đổi.
 - `2026-10-08` 🤗 Bài báo của chúng tôi có mặt trên [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699), xếp thứ ba trong danh sách ngày 8 tháng 10; câu hỏi và góp ý xin gửi tại trang bài báo.
 - `2026-10-07` 📄 Bài báo của chúng tôi đã có trên [arXiv](https://arxiv.org/abs/2610.08699): *nanoMuse: An Open-Source Personal Agent for Every Device You Own*, tác giả Guangyi Liu, Yong Liu và Jiangning Zhang (Đại học Chiết Giang); trích dẫn ở cuối trang này.
@@ -84,7 +85,7 @@ Mọi bản tải đều từ [bản phát hành mới nhất trên GitHub](http
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Có dáng vẻ riêng.</b><br>Mô tả một dáng vẻ, mô hình ảnh của bạn vẽ ra, mô hình video làm nó chuyển động. Mặc định là một chú rồng nhỏ.</td>
-    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong hai mươi mốt nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
+    <td width="50%" valign="top"><b>Mô hình nào cũng được.</b><br>Hạn mức của relay, khóa của riêng bạn ở một trong hai mươi hai nhà cung cấp (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek và các nhà cung cấp khác), hoặc gói bạn đã trả tiền: ChatGPT, Claude, Kimi. Nhà cung cấp không có mô hình ảnh hay video thì hai tính năng đó tắt, và ứng dụng nói rõ điều đó.</td>
   </tr>
 </table>
 
@@ -146,9 +147,13 @@ Tất cả những ai có thay đổi đã vào `main`, theo danh sách người
 <a href="https://github.com/Battleplus"><img src="https://avatars.githubusercontent.com/u/121445871?v=4&s=48" width="48" height="48" alt="Battleplus"></a>
 <a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
 <a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
 </p>
 <!-- contributors:end -->
 

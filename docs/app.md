@@ -83,7 +83,7 @@ A reminder, a routine, a goal pass, a check-in or a trigger is written to a smal
 - *Approvals*: the queue of cards waiting for you across all chats, answerable right there. Opens first when something is pending.
 - *Activity*: the audit trail, every tool call, decision and approval, including refused ones.
 - *Permissions*: the Sentinel mode, and every standing permission you granted with a revoke button on each.
-- *Upcoming*: the background-work switch, the next pass time, the goals in line with a *run now* button, the next check-ins, your reminders and routines, and your triggers (*When something happens*), each with *+ Add*, *run now* and cancel; a webhook has a copy button for its URL.
+- *Upcoming*: the background-work switch, the next pass time, the goals in line with a *run now* button, the next check-ins, your reminders and routines, and your triggers (*When something happens*), each with *+ Add*, *run now* and cancel; a webhook has a copy button for its URL, which is the only place the key is shown (the chat that set it up names the address and the header, not the key).
 - *Memory*: everything the agent has remembered about you, by category, plus an entry box. *Forget* deletes an item; the agent will not see it again, and the deletion is listed under *Recent changes* with the line it removed. Each turn, the memories that fit the message go into the agent's prompt: by keyword, and (with an embedding endpoint set up under *Connections → Recall by meaning*) by meaning too, so "写邮件给房东" brings up "the landlord is Bob Li" though they share no word. *Tidy up* runs one pass of the housekeeping the agent also does on its own (after every eight new lines, or weekly, at any proactivity level but Off): lines that say the same thing are merged into one, a fact that changed keeps the newer version, and one-off requests that were never facts about you are dropped. The model proposes; nanoMuse checks that a merged line adds no words that were not there, refuses to drop anything you wrote yourself, and takes out at most a fifth of the store per pass. *Recent changes* lists every merge, drop, update and forget with the text that was there before, each with *Undo*. A tidy-up that changed something is one entry in the Feed.
 - *Skills*: how a job is done, written down once (a weekly review, a trip plan, an inbox triage). See [Skills](#skills) below.
 - *Connections*: what the agent can reach, plugged in and out from the phone.
@@ -112,7 +112,8 @@ A reminder, a routine, a goal pass, a check-in or a trigger is written to a smal
   **Web search**: DuckDuckGo (nothing to set up, but scraped and occasionally
   rate-limited), Brave Search, Tavily or Serply with a key (vault:
   `SEARCH_API_KEY`), You.com with or without a key (100 searches a day without
-  one), or a SearXNG instance by URL. *Test* shows the provider, result count and
+  one), Parallel with or without a key (free at lower limits without one), or a
+  SearXNG instance by URL. *Test* shows the provider, result count and
   time; a failed search falls back to DuckDuckGo with a note.
   **Email**: presets for common providers, address and app password (vault:
   `EMAIL_ADDRESS`, `EMAIL_PASSWORD`) and IMAP/SMTP servers; *Connect* proves both
@@ -221,7 +222,7 @@ Everything the app does goes through this API, so another front-end (a Telegram 
 | POST | `/api/connections/endpoints/{id}/models` | ask the endpoint for its models again and save them: the entry plus `source: "live"`, or `"kept"` with `error` when it did not answer and the saved list stands |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | recall by meaning: `mode` auto/on/off; `base_url` `""` → the model's endpoint; `model` `""` → the endpoint's default; `api_key` set → vault (`EMBEDDINGS_API_KEY`), `""` → the model's key, omitted → unchanged. Rebuilds the embedder on the spot |
 | POST | `/api/connections/embeddings/test` | one embeddings call, then every memory indexed: `{ok, model, dims, indexed, ms}` or `{ok: false, error}` |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | web search: `provider` duckduckgo/brave/tavily/serply/you/searxng; `api_key` set → vault (`SEARCH_API_KEY`), `""` removes it, omitted → unchanged; `base_url` the SearXNG instance. Applies to the next search |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | web search: `provider` duckduckgo/brave/tavily/serply/you/parallel/searxng; `api_key` set → vault (`SEARCH_API_KEY`), `""` removes it, omitted → unchanged; `base_url` the SearXNG instance. Applies to the next search |
 | POST | `/api/connections/search/test` | one search against the configured provider, no fallback: `{ok, provider, results, first, ms}` or `{ok: false, error}` |
 | PUT / DELETE | `/api/connections/email` | save `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}` (address and password go to the vault) / disconnect and forget the credentials |
 | POST | `/api/connections/email/test` | sign in to IMAP and SMTP: `{ok, inbox}` or `{ok: false, error}` |
@@ -298,7 +299,7 @@ The client's first frame is `{"kind": "auth", "token": "…"}` (within ten secon
 | `update` | fields changed on an existing event (a tool finished, an approval was decided, a browser card got a new frame) |
 | `event_removed` | `{thread, id}`; an event left the timeline: a message deleted on another device of the account (conversation sync) |
 | `working` | `{thread, cid, device, device_name, working, at}`: another device of the account started (`true`) or finished (`false`) a turn in a synced conversation; the app shows *{device} is working…* under the last message while `true`, and drops it when the reply arrives or after ten minutes. The `hello` state lists the live ones under `working` |
-| `stream_start` / `delta` / `stream_end` | the assistant reply being generated; `stream_end` carries `discard: true` when what streamed turned out not to be a reply (a prompt-mode tool call, a quiet background pass) |
+| `stream_start` / `delta` / `reasoning_delta` / `stream_end` | the assistant reply being generated; `reasoning_delta` is the model's thinking as it streams, sent only with `show_thinking` on and never stored on its own (the final `assistant` event carries the whole of it); `stream_end` carries `discard: true` when what streamed turned out not to be a reply (a prompt-mode tool call, a quiet background pass) |
 | `status` | idle / working / waiting, with a short detail line |
 | `thread`, `thread_cleared`, `thread_deleted` | thread list changes |
 | `firstrun` | `{firstrun}`; the first conversation moved on (*Start*, the model's `nanomuse-naming` block, a pick, a dismissal): the same view as `GET /api/firstrun` without `intro`; the chat redraws its chooser. The `hello` state carries it under `firstrun` |

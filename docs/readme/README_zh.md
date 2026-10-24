@@ -45,7 +45,8 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 
 ## 🗞️ 动态
 
-- `2026-10-13` ⭐ GitHub 上 1000 个 star，距首发十八天，期间连续四天进入 GitHub Trending 的 Swift 榜（[Trendshift](https://trendshift.io/repositories/286894) 的记录：10 月 7 日第七，10 月 10 日第四）。谢谢每一次试用、每一个问题报告和每一个 pull request。我们会继续做下去：每隔几天一个版本，下一步做什么写在[路线图](../roadmap.md)里。
+- `2026-10-21` ⭐ GitHub 上 2000 个 star，并登上 GitHub Trending Swift 榜第一（[Trendshift](https://trendshift.io/repositories/286894) 的记录：10 月 20 日第三，10 月 21 日第一），距首发二十六天。谢谢每一次试用、每一个问题报告和每一个 pull request；我们会继续做下去：每隔几天一个版本，下一步做什么写在[路线图](../roadmap.md)里。
+- `2026-10-13` ⭐ GitHub 上 1000 个 star，距首发十八天。
 - `2026-10-09` 🚀 版本 [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) 发布，手机、电脑和浏览器都有；装在上一版之上，数据保留，每一处改动都写在发布说明里。
 - `2026-10-08` 🤗 我们的论文登上 [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699)，在 10 月 8 日的榜单上排第三；欢迎到论文页提问和留言。
 - `2026-10-07` 📄 我们的论文已发布在 [arXiv](https://arxiv.org/abs/2610.08699)：《nanoMuse: An Open-Source Personal Agent for Every Device You Own》，作者 Guangyi Liu、Yong Liu、Jiangning Zhang（浙江大学）；引用格式见本页末尾。
@@ -84,7 +85,7 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
   </tr>
   <tr>
     <td width="50%" valign="top"><b>有自己的形象。</b><br>描述一句，你的图像模型来画，视频模型让它动起来。默认是一只小龙。</td>
-    <td width="50%" valign="top"><b>任何模型。</b><br>中继的额度；自己在二十一家服务商（百炼、OpenRouter、OpenAI、Gemini、DeepSeek 等）任意一家的 key；或者你已经在付费的套餐：ChatGPT、Claude、Kimi。服务商没有图片或视频模型，这两项就不开，App 会直说。</td>
+    <td width="50%" valign="top"><b>任何模型。</b><br>中继的额度；自己在二十二家服务商（百炼、OpenRouter、OpenAI、Gemini、DeepSeek 等）任意一家的 key；或者你已经在付费的套餐：ChatGPT、Claude、Kimi。服务商没有图片或视频模型，这两项就不开，App 会直说。</td>
   </tr>
 </table>
 
@@ -146,9 +147,13 @@ https://github.com/user-attachments/assets/bf0ec2ae-59aa-4358-9dd0-c9d045ee7bee
 <a href="https://github.com/Battleplus"><img src="https://avatars.githubusercontent.com/u/121445871?v=4&s=48" width="48" height="48" alt="Battleplus"></a>
 <a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
 <a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
 </p>
 <!-- contributors:end -->
 

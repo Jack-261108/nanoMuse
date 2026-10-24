@@ -65,7 +65,9 @@ hub 上传递两类请求：
 `WS /v1/hub` 上的 JSON 文本帧，`Authorization: Bearer nm_…`（浏览器则把 key 放在 `hello` 里）。
 
 ```
-→ hello    {device:{id,name,kind,os,version,actions[]}}     kind: phone | computer | web
+→ hello    {device:{id,name,kind,os,version,actions[],llm?}}   kind: phone | computer | web
+           llm（中继 0.28，可选）：{provider, model}，这台设备跑模型所用的标识（"cloud"、"openrouter"、某个模型 id）；
+           只收纯标识，key 和 URL 一律丢弃；记在设备行上，供运营者查看
 ← welcome  {device_id, devices:[…], server:{version,frame_limit,time}}
 ← devices  {devices:[{id,name,kind,os,version,actions[],online,last_seen,controllable,ip}]}
 
@@ -73,7 +75,7 @@ hub 上传递两类请求：
 ← call     {id, from:{id,name,kind}, action, args}          (delivered to the target)
 → event    {id, body}          ← event  {id, from, body}    progress, approvals, images
 → result   {id, ok, body | error, message}                  ← result (to the caller)
-← error    {code, message, id?}   device_offline · not_controllable · self_call · unknown_call · timeout
+← error    {code, message, id?}   device_offline · not_controllable · self_call · duplicate_call · unknown_call · timeout
                                   too_large · rate_limited · bad_frame · device_online · bad_key · bad_device
 
 → devices  {}        → rename {name}        → forget {device_id}        → ping  ← pong
@@ -103,6 +105,8 @@ hub 上传递两类请求：
 智能体的名字和形象属于账号，不属于某台设备：中继上的 `GET` / `PUT /v1/me/profile` 保存它们（小龙、某个颜色底上的 emoji，或者形象工作室里画的一张形象及其五张小图），后写的胜出，一个 `profile` 帧通知其他设备去取新的 `rev`。运行时在 `nanomuse/hub/profile.py` 里做这件事，手机在 `io.github.nanomuse.cloud.ProfileSync` 里做；写入的那台设备会跳过自己的回声。
 
 同一份 profile 还带着**哪台设备连接了什么**（0.1.34）：一个 `connectors` 列表，每一项有连接器的 id 和标签、有地址的话还有地址、登录方式（`oauth`、`key` 或 `open`）、设备的名字和 id、是否启用，以及时间。一台设备只写自己持有的那些项；中继保留其他设备的项，列表上限 64 项，并拒绝任何带有 token、secret、key、authorization 或 password 字段的项；凭据绝不离开登录它的那台设备。其他设备在连接器目录下把这些项列为「已在 \<device\> 上连接，在这里登录即可在这台设备上使用」，照常的本地登录就是对应的操作。
+
+中继 0.29 起，profile 还可以指明画出来的形象的**短视频**：做了动画的那台设备把每段短视频作为文件传上去（`PUT /v1/blobs/{sha256}`，见 [cloud.md](cloud.md#the-record)），写入 `clips: {mood: {sha256, mime, bytes}}`；其他设备收到同一个 `profile` 帧后，从 `GET /v1/blobs/{sha256}` 下载短视频，不用各自再渲染。短视频随形象走：`clips: null`、换成别的形象或 `DELETE /v1/me/profile` 都会清掉。1.0.6 及更早的 App 忽略这个字段。
 
 0.1.36 起，**对话**也会跟着走，但走的是另一条路：它们的文本经 REST（`/v1/sync/*`，[cloud.md](cloud.md#conversation-sync)）进入中继的同步存储，hub 只负责捎个信。中继接受了一次推送之后，或者一次删除之后，账号的每一条*其他*套接字都会收到 `sync {what:"conversations", cursor, from}`（`cursor` 是变更后账号的计数器，`from` 是做出变更的设备 id），然后从自己的游标开始拉取新内容。在 `from` 里看到自己 id 的设备忽略这一帧。0.1.38 起（中继 0.20），hub 还带着**谁在回答**：一台设备在某个同步对话里开始或结束一轮时，会 POST `/v1/sync/working`，其他套接字收到 `working {cid, from, device_name, working, at}`；各个 App 在最后一条消息下面显示「kwai 正在处理…」，直到 `working: false` 到来、回复本身到达，或者过了十分钟。中继只在内存里保留这些。默认只同步主要聊天；旁聊只在打开了「同时同步旁聊」的设备之间来往。其他什么都不同步：key、服务商和设置留在输入它们的地方，文件和图片留在生成它们的设备上。各个 App 怎么用它，见 [every-device.md](every-device.md#the-same-conversations-everywhere)。
 

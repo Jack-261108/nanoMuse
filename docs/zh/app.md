@@ -81,7 +81,7 @@ nanomuse serve --port 9000 --no-qr
 - *审批*：所有聊天里等着你的卡片队列，当场就能回答。有待处理的时候先打开它。
 - *活动*：审计记录，每一次工具调用、判定和审批，包括被拒绝的。
 - *权限*：哨兵模式，以及你授予的每一条长期权限，每条都带一个撤销按钮。
-- *日程*：后台工作的开关、下一轮的时间、排队的目标和一个「现在运行」按钮、接下来的跟进、你的提醒和例程、你的触发器（*当某事发生时*），各自带「+ 添加」「现在运行」和取消；webhook 有一个复制 URL 的按钮。
+- *日程*：后台工作的开关、下一轮的时间、排队的目标和一个「现在运行」按钮、接下来的跟进、你的提醒和例程、你的触发器（*当某事发生时*），各自带「+ 添加」「现在运行」和取消；webhook 有一个复制 URL 的按钮，密钥只在这里出现（设置它的那段对话只说地址和请求头，不说密钥）。
 - *记忆*：智能体记住的关于你的一切，按类别分，加一个输入框。「忘掉」删除一条；智能体不会再看到它，这次删除会连同被删掉的那一行列在*最近的改动*里。每一轮对话，和消息相关的记忆会进入智能体的提示词：按关键词，以及（在*连接 → 按含义召回*下面设好向量（embedding）端点之后）按含义，所以「写邮件给房东」能带出「the landlord is Bob Li」，哪怕它们一个词都不重合。「整理」跑一遍智能体自己也会做的整理工作（每新增八行，或每周一次，除「关闭」外的任何主动性档位都做）：说同一件事的几行合成一行，变了的事实留新版本，从来不是关于你的事实的一次性请求被丢掉。模型提议；nanoMuse 检查合并后的那一行没有多出原本没有的词，拒绝丢掉任何你亲手写的，每遍最多拿掉存量的五分之一。*最近的改动*列出每一次合并、丢弃、更新和遗忘，以及此前的内容，每条都有「撤销」。改动了东西的一次整理，在动态里是一条。
 - *技能*：一件事怎么做，写下来一次（每周回顾、旅行计划、收件箱分拣）。见下面的[技能](#skills)。
 - *连接*：智能体够得着什么，在手机上就能接上和拔掉。
@@ -98,8 +98,8 @@ nanomuse serve --port 9000 --no-qr
   可以用模型自己的端点或另一个端点（例如给没有向量接口的 DeepSeek 配一个带
   `qwen3-embedding:0.6b` 的 Ollama；保险库：`EMBEDDINGS_API_KEY`），模型名留空用端点默认值。
   「测试」成功后会当场索引每一条记忆，卡片显示数量。
-  **网页搜索**：DuckDuckGo、带 key 的 Brave Search / Tavily / Serply、带或不带 key 的 You.com，
-  或按 URL 填 SearXNG；保险库名是 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，失败会
+  **网页搜索**：DuckDuckGo、带 key 的 Brave Search / Tavily / Serply、带或不带 key 的 You.com
+  和 Parallel（Parallel 不带 key 免费，限额较低），或按 URL 填 SearXNG；保险库名是 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，失败会
   带说明退回 DuckDuckGo。
   **邮件**：常见服务商预设、地址和应用专用密码（`EMAIL_ADDRESS`、`EMAIL_PASSWORD`）以及
   IMAP/SMTP 服务器；「连接」验证两边，「断开」删除凭据和工具。
@@ -205,7 +205,7 @@ nanomuse serve --port 9000 --no-qr
 | POST | `/api/connections/endpoints/{id}/models` | 重新向接口要一遍模型并保存：返回条目加 `source: "live"`，它没回答时是 `"kept"` 和 `error`，沿用已保存的列表 |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | 按含义召回：`mode` 为 auto/on/off；`base_url` 为 `""` → 用模型的端点；`model` 为 `""` → 用端点的默认值；`api_key` 给了 → 保险库（`EMBEDDINGS_API_KEY`），`""` → 用模型的 key，没给 → 不变。当场重建向量模型 |
 | POST | `/api/connections/embeddings/test` | 调一次向量接口，然后给每条记忆建索引：`{ok, model, dims, indexed, ms}` 或 `{ok: false, error}` |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 网页搜索：`provider` 为 duckduckgo/brave/tavily/serply/you/searxng；`api_key` 给了 → 保险库（`SEARCH_API_KEY`），`""` 删掉它，没给 → 不变；`base_url` 是 SearXNG 实例。从下一次搜索起生效 |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 网页搜索：`provider` 为 duckduckgo/brave/tavily/serply/you/parallel/searxng；`api_key` 给了 → 保险库（`SEARCH_API_KEY`），`""` 删掉它，没给 → 不变；`base_url` 是 SearXNG 实例。从下一次搜索起生效 |
 | POST | `/api/connections/search/test` | 对配置的服务商搜一次，不回退：`{ok, provider, results, first, ms}` 或 `{ok: false, error}` |
 | PUT / DELETE | `/api/connections/email` | 保存 `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}`（地址和密码进保险库）/ 断开并忘掉凭据 |
 | POST | `/api/connections/email/test` | 登录 IMAP 和 SMTP：`{ok, inbox}` 或 `{ok: false, error}` |
@@ -282,7 +282,7 @@ nanomuse serve --port 9000 --no-qr
 | `update` | 已有事件的字段变了（一个工具跑完了、一张审批有了结果、一张浏览器卡片有了新的一帧） |
 | `event_removed` | `{thread, id}`；一条事件离开了时间线：在账号的另一台设备上删掉了一条消息（对话同步） |
 | `working` | `{thread, cid, device, device_name, working, at}`：账号的另一台设备在一段同步的对话里开始（`true`）或结束（`false`）了一轮；为 `true` 期间应用在最后一条消息下面显示「{device} 正在处理…」，回复到了或者十分钟后撤掉。`hello` 的状态在 `working` 下列出正在进行的那些 |
-| `stream_start` / `delta` / `stream_end` | 正在生成的助手回复；流出来的内容最后发现不是回复时（提示词模式的工具调用、安静的后台轮次），`stream_end` 带 `discard: true` |
+| `stream_start` / `delta` / `reasoning_delta` / `stream_end` | 正在生成的助手回复；`reasoning_delta` 是模型边想边流出来的推理，只在开着 `show_thinking` 时发送，本身不保存（最后的 `assistant` 事件带着完整的推理）；流出来的内容最后发现不是回复时（提示词模式的工具调用、安静的后台轮次），`stream_end` 带 `discard: true` |
 | `status` | idle / working / waiting，附一行简短说明 |
 | `thread`、`thread_cleared`、`thread_deleted` | 会话列表的变化 |
 | `firstrun` | `{firstrun}`；第一次对话往前走了一步（「开始」、模型的 `nanomuse-naming` 代码块、选了名字、撤掉卡片）：和 `GET /api/firstrun` 同样的视图，不带 `intro`；聊天据此重画起名卡片。`hello` 的状态在 `firstrun` 下带着它 |

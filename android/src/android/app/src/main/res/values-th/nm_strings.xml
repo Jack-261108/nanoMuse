@@ -129,6 +129,9 @@
     <string name="nm_routine_paused">ปิด</string>
     <!-- The chat row a routine sent: its label and the clock time it fired -->
     <string name="nm_routine_wake_caption">กิจวัตร · %1$s · %2$s</string>
+    <!-- One scheduled task, several times a day (GH#557) -->
+    <string name="nm_scheduled_task_add_time">เพิ่มเวลาอื่น</string>
+    <string name="nm_scheduled_task_runs_scheduled_for">กำหนดไว้สำหรับ %1$s</string>
 
     <!-- Ideas tab -->
     <string name="nm_ideas_title">ไอเดีย</string>
@@ -1176,4 +1179,13 @@
     <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
     <string name="nm_mention_done">Done</string>
     <string name="nm_press_back_again_to_exit">กดกลับอีกครั้งเพื่อออก</string>
+
+    <!-- nanoMuse: backup choices and the headless run (#560, #561) -->
+    <string name="nm_backup_chat_files">ไฟล์ในแชท</string>
+    <string name="nm_backup_chat_files_on">ไฟล์แนบ ไฟล์ถ่ายโอน และไฟล์พื้นที่ทำงานทุกไฟล์ไปพร้อมกับข้อความ</string>
+    <string name="nm_backup_chat_files_off">เฉพาะข้อความ ไฟล์จะถูกระบุไว้แต่ไม่ถูกนำไปด้วย การกู้คืนจะนำแชทกลับมาโดยไม่มีไฟล์ แพ็กเกจจึงเล็กพอสำหรับเซิร์ฟเวอร์ที่ปฏิเสธการอัปโหลดขนาดใหญ่</string>
+    <string name="nm_backup_hint_too_large">เซิร์ฟเวอร์ปฏิเสธแพ็กเกจเพราะขนาด ส่วนใหญ่เป็นขีดจำกัดการอัปโหลดของเซิร์ฟเวอร์ (nginx: client_max_body_size) ให้เพิ่มขีดจำกัด หรือสำรองแชทโดยไม่รวมไฟล์</string>
+    <string name="nm_backup_delivery_failed">ส่งไม่สำเร็จ</string>
+    <string name="nm_backup_run_needs_passphrase">เปิดการเข้ารหัสอยู่ และต้องพิมพ์รหัสผ่านในหน้าสำรองข้อมูล การเรียกจากเชลล์ขอรหัสไม่ได้ ให้เริ่มสำรองข้อมูลจากหน้านั้น หรือปิดการเข้ารหัสที่นั่น</string>
+    <string name="nm_backup_run_started">เริ่มสำรองข้อมูลจากเชลล์แล้ว</string>
 </resources>

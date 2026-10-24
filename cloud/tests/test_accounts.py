@@ -11,10 +11,13 @@ from test_cloud import fake_upstream, sign_up
 
 from nanomuse_cloud.api import create_app
 from nanomuse_cloud.config import Settings
-from nanomuse_cloud.db import Database
+from nanomuse_cloud.db import INVITER_GONE, Database
 from nanomuse_cloud.identifiers import BadIdentifier, parse
 from nanomuse_cloud.senders import LogSender
 from nanomuse_cloud.service import Cloud, CloudError, check_password, hash_password
+
+# the tests call the models as one of the apps would; `apps_only` (0.28) refuses other software
+APP_UA = {"User-Agent": "nanoMuse/0.0 (tests)"}
 
 
 def make(**overrides):
@@ -39,7 +42,7 @@ def make(**overrides):
     sender = LogSender()
     cloud = Cloud(settings, Database(":memory:"), sender)
     app = create_app(settings, cloud, upstream_transport=httpx.ASGITransport(app=up))
-    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://cloud.test")
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://cloud.test", headers=APP_UA)
     return app, client, sender, up, cloud, settings
 
 
@@ -543,7 +546,7 @@ async def test_an_operator_zero_survives_a_restart_and_old_rows_still_get_seeded
     cloud.db.close()
     cloud = Cloud(settings, Database(path), sender)
     app = create_app(settings, cloud, upstream_transport=httpx.ASGITransport(app=up))
-    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://cloud.test")
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://cloud.test", headers=APP_UA)
     a = await sign_up(client, sender, "dev-a@example.com", "pixel")
     b = await sign_up(client, sender, "dev-b@example.com", "mac")
     r = await client.post(
@@ -605,13 +608,16 @@ async def test_an_invitee_whose_inviter_is_gone_or_disabled_is_still_paid():
     assert (await client.get("/v1/me", headers=auth(c["api_key"]))).json()["spend"]["grant"] == 3
     assert cloud.db.account(a["account"]["id"])["grant_uy"] == settings.allowance_uy
     assert cloud.db.invite_pending(c["account"]["id"]) is False
-    # the inviter is gone: B's first use pays B alone, and the link by id stays
+    # the inviter is gone: B's first use pays B alone. The deleted account's id leaves the
+    # rows that named it: C (settled) keeps nothing, B (still owed) keeps the mark of having
+    # been invited, by nobody that can be named
     assert (await client.post("/v1/admin/delete", headers=admin, json={"account_id": a["account"]["id"]})).status_code == 204
+    assert cloud.db.account(c["account"]["id"])["invited_by"] == ""
     await chat(client, b["api_key"])
     me_b = (await client.get("/v1/me", headers=auth(b["api_key"]))).json()
     assert me_b["spend"]["grant"] == 3
     detail = (await client.get(f"/v1/admin/accounts/{b['account']['id']}", headers=admin)).json()["account"]
-    assert detail["invited_by"] == a["account"]["id"] and detail["inviter"] is None
+    assert detail["invited_by"] == INVITER_GONE and detail["inviter"] is None
     kinds = [e["kind"] for e in (await client.get("/v1/me/events", headers=auth(b["api_key"]))).json()["events"]]
     assert kinds.count("invite.settled") == 1
 
@@ -728,11 +734,12 @@ async def test_operator_sees_who_invited_whom_and_the_ranking():
         and detail["invited"][1]["first_ip"] == "203.0.113.7"
     )
 
-    # an inviter who deleted their account: the invitee still says who, by id, and the ranking lets them go
+    # an inviter who deleted their account: the settled invitee no longer names it (nothing of
+    # a deleted account stays), and the ranking lets the inviter go
     r = await client.post("/v1/admin/delete", headers=admin, json={"account_id": b["account"]["id"]})
     assert r.status_code == 204, r.text
     detail = (await client.get(f"/v1/admin/accounts/{d['account']['id']}", headers=admin)).json()["account"]
-    assert detail["invited_by"] == b["account"]["id"] and detail["inviter"] is None
+    assert detail["invited_by"] == "" and detail["inviter"] is None
     assert [x["identifier"] for x in (await client.get("/v1/admin/invites", headers=admin)).json()["leaders"]] == ["dev-a@example.com"]
 
 

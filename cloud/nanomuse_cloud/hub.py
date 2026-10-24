@@ -8,7 +8,7 @@ command's approval, which is decided on the device that would carry it out.
 
 Frames are JSON text. From a device:
 
-    {"type":"hello", "key": "nm_…"?, "device": {"id","name","kind","os","version","actions":[…]}}
+    {"type":"hello", "key": "nm_…"?, "device": {"id","name","kind","os","version","actions":[…], "llm"?: {"provider","model"}}}
     {"type":"call",   "id","to","action","args"}         ask another device to do something
     {"type":"result", "id","ok", "body" | "error","message"}   the answer to a call received
     {"type":"event",  "id","body"}                        progress on a call still running
@@ -111,10 +111,12 @@ class Connection:
     version: str = ""
     actions: list[str] = field(default_factory=list)
     ip: str = ""  # 0.10: where the socket came from, for the operator
+    llm_provider: str = ""  # 0.28: what the device said it runs its chats under (ids only)
+    llm_model: str = ""
     connected_at: int = field(default_factory=now)
     closed: bool = False
     # the outbound queue: send() appends, the writer task drains in order
-    queue: deque[str] = field(default_factory=deque)
+    queue: deque[tuple[str, int]] = field(default_factory=deque)  # (frame, its UTF-8 size)
     queued_bytes: int = 0
     wake: asyncio.Event = field(default_factory=asyncio.Event)
     writer: asyncio.Task | None = None
@@ -157,7 +159,10 @@ class Connection:
         if self.closed:
             return
         text = json.dumps(frame, ensure_ascii=False, separators=(",", ":"))
-        if len(self.queue) >= SEND_QUEUE_FRAMES or self.queued_bytes + len(text) > SEND_QUEUE_BYTES:
+        # bytes on the wire, not characters: a Chinese or emoji frame is three to four times
+        # its character count in UTF-8, and the limits are stated in bytes
+        size = len(text.encode("utf-8"))
+        if len(self.queue) >= SEND_QUEUE_FRAMES or self.queued_bytes + size > SEND_QUEUE_BYTES:
             log.warning(
                 "hub: %s is not reading (%d frames, %d bytes waiting); closing", self.device_id[:12], len(self.queue), self.queued_bytes
             )
@@ -165,8 +170,8 @@ class Connection:
             self.stop()
             asyncio.get_running_loop().create_task(self._close(4009, "slow_consumer"))
             return
-        self.queue.append(text)
-        self.queued_bytes += len(text)
+        self.queue.append((text, size))
+        self.queued_bytes += size
         self.wake.set()
 
     async def _drain(self) -> None:
@@ -175,8 +180,8 @@ class Connection:
                 self.wake.clear()
                 await self.wake.wait()
                 continue
-            text = self.queue.popleft()
-            self.queued_bytes -= len(text)
+            text, size = self.queue.popleft()
+            self.queued_bytes -= size
             try:
                 await self.ws.send_text(text)
             except Exception as e:  # the socket went away under us; the receive loop notices too
@@ -400,10 +405,11 @@ class Hub:
                     # is JSON text (docs/hub.md); below it is answered with bad_frame and the
                     # socket stays open — it still counts towards the flood limit.
                     raw = None
-                if raw is not None and len(raw) > self.frame_limit:
+                size = len(raw.encode("utf-8")) if raw is not None else 0
+                if raw is not None and size > self.frame_limit:
                     await conn.send({"type": "error", "code": "too_large", "message": f"Frames are capped at {self.frame_limit} bytes"})
                     continue
-                if conn.over_rate(len(raw or "")):
+                if conn.over_rate(size):
                     self.dropped_total += 1
                     if conn.dropped >= FLOOD_CLOSE_AFTER:
                         self.flood_closes += 1
@@ -458,6 +464,11 @@ class Hub:
             raise CloudError(400, "bad_device", "That device id belongs to another credential")
         name = str(dev.get("name") or "").strip()[:60] or {"phone": "Phone", "computer": "Computer", "web": "Browser"}[kind]
         actions = [str(a)[:40] for a in dev.get("actions") or [] if isinstance(a, str)][:64]
+        # 0.28: optionally, which provider and model the device runs its chats under (a
+        # key of the person's own, or "nanomuse" for the relay) — two ids, never a key;
+        # the console counts them in aggregate (docs/hub.md, docs/privacy.md)
+        llm = dev.get("llm") if isinstance(dev.get("llm"), dict) else {}
+        llm_provider, llm_model = _llm_ids(llm)
         return Connection(
             ws=ws,
             account_id=caller.account_id,
@@ -469,6 +480,8 @@ class Hub:
             version=str(dev.get("version") or "")[:40],
             actions=actions,
             ip=_client.current().ip,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     async def _attach(self, conn: Connection) -> None:
@@ -480,7 +493,17 @@ class Hub:
         account[conn.device_id] = conn
         conn.start()
         if conn.kind != "web":
-            self.db.upsert_device(conn.account_id, conn.device_id, conn.name, conn.kind, conn.os, conn.version, json.dumps(conn.actions))
+            self.db.upsert_device(
+                conn.account_id,
+                conn.device_id,
+                conn.name,
+                conn.kind,
+                conn.os,
+                conn.version,
+                json.dumps(conn.actions),
+                conn.llm_provider,
+                conn.llm_model,
+            )
         # the id and the account masked like every other line; the device's name is the
         # person's own words and stays out of the log
         log.info("hub: %s %s connected; account %s has %d online", conn.kind, conn.device_id[:12], conn.account_id[:8], len(account))
@@ -547,7 +570,17 @@ class Hub:
             if name:
                 conn.name = name
                 if conn.kind != "web":
-                    self.db.upsert_device(conn.account_id, conn.device_id, name, conn.kind, conn.os, conn.version, json.dumps(conn.actions))
+                    self.db.upsert_device(
+                        conn.account_id,
+                        conn.device_id,
+                        name,
+                        conn.kind,
+                        conn.os,
+                        conn.version,
+                        json.dumps(conn.actions),
+                        conn.llm_provider,
+                        conn.llm_model,
+                    )
                 await self.broadcast_devices(conn.account_id)
         elif kind == "forget":
             try:
@@ -579,6 +612,12 @@ class Hub:
             await conn.send({"type": "error", "id": call_id, "code": "self_call", "message": "That is this device"})
             return
         await self._sweep()
+        if (conn.account_id, call_id) in self.pending:
+            # the id of a call still waiting: a second one would take its place and the first
+            # answer would land on the wrong call (or on none). Ids are the caller's to make
+            # unique; this one is refused and the first call goes on.
+            await conn.send({"type": "error", "id": call_id, "code": "duplicate_call", "message": "A call with that id is still waiting"})
+            return
         self.pending[(conn.account_id, call_id)] = Pending(call_id=call_id, caller=conn.device_id, target=to, account_id=conn.account_id)
         args = frame.get("args") if isinstance(frame.get("args"), dict) else {}
         await target.send({"type": "call", "id": call_id, "from": conn.brief(), "action": action, "args": args})
@@ -610,6 +649,20 @@ class Hub:
                 caller = self.online.get(p.account_id, {}).get(p.caller)
                 if caller:
                     await caller.send({"type": "error", "id": p.call_id, "code": "timeout", "message": "the device did not answer in time"})
+
+
+_LLM_ID = re.compile(r"^[A-Za-z0-9._:/ -]{1,80}$")
+
+
+def _llm_ids(llm: dict) -> tuple[str, str]:
+    """The provider and model ids a hello's ``device.llm`` names, each a plain id (letters,
+    digits, ``. _ : / -``) or nothing; anything shaped like a secret, a URL or a sentence
+    is dropped rather than kept."""
+    out = []
+    for key, limit in (("provider", 60), ("model", 80)):
+        v = str(llm.get(key) or "").strip()
+        out.append(v[:limit] if v and len(v) <= limit and _LLM_ID.match(v) and "://" not in v else "")
+    return out[0], out[1]
 
 
 def _loads(raw: str):

@@ -132,6 +132,9 @@
     <string name="nm_routine_paused">Kapalı</string>
     <!-- The chat row a routine sent: its label and the clock time it fired -->
     <string name="nm_routine_wake_caption">Rutin · %1$s · %2$s</string>
+    <!-- One scheduled task, several times a day (GH#557) -->
+    <string name="nm_scheduled_task_add_time">Başka saat ekle</string>
+    <string name="nm_scheduled_task_runs_scheduled_for">%1$s için planlandı</string>
 
     <!-- Ideas tab -->
     <string name="nm_ideas_title">Fikirler</string>
@@ -1180,4 +1183,13 @@
     <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
     <string name="nm_mention_done">Done</string>
     <string name="nm_press_back_again_to_exit">Çıkmak için tekrar geri tuşuna basın</string>
+
+    <!-- nanoMuse: backup choices and the headless run (#560, #561) -->
+    <string name="nm_backup_chat_files">Sohbetlerdeki dosyalar</string>
+    <string name="nm_backup_chat_files_on">Her ek, aktarılan dosya ve çalışma alanı dosyası mesajlarla birlikte gider.</string>
+    <string name="nm_backup_chat_files_off">Yalnızca mesajlar. Dosyalar listelenir, taşınmaz; geri yükleme sohbetleri onlarsız getirir. Büyük yüklemeleri reddeden bir sunucu için paketi küçük tutar.</string>
+    <string name="nm_backup_hint_too_large">Sunucu paketi boyutu nedeniyle reddetti. Çoğu zaman bu, sunucunun yükleme sınırıdır (nginx: client_max_body_size); sınırı yükseltin ya da sohbetleri dosyaları olmadan yedekleyin.</string>
+    <string name="nm_backup_delivery_failed">Teslim başarısız oldu.</string>
+    <string name="nm_backup_run_needs_passphrase">Şifreleme açık ve parola Yedekleme sayfasında yazılıyor; kabuktan başlatılan bir çalıştırma bunu soramaz. Yedeklemeyi sayfadan başlatın ya da orada şifrelemeyi kapatın.</string>
+    <string name="nm_backup_run_started">Yedekleme kabuktan başlatıldı.</string>
 </resources>

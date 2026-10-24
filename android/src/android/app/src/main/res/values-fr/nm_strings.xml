@@ -133,6 +133,9 @@
     <string name="nm_routine_paused">Désactivée</string>
     <!-- The chat row a routine sent: its label and the clock time it fired -->
     <string name="nm_routine_wake_caption">Routine · %1$s · %2$s</string>
+    <!-- One scheduled task, several times a day (GH#557) -->
+    <string name="nm_scheduled_task_add_time">Ajouter un autre horaire</string>
+    <string name="nm_scheduled_task_runs_scheduled_for">Programmé pour %1$s</string>
 
     <!-- Ideas tab -->
     <string name="nm_ideas_title">Idées</string>
@@ -1181,4 +1184,13 @@
     <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
     <string name="nm_mention_done">Done</string>
     <string name="nm_press_back_again_to_exit">Appuyez à nouveau pour quitter</string>
+
+    <!-- nanoMuse: backup choices and the headless run (#560, #561) -->
+    <string name="nm_backup_chat_files">Fichiers des conversations</string>
+    <string name="nm_backup_chat_files_on">Chaque pièce jointe, fichier déchargé et fichier d\'espace de travail accompagne les messages.</string>
+    <string name="nm_backup_chat_files_off">Messages seulement. Les fichiers sont listés, pas emportés ; une restauration ramène les conversations sans eux. Garde le paquet petit pour un serveur qui refuse les gros envois.</string>
+    <string name="nm_backup_hint_too_large">Le serveur a refusé le paquet à cause de sa taille. C\'est le plus souvent sa limite d\'envoi (nginx : client_max_body_size) ; augmentez-la, ou sauvegardez les conversations sans leurs fichiers.</string>
+    <string name="nm_backup_delivery_failed">L\'envoi a échoué.</string>
+    <string name="nm_backup_run_needs_passphrase">Le chiffrement est activé et la phrase secrète se saisit sur la page Sauvegarde ; un lancement depuis le shell ne peut pas la demander. Lancez la sauvegarde depuis la page, ou désactivez-y le chiffrement.</string>
+    <string name="nm_backup_run_started">Sauvegarde lancée depuis le shell.</string>
 </resources>

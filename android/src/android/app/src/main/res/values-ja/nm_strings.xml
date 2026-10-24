@@ -129,6 +129,9 @@
     <string name="nm_routine_paused">オフ</string>
     <!-- The chat row a routine sent: its label and the clock time it fired -->
     <string name="nm_routine_wake_caption">ルーティン · %1$s · %2$s</string>
+    <!-- One scheduled task, several times a day (GH#557) -->
+    <string name="nm_scheduled_task_add_time">時刻を追加</string>
+    <string name="nm_scheduled_task_runs_scheduled_for">%1$s に予定</string>
 
     <!-- Ideas tab -->
     <string name="nm_ideas_title">アイデア</string>
@@ -1176,4 +1179,13 @@
     <string name="nm_mention_device_step_declined">%1$s asked for permission for a step and did not get it from here; approve such steps on that device.</string>
     <string name="nm_mention_done">Done</string>
     <string name="nm_press_back_again_to_exit">もう一度戻るを押すと終了します</string>
+
+    <!-- nanoMuse: backup choices and the headless run (#560, #561) -->
+    <string name="nm_backup_chat_files">チャット内のファイル</string>
+    <string name="nm_backup_chat_files_on">添付ファイル、オフロード、ワークスペースのファイルもメッセージと一緒に保存します。</string>
+    <string name="nm_backup_chat_files_off">メッセージのみ。ファイルは一覧に残りますが中身は含まれず、復元してもチャットだけが戻ります。大きなアップロードを拒否するサーバー向けにパッケージが小さくなります。</string>
+    <string name="nm_backup_hint_too_large">サーバーがサイズを理由にパッケージを拒否しました。多くはサーバーのアップロード上限（nginx の client_max_body_size）です。上限を上げるか、チャットをファイルなしでバックアップしてください。</string>
+    <string name="nm_backup_delivery_failed">送信に失敗しました。</string>
+    <string name="nm_backup_run_needs_passphrase">暗号化がオンで、パスフレーズはバックアップ画面で入力するものです。シェルからの実行では尋ねられません。画面からバックアップを開始するか、そこで暗号化をオフにしてください。</string>
+    <string name="nm_backup_run_started">シェルからバックアップを開始しました。</string>
 </resources>

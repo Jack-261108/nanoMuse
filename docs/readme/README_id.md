@@ -45,7 +45,8 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
 
 ## 🗞️ Kabar
 
-- `2026-10-13` ⭐ 1.000 bintang di GitHub, delapan belas hari setelah rilis pertama, dengan empat hari di daftar Swift GitHub Trending di sepanjang jalan ([Trendshift](https://trendshift.io/repositories/286894): ketujuh pada 7 Oktober, keempat pada 10 Oktober). Terima kasih untuk setiap percobaan, setiap laporan, dan setiap pull request. Kami terus berjalan: satu versi setiap beberapa hari, dan [peta jalan](../roadmap.md) menyebutkan apa yang berikutnya.
+- `2026-10-21` ⭐ 2.000 bintang di GitHub dan peringkat pertama di daftar Swift GitHub Trending ([Trendshift](https://trendshift.io/repositories/286894): ketiga pada 20 Oktober, pertama pada 21 Oktober), dua puluh enam hari setelah rilis pertama. Terima kasih untuk setiap percobaan, setiap laporan, dan setiap pull request; kami terus berjalan: satu versi setiap beberapa hari, dan [peta jalan](../roadmap.md) menyebutkan apa yang berikutnya.
+- `2026-10-13` ⭐ 1.000 bintang di GitHub, delapan belas hari setelah rilis pertama.
 - `2026-10-09` 🚀 Versi [1.0.0 Keel](https://github.com/nano-muse/nanoMuse/releases/tag/v1.0.0) sudah tersedia, untuk ponsel, desktop, dan peramban; dipasang di atas versi sebelumnya dengan data tetap utuh, dan catatan rilisnya memuat setiap perubahan.
 - `2026-10-08` 🤗 Makalah kami masuk [Hugging Face Daily Papers](https://huggingface.co/papers/2610.08699), peringkat ketiga di daftar 8 Oktober; pertanyaan dan komentar silakan disampaikan di halaman makalah.
 - `2026-10-07` 📄 Makalah kami tersedia di [arXiv](https://arxiv.org/abs/2610.08699): *nanoMuse: An Open-Source Personal Agent for Every Device You Own*, oleh Guangyi Liu, Yong Liu, dan Jiangning Zhang (Universitas Zhejiang); sitasinya ada di akhir halaman ini.
@@ -84,7 +85,7 @@ Semua unduhan berasal dari [rilis terbaru](https://github.com/nano-muse/nanoMuse
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Rupa sendiri.</b><br>Gambarkan rupa yang kamu mau, model gambarmu melukisnya, model video membuatnya bergerak. Seekor naga kecil sebagai bawaan.</td>
-    <td width="50%" valign="top"><b>Model apa saja.</b><br>Kuota relay, kunci milikmu sendiri di salah satu dari dua puluh satu penyedia (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek, dan lainnya), atau paket yang sudah kamu bayar: ChatGPT, Claude, Kimi. Kalau penyedia tidak punya model gambar atau video, dua fitur itu dimatikan, dan aplikasi memberi tahu.</td>
+    <td width="50%" valign="top"><b>Model apa saja.</b><br>Kuota relay, kunci milikmu sendiri di salah satu dari dua puluh dua penyedia (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek, dan lainnya), atau paket yang sudah kamu bayar: ChatGPT, Claude, Kimi. Kalau penyedia tidak punya model gambar atau video, dua fitur itu dimatikan, dan aplikasi memberi tahu.</td>
   </tr>
 </table>
 
@@ -146,9 +147,13 @@ Semua orang yang perubahannya sudah masuk ke `main`, dari daftar kontributor Git
 <a href="https://github.com/Battleplus"><img src="https://avatars.githubusercontent.com/u/121445871?v=4&s=48" width="48" height="48" alt="Battleplus"></a>
 <a href="https://github.com/Ichiro786"><img src="https://avatars.githubusercontent.com/u/158778170?v=4&s=48" width="48" height="48" alt="Ichiro786"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
+<a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
 <a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
 </p>
 <!-- contributors:end -->
 

@@ -267,11 +267,116 @@ CREATE TABLE IF NOT EXISTS deleted_keys (
     key_hash      TEXT PRIMARY KEY,
     deleted_at    INTEGER NOT NULL
 );
+-- 0.28: one row per chat request the relay handled (analytics.py): how long it queued for a
+-- provider slot, how long the provider took to the first token and to the end, how it
+-- ended, what shape the request had (messages, pictures, tools) — never a word of it. The
+-- console's live page and the usage drill-downs read this; rows older than CALLS_KEEP_DAYS
+-- are swept. A refusal the relay made itself (over budget, too many in flight) is a row
+-- too, so demand can be told from what was served.
+CREATE TABLE IF NOT EXISTS calls (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts            INTEGER NOT NULL,              -- when the request arrived
+    account_id    TEXT NOT NULL DEFAULT '',
+    model         TEXT NOT NULL DEFAULT '',
+    platform      TEXT NOT NULL DEFAULT '',      -- client.platform_of
+    family        TEXT NOT NULL DEFAULT '',      -- client.ua_family
+    status        TEXT NOT NULL,                 -- ok | upstream_error | upstream_timeout | content_rejected | broken | refused | client_gone
+    detail        TEXT NOT NULL DEFAULT '',      -- the provider's status, the refusal's code, the exception's name
+    stream        INTEGER NOT NULL DEFAULT 0,
+    wait_ms       INTEGER NOT NULL DEFAULT 0,    -- queued for a provider slot
+    ttft_ms       INTEGER NOT NULL DEFAULT 0,    -- slot taken → first token (a stream) or the whole reply
+    total_ms      INTEGER NOT NULL DEFAULT 0,    -- arrival → done
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    messages      INTEGER NOT NULL DEFAULT 0,    -- messages in the request
+    images        INTEGER NOT NULL DEFAULT 0,    -- pictures in the request
+    tools         INTEGER NOT NULL DEFAULT 0,    -- tool definitions the client offered
+    tool_names    TEXT NOT NULL DEFAULT '',      -- the tools the reply called, names only, comma-joined
+    hands         INTEGER NOT NULL DEFAULT 0,    -- a screen-operation turn: the operator's tools offered or called
+    retries       INTEGER NOT NULL DEFAULT 0,
+    request_id    TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS calls_ts ON calls(ts);
+CREATE INDEX IF NOT EXISTS calls_account_ts ON calls(account_id, ts);
+-- 0.28: the shape of every kept turn (samples), one small row each, so the data quality
+-- page never reads the turns themselves: how many messages, how long the person's last
+-- message and the reply were, whether tools were called, pictures sent, the operator used,
+-- and a hash of the person's message for finding repeats. Written with the turn; older
+-- turns are filled in by the backfill task after start. Deleted with the turn.
+CREATE TABLE IF NOT EXISTS sample_stats (
+    sample_id     TEXT PRIMARY KEY,
+    account_id    TEXT NOT NULL,
+    ts            INTEGER NOT NULL,
+    model         TEXT NOT NULL DEFAULT '',
+    platform      TEXT NOT NULL DEFAULT '',
+    messages      INTEGER NOT NULL DEFAULT 0,
+    user_chars    INTEGER NOT NULL DEFAULT 0,    -- the person's last message
+    reply_chars   INTEGER NOT NULL DEFAULT 0,
+    tool_calls    INTEGER NOT NULL DEFAULT 0,
+    pictures      INTEGER NOT NULL DEFAULT 0,
+    hands         INTEGER NOT NULL DEFAULT 0,
+    trivial       INTEGER NOT NULL DEFAULT 0,    -- a greeting, a test, one word: nothing to learn from
+    user_hash     TEXT NOT NULL DEFAULT '',      -- of the person's last message, normalised
+    bytes         INTEGER NOT NULL DEFAULT 0     -- request + response, as stored
+);
+CREATE INDEX IF NOT EXISTS sample_stats_account ON sample_stats(account_id, ts);
+CREATE INDEX IF NOT EXISTS sample_stats_ts ON sample_stats(ts);
+CREATE INDEX IF NOT EXISTS sample_stats_hash ON sample_stats(user_hash);
+-- 0.29: the record (record.py) — every chat turn the relay answered, in full: the request as
+-- the app sent it (the system prompt, the tools' results, every message; pictures, audio and
+-- clips as blob:sha256 references into `blobs`) and the answer as the model gave it. A turn
+-- a client ran on a key of its own and sent up afterwards (POST /v1/turns) is a row too,
+-- with source 'own'. The person's own data: read back by their devices, deleted from Data
+-- controls or with the account, swept after RECORD_KEEP_DAYS when the operator set one.
+CREATE TABLE IF NOT EXISTS turns (
+    id            TEXT PRIMARY KEY,            -- the request id the app saw (x-nanomuse-request)
+    account_id    TEXT NOT NULL,
+    ts            INTEGER NOT NULL,
+    model         TEXT NOT NULL DEFAULT '',
+    platform      TEXT NOT NULL DEFAULT '',    -- client.platform_of
+    device        TEXT NOT NULL DEFAULT '',    -- X-NanoMuse-Device when the app sent one
+    conversation  TEXT NOT NULL DEFAULT '',    -- X-NanoMuse-Conversation when the app sent one
+    source        TEXT NOT NULL DEFAULT 'cloud', -- cloud | own
+    status        TEXT NOT NULL DEFAULT 'ok',  -- ok | partial (the stream broke off; what arrived is kept)
+    request       BLOB NOT NULL,               -- record.pack: the request body, media detached
+    response      BLOB NOT NULL,               -- record.pack: {message, usage, finish_reason}
+    prompt_tokens INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    media         INTEGER NOT NULL DEFAULT 0,  -- distinct pictures / clips referenced
+    media_bytes   INTEGER NOT NULL DEFAULT 0,
+    meta          TEXT NOT NULL DEFAULT '{}'   -- ua, lang, ip, provider (own), media [{sha256, mime, bytes}]
+);
+CREATE INDEX IF NOT EXISTS turns_account ON turns(account_id, ts);
+CREATE INDEX IF NOT EXISTS turns_ts ON turns(ts);
+CREATE INDEX IF NOT EXISTS turns_conversation ON turns(account_id, conversation, ts);
+-- 0.29: the files under MEDIA_DIR, one row each, and who may read which. A file is
+-- removed when its last reference goes (the account deleted its record) or when the
+-- store is over MEDIA_MAX_GB, oldest use first; the turn then keeps a reference to nothing.
+CREATE TABLE IF NOT EXISTS blobs (
+    sha256        TEXT PRIMARY KEY,
+    mime          TEXT NOT NULL DEFAULT '',
+    bytes         INTEGER NOT NULL,
+    created_at    INTEGER NOT NULL,
+    last_used_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS blobs_used ON blobs(last_used_at);
+CREATE TABLE IF NOT EXISTS blob_refs (
+    sha256        TEXT NOT NULL,
+    account_id    TEXT NOT NULL,
+    owner         TEXT NOT NULL,                -- turn | profile | upload: one row per account and kind,
+                                                -- however many turns name the file (the turn's meta lists its own)
+    PRIMARY KEY (sha256, account_id, owner)
+);
+CREATE INDEX IF NOT EXISTS blob_refs_account ON blob_refs(account_id, sha256);
 """
 
 # How long a deleted account's key hashes are remembered. Long enough for every device of the
 # account to come back online and hear the answer; short enough that a deletion is a deletion.
 DELETED_KEYS_TTL_S = 90 * 24 * 3600
+
+# What `invited_by` says once the inviter's account is deleted and the bonus was still unpaid:
+# the invitee was invited (its own half is still due) but by nobody that can be named.
+INVITER_GONE = "deleted"
 
 # How long a write waits for another process's lock on the file before it fails (sqlite3's
 # `timeout` and PRAGMA busy_timeout). Five seconds covers a backup's read transaction or a
@@ -437,6 +542,10 @@ class Database:
         # aggregates) and the sign-ups of the last day (the per-domain limit), without a scan
         self._conn.execute("CREATE INDEX IF NOT EXISTS accounts_invited_by ON accounts(invited_by) WHERE invited_by<>''")
         self._conn.execute("CREATE INDEX IF NOT EXISTS accounts_created_at ON accounts(created_at)")
+        # 0.28: the model a device runs under a key of its own, as its hub hello may say
+        # (docs/hub.md: `device.llm`); a provider id and a model id, never a key
+        add("devices", "llm_provider", "TEXT NOT NULL DEFAULT ''")
+        add("devices", "llm_model", "TEXT NOT NULL DEFAULT ''")
 
     # -- 0.15: settings the operator changes while the relay runs ------------------------------
 
@@ -938,11 +1047,26 @@ class Database:
     def delete_account(self, account_id: str) -> None:
         """Everything about one person: keys, ledger, devices, pending codes, the row itself."""
         with self.tx() as c:
-            row = c.execute("SELECT id_hash FROM accounts WHERE id=?", (account_id,)).fetchone()
+            row = c.execute("SELECT id_hash, created_at FROM accounts WHERE id=?", (account_id,)).fetchone()
             if row is None:
                 return
             c.execute("DELETE FROM codes WHERE id_hash=?", (row["id_hash"],))
+            # one more account of its sign-up day is gone: the statistics' sign-ups per day
+            # and the total at each day's end stay right (stats._accounts_daily); a count per
+            # UTC day, nothing of the account
+            ts = now()
+            c.execute(
+                "INSERT INTO daily(day, metric, key, value, updated_at) VALUES (?,?,?,?,?) "
+                "ON CONFLICT(day, metric, key) DO UPDATE SET value=value+excluded.value, updated_at=excluded.updated_at",
+                (utc_day(int(row["created_at"] or ts)), "accounts", "gone", 1, ts),
+            )
             c.execute("DELETE FROM samples WHERE account_id=?", (account_id,))
+            c.execute("DELETE FROM sample_stats WHERE account_id=?", (account_id,))
+            # the record's rows go here; the files whose last reference this was are removed
+            # by the service (Cloud.delete_account → purge_record) before it gets here
+            c.execute("DELETE FROM turns WHERE account_id=?", (account_id,))
+            c.execute("DELETE FROM blob_refs WHERE account_id=?", (account_id,))
+            c.execute("DELETE FROM calls WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM events WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM video_tasks WHERE account_id=?", (account_id,))
             c.execute("DELETE FROM devices WHERE account_id=?", (account_id,))
@@ -956,13 +1080,21 @@ class Database:
             c.execute("DELETE FROM daily WHERE metric='active' AND key=?", (account_id,))
             # the keys' hashes stay a while, so a device still holding one hears
             # `account_deleted` (0.1.40); the rows that named the account do not
-            ts = now()
             c.execute("DELETE FROM deleted_keys WHERE deleted_at < ?", (ts - DELETED_KEYS_TTL_S,))
             c.execute(
                 "INSERT OR REPLACE INTO deleted_keys(key_hash, deleted_at) SELECT key_hash, ? FROM api_keys WHERE account_id=?",
                 (ts, account_id),
             )
             c.execute("DELETE FROM api_keys WHERE account_id=?", (account_id,))
+            # the accounts that signed up with this one's code no longer name it. A settled
+            # one keeps nothing; one whose bonus is still unpaid keeps the mark of having
+            # been invited (settle_invite then credits that side alone, as for any inviter
+            # that is gone). A code is only ever accepted at sign-up, so nothing reopens.
+            c.execute(
+                "UPDATE accounts SET invited_by='' WHERE invited_by=? AND invite_settled_at IS NOT NULL",
+                (account_id,),
+            )
+            c.execute("UPDATE accounts SET invited_by=? WHERE invited_by=?", (INVITER_GONE, account_id))
             c.execute("DELETE FROM accounts WHERE id=?", (account_id,))
 
     def key_deleted(self, key_hash: str) -> bool:
@@ -1039,7 +1171,232 @@ class Database:
 
     def delete_samples(self, account_id: str) -> int:
         with self.tx() as c:
+            c.execute("DELETE FROM sample_stats WHERE account_id=?", (account_id,))
             return c.execute("DELETE FROM samples WHERE account_id=?", (account_id,)).rowcount
+
+    # -- 0.29: the record (turns, blobs, blob_refs) -------------------------------------------
+
+    def add_turn(self, row: dict[str, Any], media: list[dict[str, Any]]) -> None:
+        """One turn and the files it references: a file's row is made on first sight and its
+        ``last_used_at`` moved on every later one (the sweep and the trim go by it); the
+        account's reference to it is written once, whether or not the file was known."""
+        t = int(row.get("ts") or now())
+        with self.tx() as c:
+            c.execute(
+                "INSERT OR REPLACE INTO turns(id, account_id, ts, model, platform, device, conversation, source, status, "
+                "request, response, prompt_tokens, completion_tokens, media, media_bytes, meta) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    row["id"],
+                    row["account_id"],
+                    t,
+                    row.get("model", ""),
+                    row.get("platform", ""),
+                    row.get("device", ""),
+                    row.get("conversation", ""),
+                    row.get("source", "cloud"),
+                    row.get("status", "ok"),
+                    row["request"],
+                    row["response"],
+                    int(row.get("prompt_tokens") or 0),
+                    int(row.get("completion_tokens") or 0),
+                    len(media),
+                    sum(int(m.get("bytes") or 0) for m in media),
+                    row.get("meta", "{}"),
+                ),
+            )
+            for m in media:
+                self._reference_blob(c, m, row["account_id"], "turn", t)
+
+    @staticmethod
+    def _reference_blob(c: sqlite3.Cursor, m: dict[str, Any], account_id: str, owner: str, t: int) -> None:
+        c.execute(
+            "INSERT INTO blobs(sha256, mime, bytes, created_at, last_used_at) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(sha256) DO UPDATE SET last_used_at=MAX(last_used_at, excluded.last_used_at)",
+            (m["sha256"], str(m.get("mime") or ""), int(m.get("bytes") or 0), t, t),
+        )
+        c.execute("INSERT OR IGNORE INTO blob_refs(sha256, account_id, owner) VALUES (?,?,?)", (m["sha256"], account_id, owner))
+
+    def add_blob(self, sha256: str, mime: str, size: int, account_id: str, owner: str = "upload") -> None:
+        """A file a client put up on its own (PUT /v1/blobs), before the turn or profile
+        that names it: the account may read it back from now on."""
+        with self.tx() as c:
+            self._reference_blob(c, {"sha256": sha256, "mime": mime, "bytes": size}, account_id, owner, now())
+
+    def set_blob_refs(self, account_id: str, owner: str, shas: list[str]) -> None:
+        """The account's references under one owner (``profile``) replaced by ``shas``."""
+        with self.tx() as c:
+            c.execute("DELETE FROM blob_refs WHERE account_id=? AND owner=?", (account_id, owner))
+            for sha in shas:
+                c.execute("INSERT OR IGNORE INTO blob_refs(sha256, account_id, owner) VALUES (?,?,?)", (sha, account_id, owner))
+
+    def blob(self, sha256: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute("SELECT * FROM blobs WHERE sha256=?", (sha256,)).fetchone()
+
+    def blob_readable(self, account_id: str, sha256: str) -> bool:
+        """Whether the account holds a reference to the file: one of its turns, its profile
+        or an upload of its own names it. A hash alone opens nothing."""
+        with self._lock:
+            r = self._conn.execute("SELECT 1 FROM blob_refs WHERE account_id=? AND sha256=? LIMIT 1", (account_id, sha256)).fetchone()
+            return r is not None
+
+    def turn(self, turn_id: str) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute("SELECT * FROM turns WHERE id=?", (turn_id,)).fetchone()
+
+    def turns(
+        self,
+        account_id: str | None = None,
+        since: int = 0,
+        limit: int = 100,
+        before: int = 0,
+        before_id: str = "",
+        conversation: str = "",
+    ) -> list[sqlite3.Row]:
+        """Newest first; keyset paging on (ts, rowid) as ``samples`` does, so a page that ends
+        inside a busy second continues there. ``conversation`` narrows to one chat."""
+        q = "SELECT * FROM turns WHERE ts>=?"
+        args: list = [since]
+        if account_id is not None:
+            q += " AND account_id=?"
+            args.append(account_id)
+        if conversation:
+            q += " AND conversation=?"
+            args.append(conversation)
+        if before and before_id:
+            q += " AND (ts<? OR (ts=? AND rowid<(SELECT rowid FROM turns WHERE id=?)))"
+            args.extend([before, before, before_id])
+        elif before:
+            q += " AND ts<?"
+            args.append(before)
+        q += " ORDER BY ts DESC, rowid DESC LIMIT ?"
+        args.append(max(1, min(limit, 1000)))
+        with self._lock:
+            return self._conn.execute(q, args).fetchall()
+
+    def turn_count(self, account_id: str | None = None) -> int:
+        with self._lock:
+            if account_id is None:
+                return int(self._conn.execute("SELECT COUNT(*) FROM turns").fetchone()[0])
+            return int(self._conn.execute("SELECT COUNT(*) FROM turns WHERE account_id=?", (account_id,)).fetchone()[0])
+
+    def record_totals(self, since: int = 0, account_id: str | None = None) -> dict[str, int]:
+        """Turns, accounts, tokens and referenced media since ``since``, and the store's size
+        (every file once, whoever references it) — for Data controls and the operator's page."""
+        q = (
+            "SELECT COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, SUM(prompt_tokens) AS prompt_tokens, "
+            "SUM(completion_tokens) AS completion_tokens, SUM(media) AS media, SUM(media_bytes) AS media_bytes, "
+            "SUM(CASE WHEN source='own' THEN 1 ELSE 0 END) AS own, "
+            "SUM(CASE WHEN status='partial' THEN 1 ELSE 0 END) AS partial FROM turns WHERE ts>=?"
+        )
+        args: list = [since]
+        if account_id is not None:
+            q += " AND account_id=?"
+            args.append(account_id)
+        with self._lock:
+            r = self._conn.execute(q, args).fetchone()
+            out = {k: int(r[k] or 0) for k in r.keys()}
+            if account_id is None:
+                s = self._conn.execute("SELECT COUNT(*) AS files, SUM(bytes) AS bytes FROM blobs").fetchone()
+            else:
+                s = self._conn.execute(
+                    "SELECT COUNT(*) AS files, SUM(b.bytes) AS bytes FROM blobs b "
+                    "WHERE EXISTS (SELECT 1 FROM blob_refs r WHERE r.sha256=b.sha256 AND r.account_id=?)",
+                    (account_id,),
+                ).fetchone()
+            out["files"] = int(s["files"] or 0)
+            out["store_bytes"] = int(s["bytes"] or 0)
+            return out
+
+    def turns_by_day(self, since: int, offset_s: int) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                f"""SELECT {self._DAY} AS day, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts,
+                           SUM(media) AS media, SUM(media_bytes) AS media_bytes
+                    FROM turns WHERE ts>=? GROUP BY day ORDER BY day""",
+                (offset_s, offset_s, offset_s, since),
+            ).fetchall()
+
+    def delete_turns(self, account_id: str) -> tuple[int, list[str]]:
+        """The account's whole record: its turns and every reference it holds. Answers how
+        many turns went and the files nobody references any more (their rows are gone; the
+        caller removes the files)."""
+        with self.tx() as c:
+            held = [r[0] for r in c.execute("SELECT DISTINCT sha256 FROM blob_refs WHERE account_id=?", (account_id,)).fetchall()]
+            n = c.execute("DELETE FROM turns WHERE account_id=?", (account_id,)).rowcount
+            c.execute("DELETE FROM blob_refs WHERE account_id=?", (account_id,))
+            return n, self._drop_orphans(c, held)
+
+    def sweep_turns(self, before: int, limit: int = 5000) -> tuple[int, list[str]]:
+        """Turns older than ``before`` (RECORD_KEEP_DAYS), a page at a time; then the files
+        no turn younger than that names — a file's ``last_used_at`` moves with every turn
+        that names it, so one last used before ``before`` is referenced by swept turns only
+        — unless a profile wears it (the face's clips). Answers the turns gone and the
+        files to remove."""
+        with self.tx() as c:
+            ids = [r[0] for r in c.execute("SELECT id FROM turns WHERE ts<? ORDER BY ts LIMIT ?", (before, limit)).fetchall()]
+            n = 0
+            for i in range(0, len(ids), 500):
+                page = ids[i : i + 500]
+                n += c.execute(f"DELETE FROM turns WHERE id IN ({','.join('?' * len(page))})", page).rowcount
+            if len(ids) >= limit:
+                return n, []  # more turns to go first; the files follow on the last page
+            gone = [
+                r[0]
+                for r in c.execute(
+                    "SELECT sha256 FROM blobs b WHERE last_used_at<? "
+                    "AND NOT EXISTS (SELECT 1 FROM blob_refs r WHERE r.sha256=b.sha256 AND r.owner='profile') LIMIT ?",
+                    (before, limit),
+                ).fetchall()
+            ]
+            for i in range(0, len(gone), 500):
+                page = gone[i : i + 500]
+                marks = ",".join("?" * len(page))
+                c.execute(f"DELETE FROM blob_refs WHERE sha256 IN ({marks})", page)
+                c.execute(f"DELETE FROM blobs WHERE sha256 IN ({marks})", page)
+            return n, gone
+
+    @staticmethod
+    def _drop_orphans(c: sqlite3.Cursor, candidates: list[str]) -> list[str]:
+        """Of ``candidates``, the files nobody references any more: their rows removed, the
+        hashes answered so the caller can remove the files."""
+        gone: list[str] = []
+        for i in range(0, len(candidates), 500):
+            page = candidates[i : i + 500]
+            marks = ",".join("?" * len(page))
+            gone += [
+                r[0]
+                for r in c.execute(
+                    f"SELECT sha256 FROM blobs b WHERE sha256 IN ({marks}) "
+                    "AND NOT EXISTS (SELECT 1 FROM blob_refs r WHERE r.sha256=b.sha256)",
+                    page,
+                ).fetchall()
+            ]
+        for i in range(0, len(gone), 500):
+            page = gone[i : i + 500]
+            c.execute(f"DELETE FROM blobs WHERE sha256 IN ({','.join('?' * len(page))})", page)
+        return gone
+
+    def trim_blobs(self, max_bytes: int, limit: int = 2000) -> list[str]:
+        """Files beyond ``max_bytes`` in all, oldest use first, their rows and references
+        removed; the caller removes the files. At most ``limit`` per call."""
+        with self.tx() as c:
+            total = int(c.execute("SELECT COALESCE(SUM(bytes),0) FROM blobs").fetchone()[0])
+            if total <= max_bytes:
+                return []
+            gone: list[str] = []
+            for sha, size in c.execute("SELECT sha256, bytes FROM blobs ORDER BY last_used_at, rowid LIMIT ?", (limit,)).fetchall():
+                if total <= max_bytes:
+                    break
+                gone.append(sha)
+                total -= int(size)
+            for i in range(0, len(gone), 500):
+                page = gone[i : i + 500]
+                marks = ",".join("?" * len(page))
+                c.execute(f"DELETE FROM blob_refs WHERE sha256 IN ({marks})", page)
+                c.execute(f"DELETE FROM blobs WHERE sha256 IN ({marks})", page)
+            return gone
 
     def contributors(self) -> int:
         with self._lock:
@@ -2067,18 +2424,34 @@ class Database:
 
     # -- devices (the hub) ---------------------------------------------------------
 
-    def upsert_device(self, account_id: str, device_id: str, name: str, kind: str, os: str, version: str, actions: str) -> None:
+    def upsert_device(
+        self,
+        account_id: str,
+        device_id: str,
+        name: str,
+        kind: str,
+        os: str,
+        version: str,
+        actions: str,
+        llm_provider: str = "",
+        llm_model: str = "",
+    ) -> None:
+        """A device's hello. `llm_provider` / `llm_model` (0.28) are what it said it runs
+        the model under, kept as said; empty keeps what an earlier hello said (an older
+        client that does not send them must not erase a newer one's word)."""
         t = now()
         ip = _client.current().ip
         with self.tx() as c:
             c.execute(
-                """INSERT INTO devices(account_id, id, name, kind, os, version, actions, first_seen, last_seen, ip)
-                   VALUES(?,?,?,?,?,?,?,?,?,?)
+                """INSERT INTO devices(account_id, id, name, kind, os, version, actions, first_seen, last_seen, ip, llm_provider, llm_model)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(account_id, id) DO UPDATE SET
                      name=excluded.name, kind=excluded.kind, os=excluded.os, version=excluded.version,
                      actions=excluded.actions, last_seen=excluded.last_seen,
-                     ip=CASE WHEN excluded.ip<>'' THEN excluded.ip ELSE devices.ip END""",
-                (account_id, device_id, name, kind, os, version, actions, t, t, ip),
+                     ip=CASE WHEN excluded.ip<>'' THEN excluded.ip ELSE devices.ip END,
+                     llm_provider=CASE WHEN excluded.llm_provider<>'' THEN excluded.llm_provider ELSE devices.llm_provider END,
+                     llm_model=CASE WHEN excluded.llm_model<>'' THEN excluded.llm_model ELSE devices.llm_model END""",
+                (account_id, device_id, name, kind, os, version, actions, t, t, ip, llm_provider[:60], llm_model[:80]),
             )
 
     def touch_device(self, account_id: str, device_id: str) -> None:
@@ -2179,6 +2552,503 @@ class Database:
         """The relay asked the provider about this task and got an answer."""
         with self.tx() as c:
             c.execute("UPDATE video_tasks SET checks=checks+1 WHERE task_id=?", (task_id,))
+
+    # -- 0.28: chat call telemetry (analytics.py) ------------------------------------------------
+
+    CALL_COLUMNS = (
+        "ts",
+        "account_id",
+        "model",
+        "platform",
+        "family",
+        "status",
+        "detail",
+        "stream",
+        "wait_ms",
+        "ttft_ms",
+        "total_ms",
+        "prompt_tokens",
+        "completion_tokens",
+        "messages",
+        "images",
+        "tools",
+        "tool_names",
+        "hands",
+        "retries",
+        "request_id",
+    )
+
+    def add_call(self, row: dict[str, Any]) -> int:
+        """One handled chat request (the columns of `calls`; missing ones take their defaults)."""
+        cols = [c for c in self.CALL_COLUMNS if c in row]
+        with self.tx() as c:
+            cur = c.execute(
+                f"INSERT INTO calls({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                [row[k] for k in cols],
+            )
+            return int(cur.lastrowid or 0)
+
+    def sweep_calls(self, before: int) -> int:
+        with self.tx() as c:
+            return c.execute("DELETE FROM calls WHERE ts<?", (before,)).rowcount
+
+    def sweep_events(self, before: int) -> int:
+        """The timelines' lines older than `before` go, except the `account.deleted` ones (the
+        statistics' only trace of a deletion) and the operator's `control_audit`, which is
+        kept whole. The leftovers of the retired media proxy (`video_tasks`, otherwise only
+        purged when a new task is written) go with them."""
+        with self.tx() as c:
+            n = c.execute("DELETE FROM events WHERE ts<? AND kind<>'account.deleted'", (before,)).rowcount
+            c.execute("DELETE FROM video_tasks WHERE created_at<?", (now() - self.VIDEO_KEEP_S,))
+            return n
+
+    def calls_since(self, since: int, limit: int = 20000) -> list[sqlite3.Row]:
+        """Every call since `since`, oldest first (the live meter's warm-up after a restart).
+        Over ``limit`` rows it is the newest that are kept, so a busy hour's latest minutes
+        are the ones the live page shows."""
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM calls WHERE ts>=? ORDER BY id DESC LIMIT ?", (since, limit)).fetchall()
+            rows.reverse()
+            return rows
+
+    def calls_between(self, since: int, until: int) -> list[sqlite3.Row]:
+        """The figures of every call of a window, without the ids: what the drill-downs and
+        the platform comparison compute percentiles from (a day is tens of thousands of rows)."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT ts, account_id, model, platform, family, status, stream, wait_ms, ttft_ms, total_ms,
+                          prompt_tokens, completion_tokens, messages, images, tools, hands, retries
+                   FROM calls WHERE ts>=? AND ts<?""",
+                (since, until),
+            ).fetchall()
+
+    def calls_by_platform(self, since: int, until: int) -> list[sqlite3.Row]:
+        """Per platform over a window: how many calls, how they ended, what they carried; the
+        aggregation stays in SQLite (a season is hundreds of thousands of rows)."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT platform, COUNT(*) AS n, SUM(status='ok') AS ok,
+                          SUM(status IN ('upstream_error','upstream_timeout','broken')) AS errors,
+                          SUM(status='refused') AS refused, SUM(COALESCE(hands, 0)) AS hands,
+                          SUM(COALESCE(images, 0)>0) AS images, SUM(COALESCE(tools, 0)>0) AS tools,
+                          SUM(COALESCE(stream, 0)) AS stream, SUM(COALESCE(messages, 0)) AS messages
+                   FROM calls WHERE ts>=? AND ts<? GROUP BY platform""",
+                (since, until),
+            ).fetchall()
+
+    def calls_latency_by_platform(self, since: int, until: int) -> list[sqlite3.Row]:
+        """Per platform over a window: the nearest-rank percentiles of the waits (every call)
+        and of the time to the first token and the total (the calls that went well), the
+        same figures `analytics.percentile` gives, ranked by SQLite's window functions."""
+        with self._lock:
+            return self._conn.execute(
+                """WITH w AS (
+                       SELECT platform, status='ok' AS ok, wait_ms, ttft_ms, total_ms,
+                              ROW_NUMBER() OVER (PARTITION BY platform ORDER BY wait_ms) AS r_wait,
+                              COUNT(*) OVER (PARTITION BY platform) AS n_all,
+                              ROW_NUMBER() OVER (PARTITION BY platform, status='ok' ORDER BY ttft_ms) AS r_ttft,
+                              ROW_NUMBER() OVER (PARTITION BY platform, status='ok' ORDER BY total_ms) AS r_total,
+                              COUNT(*) OVER (PARTITION BY platform, status='ok') AS n_ok
+                       FROM calls WHERE ts>=? AND ts<?)
+                   SELECT platform,
+                          MAX(CASE WHEN r_wait=(95*n_all+99)/100 THEN wait_ms END) AS p95_wait_ms,
+                          MAX(CASE WHEN ok AND r_ttft=(n_ok+1)/2 THEN ttft_ms END) AS p50_ttft_ms,
+                          MAX(CASE WHEN ok AND r_ttft=(95*n_ok+99)/100 THEN ttft_ms END) AS p95_ttft_ms,
+                          MAX(CASE WHEN ok AND r_total=(n_ok+1)/2 THEN total_ms END) AS p50_total_ms
+                   FROM w GROUP BY platform""",
+                (since, until),
+            ).fetchall()
+
+    def calls_by_day(self, since: int, day_offset_s: int = 0) -> list[sqlite3.Row]:
+        """Per local day and platform: calls, how they ended, screen-operation turns, pictures,
+        tools offered, accounts — the hands page and the platform series."""
+        with self._lock:
+            return self._conn.execute(
+                f"""SELECT {self._DAY} AS day, platform, COUNT(*) AS n,
+                           SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END) AS ok,
+                           SUM(CASE WHEN status IN ('upstream_error','upstream_timeout','broken') THEN 1 ELSE 0 END) AS errors,
+                           SUM(CASE WHEN status='refused' THEN 1 ELSE 0 END) AS refused,
+                           SUM(hands) AS hands, SUM(CASE WHEN images>0 THEN 1 ELSE 0 END) AS with_images,
+                           SUM(CASE WHEN tools>0 THEN 1 ELSE 0 END) AS with_tools,
+                           COUNT(DISTINCT account_id) AS accounts,
+                           COUNT(DISTINCT CASE WHEN hands=1 THEN account_id END) AS hands_accounts
+                    FROM calls WHERE ts>=? GROUP BY day, platform ORDER BY day""",
+                (day_offset_s, day_offset_s, day_offset_s, since),
+            ).fetchall()
+
+    def calls_tool_names(self, since: int, limit: int = 2000) -> list[sqlite3.Row]:
+        """The distinct tool-name strings of the window with their counts, for the hands page
+        to split and rank (a few hundred distinct strings; the names are the clients' own)."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT tool_names, platform, COUNT(*) AS n FROM calls WHERE ts>=? AND tool_names<>'' GROUP BY tool_names, platform ORDER BY n DESC LIMIT ?",
+                (since, limit),
+            ).fetchall()
+
+    def calls_hands_accounts(self, since: int) -> list[sqlite3.Row]:
+        """The accounts that ran a screen-operation turn in the window: how many, when first and last, on what."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT account_id, COUNT(*) AS n, MIN(ts) AS first_ts, MAX(ts) AS last_ts,
+                          GROUP_CONCAT(DISTINCT platform) AS platforms,
+                          SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END) AS ok
+                   FROM calls WHERE ts>=? AND hands=1 GROUP BY account_id ORDER BY n DESC LIMIT 500""",
+                (since,),
+            ).fetchall()
+
+    def calls_refused_by_family(self, since: int, limit: int = 30) -> list[sqlite3.Row]:
+        """The clients the `apps_only` switch turned away in the window, by family: calls,
+        accounts, the last one (what the Non-app traffic page shows once the switch is on and
+        the ledger no longer sees them)."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT family, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, MAX(ts) AS last_ts
+                   FROM calls WHERE ts>=? AND status='refused' AND detail='client_not_supported'
+                   GROUP BY family ORDER BY n DESC LIMIT ?""",
+                (since, limit),
+            ).fetchall()
+
+    def calls_for_account(self, account_id: str, since: int) -> sqlite3.Row:
+        """One account's calls in the window: how many, how they ended, how long they took."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT COUNT(*) AS n, SUM(CASE WHEN status='ok' THEN 1 ELSE 0 END) AS ok,
+                          SUM(CASE WHEN status IN ('upstream_error','upstream_timeout','broken') THEN 1 ELSE 0 END) AS errors,
+                          SUM(CASE WHEN status='refused' THEN 1 ELSE 0 END) AS refused,
+                          SUM(hands) AS hands, SUM(images) AS images, SUM(CASE WHEN tools>0 THEN 1 ELSE 0 END) AS with_tools,
+                          AVG(CASE WHEN status='ok' THEN ttft_ms END) AS avg_ttft_ms,
+                          AVG(CASE WHEN status='ok' THEN total_ms END) AS avg_total_ms,
+                          AVG(wait_ms) AS avg_wait_ms, MAX(ts) AS last_ts
+                   FROM calls WHERE account_id=? AND ts>=?""",
+                (account_id, since),
+            ).fetchone()
+
+    def calls_count(self) -> int:
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM calls").fetchone()[0])
+
+    # -- 0.28: the usage matrix and its drill-downs (analytics.py) --------------------------
+
+    def usage_by_day_model(self, since: int, day_offset_s: int = 0) -> list[sqlite3.Row]:
+        """Per local day and model: requests, tokens, money, accounts (the usage matrix)."""
+        with self._lock:
+            return self._conn.execute(
+                f"""SELECT {self._DAY} AS day, model, kind, COUNT(*) AS requests, SUM(prompt_tokens) AS prompt_tokens,
+                           SUM(completion_tokens) AS completion_tokens, SUM(cost_uy) AS cost_uy,
+                           COUNT(DISTINCT account_id) AS accounts
+                    FROM ledger WHERE ts>=? AND charged>=0 AND kind IN ('chat','image','video','realtime')
+                    GROUP BY day, model, kind ORDER BY day""",
+                (day_offset_s, day_offset_s, day_offset_s, since),
+            ).fetchall()
+
+    def usage_by_hour_model(self, since: int, until: int, day_offset_s: int = 0) -> list[sqlite3.Row]:
+        """Per local hour and model inside one window (a day's drill-down)."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT ((ts + ?) % 86400) / 3600 AS hour, model, COUNT(*) AS requests, SUM(prompt_tokens) AS prompt_tokens,
+                          SUM(completion_tokens) AS completion_tokens, SUM(cost_uy) AS cost_uy, COUNT(DISTINCT account_id) AS accounts
+                   FROM ledger WHERE ts>=? AND ts<? AND charged>=0 AND kind IN ('chat','image','video','realtime')
+                   GROUP BY hour, model ORDER BY hour""",
+                (day_offset_s, since, until),
+            ).fetchall()
+
+    def usage_by_ua(self, since: int, until: int | None = None) -> list[sqlite3.Row]:
+        """Per user agent string in the window: requests, tokens, money and the accounts
+        behind it — a few thousand rows at most; the caller folds them into platforms and
+        families (client.py) and counts accounts once per group from `account_ua_pairs`."""
+        with self._lock:
+            until_clause = " AND ts<?" if until is not None else ""
+            args: tuple = (since, until) if until is not None else (since,)
+            return self._conn.execute(
+                f"""SELECT ua, COUNT(*) AS requests, SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens,
+                           SUM(cost_uy) AS cost_uy, COUNT(DISTINCT account_id) AS accounts
+                    FROM ledger WHERE ts>=?{until_clause} AND charged>=0 AND kind IN ('chat','image','video','realtime')
+                    GROUP BY ua ORDER BY requests DESC""",
+                args,
+            ).fetchall()
+
+    def account_ua_pairs(self, since: int, until: int | None = None) -> list[sqlite3.Row]:
+        """The distinct (account, user agent) pairs of the window with the requests of each,
+        so accounts can be counted once per platform and the accounts on two platforms found."""
+        with self._lock:
+            until_clause = " AND ts<?" if until is not None else ""
+            args: tuple = (since, until) if until is not None else (since,)
+            return self._conn.execute(
+                f"""SELECT account_id, ua, COUNT(*) AS requests FROM ledger
+                    WHERE ts>=?{until_clause} AND charged>=0 AND kind IN ('chat','image','video','realtime')
+                    GROUP BY account_id, ua""",
+                args,
+            ).fetchall()
+
+    def top_accounts_between(self, since: int, until: int, limit: int = 50) -> list[sqlite3.Row]:
+        """The accounts that cost most inside one window, with the client they last used."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT account_id, COUNT(*) AS requests, SUM(charged) AS charged, SUM(cost_uy) AS cost_uy,
+                          SUM(prompt_tokens) AS prompt_tokens, SUM(completion_tokens) AS completion_tokens, MAX(ua) AS ua
+                   FROM ledger WHERE ts>=? AND ts<? AND charged>=0 AND kind IN ('chat','image','video','realtime')
+                   GROUP BY account_id ORDER BY cost_uy DESC LIMIT ?""",
+                (since, until, limit),
+            ).fetchall()
+
+    def event_details_between(self, kind: str, since: int, until: int, limit: int = 30) -> list[sqlite3.Row]:
+        """The most frequent `detail` lines of one event kind in a window (why requests failed)."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT detail, COUNT(*) AS n FROM events WHERE kind=? AND ts>=? AND ts<? GROUP BY detail ORDER BY n DESC LIMIT ?",
+                (kind, since, until, limit),
+            ).fetchall()
+
+    def events_by_hour(self, since: int, until: int, day_offset_s: int = 0) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT ((ts + ?) % 86400) / 3600 AS hour, kind, COUNT(*) AS n FROM events WHERE ts>=? AND ts<? GROUP BY hour, kind",
+                (day_offset_s, since, until),
+            ).fetchall()
+
+    def account_versions(self) -> list[sqlite3.Row]:
+        """Every account's last user agent with how many share it: the platform and version
+        mix of the people as they stand now (client.py folds the strings)."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT last_ua, COUNT(*) AS n, SUM(disabled) AS disabled, MAX(last_seen_at) AS last_seen_at FROM accounts GROUP BY last_ua"
+            ).fetchall()
+
+    def keys_by_ua(self, since: int) -> list[sqlite3.Row]:
+        """Sign-ins (keys issued) since `since` per user agent: which clients people sign in from."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT ua, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts FROM api_keys WHERE created_at>=? GROUP BY ua ORDER BY n DESC",
+                (since,),
+            ).fetchall()
+
+    def shared_first_addresses(self, at_least: int = 5, limit: int = 100) -> list[sqlite3.Row]:
+        """Addresses that signed up `at_least` accounts: a household, a campus, or one person many times."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT first_ip AS ip, COUNT(*) AS accounts, SUM(disabled) AS disabled, MIN(created_at) AS first_at, MAX(created_at) AS last_at
+                   FROM accounts WHERE first_ip<>'' GROUP BY first_ip HAVING COUNT(*)>=? ORDER BY accounts DESC LIMIT ?""",
+                (at_least, limit),
+            ).fetchall()
+
+    def account_ua_usage(self, since: int, limit: int = 3000) -> list[sqlite3.Row]:
+        """Per account and user agent in the window, the heaviest first: the abuse page's
+        suspects are the ones whose client is not one of the apps."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT l.account_id, l.ua, COUNT(*) AS requests, SUM(l.prompt_tokens) AS prompt_tokens,
+                          SUM(l.completion_tokens) AS completion_tokens, SUM(l.cost_uy) AS cost_uy, MAX(l.ts) AS last_ts,
+                          a.hint, a.channel, a.disabled, a.created_at, a.unlimited
+                   FROM ledger l JOIN accounts a ON a.id=l.account_id
+                   WHERE l.ts>=? AND l.charged>=0 AND l.kind IN ('chat','image','video','realtime')
+                   GROUP BY l.account_id, l.ua ORDER BY requests DESC LIMIT ?""",
+                (since, limit),
+            ).fetchall()
+
+    # -- 0.28: cohorts — the pool, what came after it, retention (analytics.py) ------------------
+
+    def pool_cohort_rows(self) -> list[sqlite3.Row]:
+        """Per account: when it came, its pool and what it spent, its first and last charged
+        chat, its first refusal for budget, when it was last seen at all — the funnel from
+        sign-up through the free allowance to what came after."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT a.id, a.id_hash, a.created_at, a.unlimited, a.disabled, a.grant_uy, a.last_seen_at, a.last_ua, a.invited_by,
+                          COALESCE(l.spent_uy, 0) AS spent_uy, COALESCE(l.chats, 0) AS chats, l.first_chat, l.last_chat,
+                          r.first_refused, r.refusals
+                   FROM accounts a
+                   LEFT JOIN (SELECT account_id, SUM(CASE WHEN cost_uy>0 THEN cost_uy ELSE 0 END) AS spent_uy,
+                                     SUM(CASE WHEN kind IN ('chat','image','video','realtime') THEN 1 ELSE 0 END) AS chats,
+                                     MIN(CASE WHEN kind IN ('chat','image','video','realtime') THEN ts END) AS first_chat,
+                                     MAX(CASE WHEN kind IN ('chat','image','video','realtime') THEN ts END) AS last_chat
+                              FROM ledger GROUP BY account_id) l ON l.account_id=a.id
+                   LEFT JOIN (SELECT account_id, MIN(ts) AS first_refused, COUNT(*) AS refusals
+                              FROM events WHERE kind='budget.refused' GROUP BY account_id) r ON r.account_id=a.id"""
+            ).fetchall()
+
+    def active_days_by_account(self, since: int) -> list[sqlite3.Row]:
+        """The UTC days each account made any authenticated call (the `daily` table's
+        `active` rows), since `since` — retention by any use, not only model use."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT key AS account_id, day FROM daily WHERE metric='active' AND day>=? AND key<>''", (since,)
+            ).fetchall()
+
+    def chat_days_by_account(self, since: int) -> list[sqlite3.Row]:
+        """The UTC days each account made a charged model request, since `since`."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT account_id, (ts - ts % 86400) AS day FROM ledger
+                   WHERE ts>=? AND kind IN ('chat','image','video','realtime') GROUP BY account_id, day""",
+                (since,),
+            ).fetchall()
+
+    def sync_assistant_accounts(self, since: int) -> list[sqlite3.Row]:
+        """Accounts whose devices synced an assistant message written since `since`, with how
+        many: a model answered them somewhere — on the relay, or under a key of their own."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT account_id, COUNT(*) AS n, MAX(created_at) AS last_at FROM sync_messages
+                   WHERE role='assistant' AND deleted=0 AND created_at>=? GROUP BY account_id""",
+                (since,),
+            ).fetchall()
+
+    def chat_accounts_since(self, since: int) -> set[str]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT DISTINCT account_id FROM ledger WHERE ts>=? AND kind IN ('chat','image','video','realtime')", (since,)
+            ).fetchall()
+        return {str(r[0]) for r in rows}
+
+    def device_seen_accounts(self, since: int) -> list[sqlite3.Row]:
+        """Accounts with a hub device seen since `since`, by kind: the app was open."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT account_id, GROUP_CONCAT(DISTINCT kind) AS kinds, MAX(last_seen) AS last_seen FROM devices WHERE last_seen>=? GROUP BY account_id",
+                (since,),
+            ).fetchall()
+
+    def devices_detail(self) -> list[sqlite3.Row]:
+        """Every remembered device's kind, system, version, actions and reported model, for
+        the platform and hands pages to fold (one row per device; tens of thousands at most)."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT account_id, kind, os, version, actions, llm_provider, llm_model, last_seen FROM devices"
+            ).fetchall()
+
+    # -- 0.28: the shape of kept turns (analytics.py) -------------------------------------------
+
+    SAMPLE_STAT_COLUMNS = (
+        "sample_id",
+        "account_id",
+        "ts",
+        "model",
+        "platform",
+        "messages",
+        "user_chars",
+        "reply_chars",
+        "tool_calls",
+        "pictures",
+        "hands",
+        "trivial",
+        "user_hash",
+        "bytes",
+    )
+
+    def add_sample_stats(self, rows: list[dict[str, Any]]) -> int:
+        """The shape rows of kept turns (one per turn); a turn already described is left alone."""
+        if not rows:
+            return 0
+        cols = self.SAMPLE_STAT_COLUMNS
+        with self.tx() as c:
+            c.executemany(
+                f"INSERT OR IGNORE INTO sample_stats({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+                [[r.get(k, "" if k in ("sample_id", "account_id", "model", "platform", "user_hash") else 0) for k in cols] for r in rows],
+            )
+        return len(rows)
+
+    def samples_without_stats(self, limit: int, since: int) -> list[sqlite3.Row]:
+        """Kept turns since `since` that have no shape row (the row's write failed once, after
+        the turn was kept): the newest first. The window matters: the walk is a lookup per
+        turn, and over every turn ever kept it ran for a minute and a half on a cold page cache
+        with the database lock held, which froze the relay (every handler waits on that lock).
+        A missing row is at most a day old when the daily pass looks, so a few days suffice."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT s.rowid, s.id, s.account_id, s.ts, s.model, s.request, s.response, s.meta FROM samples s
+                   LEFT JOIN sample_stats t ON t.sample_id=s.id WHERE s.ts>=? AND t.sample_id IS NULL
+                   ORDER BY s.ts DESC LIMIT ?""",
+                (since, limit),
+            ).fetchall()
+
+    def samples_page_before(self, before_ts: int, before_rowid: int, limit: int) -> list[sqlite3.Row]:
+        """The next page of turns going back in time from a (ts, rowid) position — the
+        backfill's cursor; newest first, so recent turns are described first."""
+        with self._lock:
+            if before_ts <= 0:
+                return self._conn.execute(
+                    "SELECT rowid, id, account_id, ts, model, request, response, meta FROM samples ORDER BY ts DESC, rowid DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            return self._conn.execute(
+                """SELECT rowid, id, account_id, ts, model, request, response, meta FROM samples
+                   WHERE ts<? OR (ts=? AND rowid<?) ORDER BY ts DESC, rowid DESC LIMIT ?""",
+                (before_ts, before_ts, before_rowid, limit),
+            ).fetchall()
+
+    def sample_stats_count(self) -> int:
+        with self._lock:
+            return int(self._conn.execute("SELECT COUNT(*) FROM sample_stats").fetchone()[0])
+
+    def sample_stats_totals(self, since: int) -> sqlite3.Row:
+        with self._lock:
+            return self._conn.execute(
+                """SELECT COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, SUM(trivial) AS trivial, SUM(hands) AS hands,
+                          SUM(CASE WHEN tool_calls>0 THEN 1 ELSE 0 END) AS with_tools,
+                          SUM(CASE WHEN pictures>0 THEN 1 ELSE 0 END) AS with_pictures,
+                          SUM(bytes) AS bytes, AVG(user_chars) AS avg_user_chars, AVG(reply_chars) AS avg_reply_chars,
+                          AVG(messages) AS avg_messages,
+                          SUM(CASE WHEN reply_chars<40 THEN 1 ELSE 0 END) AS short_replies
+                   FROM sample_stats WHERE ts>=?""",
+                (since,),
+            ).fetchone()
+
+    def sample_stats_repeats(self, since: int, at_least: int = 3) -> sqlite3.Row:
+        """How many turns of the window repeat a person's message seen `at_least` times in it
+        (scripts, tests, the same opening line), and how many distinct such messages."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT COALESCE(SUM(n), 0) AS turns, COUNT(*) AS messages, COALESCE(SUM(accounts), 0) AS account_rows FROM (
+                       SELECT user_hash, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts FROM sample_stats
+                       WHERE ts>=? AND user_hash<>'' GROUP BY user_hash HAVING COUNT(*)>=?)""",
+                (since, at_least),
+            ).fetchone()
+
+    def sample_stats_top_repeats(self, since: int, limit: int = 20) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                """SELECT user_hash, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, MIN(user_chars) AS user_chars
+                   FROM sample_stats WHERE ts>=? AND user_hash<>'' GROUP BY user_hash HAVING COUNT(*)>=3 ORDER BY n DESC LIMIT ?""",
+                (since, limit),
+            ).fetchall()
+
+    def sample_stats_by_day(self, since: int, day_offset_s: int = 0) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                f"""SELECT {self._DAY} AS day, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, SUM(trivial) AS trivial,
+                           SUM(hands) AS hands, SUM(CASE WHEN tool_calls>0 THEN 1 ELSE 0 END) AS with_tools,
+                           SUM(CASE WHEN pictures>0 THEN 1 ELSE 0 END) AS with_pictures, SUM(bytes) AS bytes
+                    FROM sample_stats WHERE ts>=? GROUP BY day ORDER BY day""",
+                (day_offset_s, day_offset_s, day_offset_s, since),
+            ).fetchall()
+
+    def sample_stats_by_account(self, since: int) -> list[sqlite3.Row]:
+        """Per contributing account in the window: the figures the quality score is made of."""
+        with self._lock:
+            return self._conn.execute(
+                """SELECT s.account_id, a.hint, a.channel, a.contribute, a.disabled, a.created_at, a.last_ua,
+                          COUNT(*) AS n, SUM(s.trivial) AS trivial, SUM(s.hands) AS hands,
+                          SUM(CASE WHEN s.tool_calls>0 THEN 1 ELSE 0 END) AS with_tools,
+                          SUM(CASE WHEN s.pictures>0 THEN 1 ELSE 0 END) AS with_pictures,
+                          SUM(CASE WHEN s.reply_chars<40 THEN 1 ELSE 0 END) AS short_replies,
+                          COUNT(DISTINCT s.user_hash) AS distinct_messages,
+                          AVG(s.user_chars) AS avg_user_chars, AVG(s.reply_chars) AS avg_reply_chars, AVG(s.messages) AS avg_messages,
+                          SUM(s.bytes) AS bytes, MIN(s.ts) AS first_ts, MAX(s.ts) AS last_ts,
+                          GROUP_CONCAT(DISTINCT s.platform) AS platforms
+                   FROM sample_stats s JOIN accounts a ON a.id=s.account_id
+                   WHERE s.ts>=? GROUP BY s.account_id ORDER BY n DESC""",
+                (since,),
+            ).fetchall()
+
+    def sample_stats_by_platform(self, since: int) -> list[sqlite3.Row]:
+        with self._lock:
+            return self._conn.execute(
+                """SELECT platform, COUNT(*) AS n, COUNT(DISTINCT account_id) AS accounts, SUM(trivial) AS trivial, SUM(hands) AS hands,
+                          SUM(CASE WHEN tool_calls>0 THEN 1 ELSE 0 END) AS with_tools, SUM(CASE WHEN pictures>0 THEN 1 ELSE 0 END) AS with_pictures,
+                          AVG(user_chars) AS avg_user_chars, SUM(bytes) AS bytes
+                   FROM sample_stats WHERE ts>=? GROUP BY platform ORDER BY n DESC""",
+                (since,),
+            ).fetchall()
 
     # -- the catalog's probes (catalog.py) ----------------------------------------
 
