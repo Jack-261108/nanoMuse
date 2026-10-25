@@ -1748,6 +1748,8 @@ const zhCN: Record<string, string> = {
   "On. This device's side chats go to the account; the other devices' are on their way.": "已打开。本机的旁聊会上传到账号，其他设备的旁聊正在同步过来。",
   "Off. Side chats stay on this device from now on.": "已关闭。从现在起，旁聊只留在本机。",
   "{device} is working…": "{device} 正在处理…",
+  "{device} is working: {detail}": "{device} 正在处理：{detail}",
+  "{device} is waiting for you": "{device} 在等你确认",
   "From {device}": "来自 {device}",
   "to {device}": "发给 {device}",
   "This goes to {device}.": "这条会发给 {device}。",
@@ -1760,6 +1762,8 @@ const zhCN: Record<string, string> = {
   "Open the chat. It introduces itself and asks your name.": "打开聊天。它会介绍自己，并问你的名字。",
   "Pick a name for me, or type one": "给我挑一个名字，或者自己输入一个",
   "Something else": "自己起一个",
+  "Type a name for me": "输入你想叫我什么",
+  "Call me this": "就叫这个",
 
   // the own-key model form: the proxy for this provider
   "Proxy (optional)": "代理（可选）",

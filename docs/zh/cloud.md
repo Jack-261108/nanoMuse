@@ -77,7 +77,7 @@ GET    /v1/sync/state                   → {enabled, cursor, counts{conversatio
 PUT    /v1/sync/state   {enabled}       → the same; false deletes everything stored, the counter keeps counting
 GET    /v1/sync/changes ?since=0&limit=500&scope=all|main&tail=K   → {cursor, more, conversations[], messages[], skipped?}
 POST   /v1/sync/changes {device, conversations[], messages[]}   → {cursor, accepted, rejected[{cid | mid, reason, cid_main?}]}
-POST   /v1/sync/working {cid, working, device?}   → 204; the hub tells the other devices   404 no_conversation
+POST   /v1/sync/working {cid, working, device?, state?, detail?}   → 204; the hub tells the other devices (0.31: state and step ride along)   404 no_conversation
 DELETE /v1/sync/changes                 → the state, counts at zero     everything stored, switch unchanged
 DELETE /v1/sync/conversations/{cid}     → {cursor, deleted: true}      a tombstone the other devices apply; 404 no_conversation
 ```
@@ -182,6 +182,8 @@ DELETE /v1/devices/{id}     Bearer                            → 204; 409 devic
 `/v1/config` 里的 `code_ttl_s` 和 `password_min_len` 就是中继的 `CODE_TTL_S` 和 `PASSWORD_MIN_LEN`；网页控制台的登录表单和密码表单打印这两个数，所以设了别的数值的中继也能被说对，没有这两个字段的旧中继按十分钟和 8 位读。
 
 其余都是 OpenAI API：`GET /v1/models`（带 `architecture` 模态，好认出图像模型，每个模型还有一个 `nanomuse` 块，含它的 `kind`、价格、`for`（聊天模型适用的通道：`chat` 和 / 或 `gui`）以及 `recommended_for`）、`GET /v1/models/{id}?kind=chat`（成员检查一个手动输入的 id：`listed`、`priced_as`）、流式的 `POST /v1/chat/completions`、`POST /v1/images/generations` 和 `/v1/images/edits`，以及走服务商自己路径的短视频（`POST /api/v1/services/aigc/video-generation/video-synthesis`、只能查自己任务的 `GET /api/v1/tasks/{id}`、`GET /api/v1/uploads`）。项目托管服务对图片/视频请求、上传、手动媒体模型查询、媒体估算和视频任务轮询，在调用上游之前统一返回 `410 hosted_media_retired`，并带 `action: configure_own_provider`。错误是 `{"error": {"message", "type": "nanomuse_cloud", "code"}}`，`code` 稳定不变，App 把它变成一句话。中继 0.22 加了运营者[开关](#controls)的码：`403 signup_closed`、`503 service_paused`、`503 sync_paused`、`503 hub_paused`（以及 hub 的关闭码 `4003 hub_paused`），还有免费额度是被暂停而不是花完时带 `paused: true` 的 `allowance_exhausted`；`/healthz`、`/v1/config` 和 `/v1/me` 在 `paused` 下列出关着的开关。
+
+**模型开口之前（中继 0.31）。** 一次流式对话可能先收到几段没有 `choices` 的 chunk：`{"object": "chat.completion.chunk", "model", "created", "choices": [], "nanomuse": {"phase", "waited_ms", "ahead"?}}`。请求在中继的模型名额（`CHAT_CONCURRENCY`）前排队时，每 5 秒来一段 `phase: "queued"`，`ahead` 是排在它前面的请求数；轮到它时来一段 `phase: "working"`；没排过队的请求一段也不会收到。模型迟迟不吐出第一个字节的时候，每 10 秒发一行注释（`: keepalive`）。SSE 解析器按定义会跳过注释行，而没有 choices 的 chunk 正是每个客户端早已处理的只带 usage 的那种形状，所以不认识这些的客户端看到的回复和从前一样；手机和桌面读这个字段，告诉你前面还有几个、这一轮等了多久。非流式对话里没有这些；这些也不计费、不入账。
 
 中继不认识的 key 得到 `401 bad_key`；0.1.40 起，账号已被删除的 key 改为得到 `401 account_deleted`，在每一个需要 key 的调用上都如此（`/v1/me`、`/v1/models`、`/v1/chat/completions`、同步和 hub 的调用），删除后持续 90 天；中继把已删除账号的 key 哈希保留这么久，别的什么都不留。不认识这个码的客户端看到的是和以前一样的 `401`；认识的客户端（手机）在 `account_deleted` 时删除账号的本地数据，其他情况都收起来保留（[sync.md](sync.md)）。完整的错误码表在 [`cloud/README.md`](../../cloud/README.md)。
 

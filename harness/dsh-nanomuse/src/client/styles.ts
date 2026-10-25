@@ -684,6 +684,8 @@ html[data-nm-platform='darwin']:not([data-nm-fullscreen]) .nm-pf-top { padding-t
 .nm-headsup-text { flex: 1; min-width: 0; }
 .nm-headsup-text .nm-ob-link.nm-inline { color: var(--nm-blue); font-weight: 600; font-size: 12.5px; }
 .nm-headsup-close { width: 22px; height: 22px; flex: none; }
+.nm-waitline { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; padding: 0 12px; font-size: 12px; line-height: 1.4; color: var(--dsw-alias-label-tertiary); }
+.nm-waitline .nm-ob-link.nm-inline { color: var(--nm-blue); font-weight: 600; font-size: 12px; }
 .nm-star-card { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: var(--nm-radius); background: var(--nm-card); border: 1px solid var(--nm-divider); }
 .nm-star-head { display: flex; gap: 10px; align-items: flex-start; }
 .nm-star-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex: none; background: color-mix(in srgb, var(--nm-accent) 18%, transparent); color: var(--nm-accent); }
@@ -1371,6 +1373,9 @@ html[data-nm-muse] [data-conversation-scroll]:has(> .nm-intro-host) [class*="_co
 .nm-naming-row.nm-selected { border: 1.5px solid var(--nm-blue); color: var(--nm-blue); }
 .nm-naming-row.nm-dimmed { opacity: 0.4; }
 .nm-naming-custom { border-style: dashed; color: var(--dsw-alias-label-tertiary); background: transparent; }
+.nm-naming input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; color: var(--dsw-alias-label-primary); font: inherit; font-size: 15px; padding: 0; }
+.nm-naming-confirm { flex: none; padding: 5px 12px; border-radius: 9px; border: 1px solid var(--nm-divider); background: var(--nm-base); color: var(--dsw-alias-label-primary); font: inherit; font-size: 13.5px; cursor: pointer; }
+.nm-naming-confirm:disabled { opacity: 0.5; cursor: default; }
 
 /* The Feed (C5): the intro card, the "how" card under the empty state, the routine row in the sliders. */
 .nm-feed-intro { display: flex; flex-direction: column; gap: 8px; margin: 0 0 14px; padding: 14px 16px; border-radius: var(--nm-radius); background: var(--nm-card); border: 1px solid var(--nm-divider); }
