@@ -108,8 +108,10 @@ The relay is the code in [`cloud/`](../cloud/README.md). It stores:
 - since relay 0.28, a device may say in its hub hello which model it runs on
   (`llm {provider, model}`, the two ids and nothing else: never a key, an
   address or a setting), so the operator can see which providers people
-  configure for themselves. The apps of 1.0.6 and earlier say nothing, and a
-  later app says it only when the person runs their own key;
+  configure for themselves. The apps of 1.0.6 and earlier say nothing; from
+  1.0.7 every client says `cloud` while the account's models answer and the
+  catalogue's vendor id (`openrouter`, `bailian`) with the model id on a key
+  of its own;
 - a timeline of account events (signed in, failed sign-in, password set or
   changed, signed out, refused for budget, upstream error) with a
   device name, a model or an error code as the detail, never message content;
@@ -252,6 +254,8 @@ this is the account's data, not the training set, which stays
 `/v1/admin/samples/export` without them), one file at
 `/v1/admin/blobs/{sha256}`, and `GET /v1/admin/record` for the figures:
 turns and files in all and per day, the store against its cap.
+
+History and sample pages use the existing timestamp indexes to skip newer seconds before applying the insertion-order tie-break. Exports and the analytics backfill use the same paging boundary; no database migration is needed.
 
 **Turns on your own key.** From 1.0.7 an app that ran a turn on a key of its
 own sends it up afterwards, so the record is whole wherever the model was:
@@ -567,6 +571,8 @@ nothing about any person). The state of the switches and the next threshold
 are the first line of the admin dashboard.
 
 ## Running your own
+
+API and error counters are written through the relay's worker pool. The response awaits these writes, while the event loop remains available if a counter write waits for a database lock.
 
 Anyone can run a relay (for a family, a class, a company) and point the app
 at it. The server is a single Python process over SQLite; a VPS with Docker and
