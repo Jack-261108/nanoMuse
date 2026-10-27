@@ -85,7 +85,7 @@ Tous les téléchargements viennent de la [dernière version](https://github.com
   </tr>
   <tr>
     <td width="50%" valign="top"><b>Une apparence à lui.</b><br>Décrivez-la, votre modèle d'image la dessine, un modèle vidéo la fait bouger. Un petit dragon par défaut.</td>
-    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des vingt-trois fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
+    <td width="50%" valign="top"><b>N'importe quel modèle.</b><br>Le crédit du relais, votre propre clé chez l'un des vingt-quatre fournisseurs (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek et d'autres), ou un abonnement que vous payez déjà : ChatGPT, Claude, Kimi. Sans modèle d'image ou de vidéo chez le fournisseur, ces deux fonctions restent éteintes et l'application le dit.</td>
   </tr>
 </table>
 
@@ -141,8 +141,8 @@ Toutes les personnes dont un changement a été intégré dans `main`, d'après 
 <a href="https://github.com/Yicheng-Mark"><img src="https://avatars.githubusercontent.com/u/250364610?v=4&s=48" width="48" height="48" alt="Yicheng-Mark"></a>
 <a href="https://github.com/z1010223zero-pixel"><img src="https://avatars.githubusercontent.com/u/228320705?v=4&s=48" width="48" height="48" alt="z1010223zero-pixel"></a>
 <a href="https://github.com/jiangkaiqi2005"><img src="https://avatars.githubusercontent.com/u/184961141?v=4&s=48" width="48" height="48" alt="jiangkaiqi2005"></a>
-<a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/Longfellow1"><img src="https://avatars.githubusercontent.com/u/53395614?v=4&s=48" width="48" height="48" alt="Longfellow1"></a>
+<a href="https://github.com/hobostay"><img src="https://avatars.githubusercontent.com/u/110803307?v=4&s=48" width="48" height="48" alt="hobostay"></a>
 <a href="https://github.com/takiAA"><img src="https://avatars.githubusercontent.com/u/119551932?v=4&s=48" width="48" height="48" alt="takiAA"></a>
 <a href="https://github.com/fenghaofenghao-ctrl"><img src="https://avatars.githubusercontent.com/u/306929974?v=4&s=48" width="48" height="48" alt="fenghaofenghao-ctrl"></a>
 <a href="https://github.com/Yicheng-1218"><img src="https://avatars.githubusercontent.com/u/72242651?v=4&s=48" width="48" height="48" alt="Yicheng-1218"></a>
@@ -152,10 +152,12 @@ Toutes les personnes dont un changement a été intégré dans `main`, d'après 
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
 <a href="https://github.com/DennyHo0917"><img src="https://avatars.githubusercontent.com/u/149746199?v=4&s=48" width="48" height="48" alt="DennyHo0917"></a>
 <a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
+<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
 <a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
 <a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
 <a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
 <a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
 </p>
 <!-- contributors:end -->
 
