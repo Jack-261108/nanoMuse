@@ -54,6 +54,8 @@ export interface AssistantEvent extends BaseEvent {
   /** a synced reply written on another device of the account */
   via_device?: string;
   via_device_name?: string;
+  /** the person's thumb on this reply (`POST /api/threads/{id}/feedback`), "" or absent when none */
+  feedback?: "up" | "down" | "";
 }
 
 export interface ToolEvent extends BaseEvent {
@@ -1065,6 +1067,7 @@ export interface ConnectionsData {
       | "serply"
       | "you"
       | "parallel"
+      | "keenable"
       | "searxng";
     /** SearXNG instance */
     base_url: string;
@@ -1076,7 +1079,7 @@ export interface ConnectionsData {
       id: string;
       label: string;
       needs_key: boolean;
-      /** works without a key; one raises the limit (You.com, Parallel) */
+      /** works without a key; one raises the limit (You.com, Parallel, Keenable) */
       optional_key?: boolean;
       keys_url: string;
     }>;

@@ -52,6 +52,8 @@ nanomuse serve --port 9000 --no-qr
 
 **聊天。** 一个主要聊天，加上旁聊（左上角的圆形「对话」按钮打开列出它们的抽屉）。消息一边生成一边流进来。工具调用显示成小标签：点一下看参数和输出。智能体写的文件显示成构件卡片，在应用里就能打开。哨兵（Sentinel）需要你拿主意时出现一张审批卡片；智能体需要信息时出现一张提问卡片。智能体干活时输入框一直开着；你这时发的任何东西都会在下一次调用模型之前并进正在进行的这一轮。
 
+*赞和踩，停下来问一句。* 最新一条回复完成后，下面有一个赞和一个踩。点踩会展开一行原因（「答错了」「没帮上忙」「不该这么做」「太慢了」「其他原因」）和「跳过」；再点一次同一个按钮就收回，点过的回复在有新回复之后也会留着它的标记。刚停掉一次运行时，聊天里卡片的位置会出现一张「为什么停下来？」，可选「方向不对」「太慢了」「改主意了」「已经做完了」「其他原因」和「跳过」；选了、跳过了，或者过了一分半没理它，就自己消失。两者都调用你运行时上的 `POST /api/threads/{id}/feedback`：标记记在那条回复上；运行时登录了 nanoMuse Cloud 的话，再把这个代号和它属于哪一轮告诉账号的记录，对话里的文字一个字都不会发。
+
 *附件。* 「+」按钮（或者粘贴）可以附上照片和文件，每条消息最多十个，每个 25 MB（`server.max_upload_mb`），来源是相机、相册或者手机里的文件。选中就开始上传，显示成缩略图和可以去掉的小标签，一条消息也可以只有附件。每个文件都落到工作区的 `attachments/<date>/` 下（所以资源库里有它，任何工具都能用它），消息里会给智能体列出这些文件和它们是什么。模型接得住的时候，图片以图像形式发给模型：`llm.vision = auto` 会发，如果端点拒绝（DeepSeek 和大多数纯文本模型都会拒绝），从那以后就只发文字，并告诉你一次（图片仍然作为文件留着，智能体知道它的文件名，会说自己看不见它，而不是瞎猜）；`off` 从不发图片，`on` 坚持发。手机照片在编码前会缩到 1568 px，所以一张 10 MB 的照片花的钱和一张小图一样。PDF、电子表格和文档智能体用 `files` 读；PDF 的文字按页提取（扫描版 PDF 会说它没有文字层）。在聊天里，点图片或文件小标签就能打开。
 
 *浏览器视图。* 智能体用浏览器工具时，会出现一张浏览器卡片，显示它正在看的东西：每做一个动作之后页面的一张图、页面标题、它在哪儿、刚做了什么（「打开了 example.com」「点击了『Sign in』」）。运行期间卡片是 LIVE 的，之后留在聊天里。点一下看完整视图；「接管」把控制权交到你手上（点图片就在那个位置点击，往聚焦的输入框里打字，按回车，打开一个 URL），「交还」把页面还给智能体，它会被告知你做了什么，然后从那里接着干。登录就是这么发生的：智能体停在表单那儿问你，你登录，它继续。你输入的密码直接去网站，从不经过模型。画面帧只在当前会话期间留在服务器内存里（每个聊天最近十几帧）；重启之后旧卡片显示一个占位图。需要浏览器工具（`pip install "nanomuse[browser]" && playwright install chromium`，或者 `-browser` 的 Docker 镜像），或者 Android 应用：只要它连着，它自己的 WebView 就是智能体的浏览器（卡片会说明是哪一种：`backend`）。在应用里，这种卡片上的「接管」滑上来的是真实页面的一层弹出面板，而不是页面的一张图；用手机的键盘和自动填充登录，点**完成**，智能体接着干。完整的故事，包括哪些东西没法在 WebView 里登录：[browser.md](browser.md)。
@@ -98,8 +100,8 @@ nanomuse serve --port 9000 --no-qr
   可以用模型自己的端点或另一个端点（例如给没有向量接口的 DeepSeek 配一个带
   `qwen3-embedding:0.6b` 的 Ollama；保险库：`EMBEDDINGS_API_KEY`），模型名留空用端点默认值。
   「测试」成功后会当场索引每一条记忆，卡片显示数量。
-  **网页搜索**：DuckDuckGo、带 key 的 Brave Search / Tavily / Serply、带或不带 key 的 You.com
-  和 Parallel（Parallel 不带 key 免费，限额较低），或按 URL 填 SearXNG；保险库名是 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，失败会
+  **网页搜索**：DuckDuckGo、带 key 的 Brave Search / Tavily / Serply、带或不带 key 的 You.com、
+  Parallel 和 Keenable（Parallel 不带 key 免费，限额较低；Keenable 不带 key 每小时 1000 次），或按 URL 填 SearXNG；保险库名是 `SEARCH_API_KEY`。「测试」显示服务商、结果数和耗时，失败会
   带说明退回 DuckDuckGo。
   **邮件**：常见服务商预设、地址和应用专用密码（`EMAIL_ADDRESS`、`EMAIL_PASSWORD`）以及
   IMAP/SMTP 服务器；「连接」验证两边，「断开」删除凭据和工具。
@@ -206,7 +208,7 @@ nanomuse serve --port 9000 --no-qr
 | POST | `/api/connections/endpoints/{id}/models` | 重新向接口要一遍模型并保存：返回条目加 `source: "live"`，它没回答时是 `"kept"` 和 `error`，沿用已保存的列表 |
 | PUT | `/api/connections/embeddings` `{mode, model, base_url, api_key}` | 按含义召回：`mode` 为 auto/on/off；`base_url` 为 `""` → 用模型的端点；`model` 为 `""` → 用端点的默认值；`api_key` 给了 → 保险库（`EMBEDDINGS_API_KEY`），`""` → 用模型的 key，没给 → 不变。当场重建向量模型 |
 | POST | `/api/connections/embeddings/test` | 调一次向量接口，然后给每条记忆建索引：`{ok, model, dims, indexed, ms}` 或 `{ok: false, error}` |
-| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 网页搜索：`provider` 为 duckduckgo/brave/tavily/serply/you/parallel/searxng；`api_key` 给了 → 保险库（`SEARCH_API_KEY`），`""` 删掉它，没给 → 不变；`base_url` 是 SearXNG 实例。从下一次搜索起生效 |
+| PUT | `/api/connections/search` `{provider, api_key, base_url}` | 网页搜索：`provider` 为 duckduckgo/brave/tavily/serply/you/parallel/keenable/searxng；`api_key` 给了 → 保险库（`SEARCH_API_KEY`），`""` 删掉它，没给 → 不变；`base_url` 是 SearXNG 实例。从下一次搜索起生效 |
 | POST | `/api/connections/search/test` | 对配置的服务商搜一次，不回退：`{ok, provider, results, first, ms}` 或 `{ok: false, error}` |
 | PUT / DELETE | `/api/connections/email` | 保存 `{address, password, imap_host, imap_port, smtp_host, smtp_port, smtp_starttls, enabled}`（地址和密码进保险库）/ 断开并忘掉凭据 |
 | POST | `/api/connections/email/test` | 登录 IMAP 和 SMTP：`{ok, inbox}` 或 `{ok: false, error}` |

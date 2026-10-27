@@ -332,6 +332,9 @@
     <string name="nm_avatar_menu_model">Модель изображений</string>
     <string name="nm_avatar_menu_regenerate_moods">Перерисовать настроения</string>
     <string name="nm_avatar_menu_reset">Вернуть встроенный образ</string>
+    <string name="nm_avatar_menu_export">Сохранить в галерею</string>
+    <string name="nm_avatar_export_done">Сохранено в галерею в nanoMuse/avatar: изображений %1$d, клипов %2$d</string>
+    <string name="nm_avatar_export_failed">В галерею ничего не удалось сохранить</string>
     <string name="nm_avatar_mood_idle">В покое</string>
     <string name="nm_avatar_mood_working">Работает</string>
     <string name="nm_avatar_mood_waiting">Ждёт вас</string>
@@ -371,7 +374,7 @@
     <string name="nm_avatar_pick_body">Можно нарисовать ещё четыре в любой момент; старые сохраняются, пока вы этого не сделаете.</string>
     <string name="nm_avatar_use_this">Использовать этот</string>
     <string name="nm_avatar_use_this_hint">Дальше из него в фоне рисуются настроения: работает, ждёт, готово, ошибка.</string>
-    <string name="nm_avatar_footer">Картинки хранятся на этом телефоне в minis-global/nanomuse/avatar. Каждый образ стоит пять изображений у вашего провайдера: одно выбранное плюс четыре настроения.</string>
+    <string name="nm_avatar_footer">Картинки лежат в собственном хранилище приложения на этом телефоне, которое не откроет ни один файловый менеджер. «Сохранить в галерею» в меню копирует образ, его настроения и клипы в Pictures и Movies в папку nanoMuse/avatar. Каждый образ стоит пять изображений у вашего провайдера: одно выбранное плюс четыре настроения.</string>
     <string name="nm_own_clip_title">Ваш собственный клип</string>
     <string name="nm_own_clip_body">Короткое видео из вашей галереи играет как лицо в покое, а остальные состояния тоже используют его. MP4 или MOV с видео H.264, не длиннее 15 секунд и не больше 30 МБ; играет без звука, по кругу.</string>
     <string name="nm_own_clip_on">Ваш клип включён и играет в каждом состоянии; там, где показывается неподвижная картинка, по-прежнему используются нарисованные. «Лицо по умолчанию» убирает его.</string>
@@ -1212,4 +1215,21 @@
     <string name="nm_wait_busy">Модель занята, прошло %1$d с</string>
     <string name="nm_wait_queued">Перед вами %1$d, прошло %2$d с</string>
     <string name="nm_wait_next">Вы следующий, прошло %1$d с</string>
+    <string name="nm_fb_up">Хороший ответ</string>
+    <string name="nm_fb_down">Плохой ответ</string>
+    <string name="nm_fb_why">Что было не так?</string>
+    <string name="nm_fb_reason_wrong">Неверно</string>
+    <string name="nm_fb_reason_unhelpful">Не помогло</string>
+    <string name="nm_fb_reason_unsafe">Так делать не следовало</string>
+    <string name="nm_fb_reason_slow">Слишком медленно</string>
+    <string name="nm_fb_reason_other">Другое</string>
+    <string name="nm_fb_skip">Пропустить</string>
+    <string name="nm_fb_thanks">Принято, спасибо</string>
+    <string name="nm_stop_why">Почему вы остановили?</string>
+    <string name="nm_stop_reason_wrong">Пошло не туда</string>
+    <string name="nm_stop_reason_slow">Слишком медленно</string>
+    <string name="nm_stop_reason_changed_mind">Передумал</string>
+    <string name="nm_stop_reason_done">Уже было готово</string>
+    <string name="nm_stop_reason_other">Другое</string>
+    <string name="nm_feed_limit_notice">%1$d созданных публикаций не поместились из-за дневного лимита в 12.</string>
 </resources>
