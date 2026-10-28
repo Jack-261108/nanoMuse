@@ -85,7 +85,7 @@ All downloads come from the [latest release](https://github.com/nano-muse/nanoMu
   </tr>
   <tr>
     <td width="50%" valign="top"><b>A look of its own.</b><br>Describe one, your image model draws it, a video model makes it move. A small dragon by default.</td>
-    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of twenty-four providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
+    <td width="50%" valign="top"><b>Any model.</b><br>The relay's allowance, your own key at one of twenty-five providers (Bailian, OpenRouter, OpenAI, Gemini, DeepSeek and more), or a plan you already pay for: ChatGPT, Claude, Kimi. A provider without picture or video models leaves those two off, and the app says so.</td>
   </tr>
 </table>
 
@@ -152,14 +152,16 @@ Everyone whose change has landed on `main`, from GitHub's contributors list.
 <a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
 <a href="https://github.com/DennyHo0917"><img src="https://avatars.githubusercontent.com/u/149746199?v=4&s=48" width="48" height="48" alt="DennyHo0917"></a>
-<a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
-<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
-<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
-<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
-<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
-<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
-<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
 <a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
+<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
+<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
+<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
 </p>
 <!-- contributors:end -->
 

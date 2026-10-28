@@ -85,7 +85,7 @@ https://github.com/user-attachments/assets/c7694d5a-9450-4f99-9254-5d70560d7565
   </tr>
   <tr>
     <td width="50%" valign="top"><b>自分の姿。</b><br>言葉で描写すれば画像モデルが描き、動画モデルが動かします。デフォルトは小さなドラゴン。</td>
-    <td width="50%" valign="top"><b>どのモデルでも。</b><br>リレーの無料枠、24 社（Bailian、OpenRouter、OpenAI、Gemini、DeepSeek など）のいずれかで自分のキー、あるいは既に支払っているプラン：ChatGPT、Claude、Kimi。画像や動画のモデルがない事業者ではその二つは使えず、アプリがそう伝えます。</td>
+    <td width="50%" valign="top"><b>どのモデルでも。</b><br>リレーの無料枠、25 社（Bailian、OpenRouter、OpenAI、Gemini、DeepSeek など）のいずれかで自分のキー、あるいは既に支払っているプラン：ChatGPT、Claude、Kimi。画像や動画のモデルがない事業者ではその二つは使えず、アプリがそう伝えます。</td>
   </tr>
 </table>
 
@@ -152,14 +152,16 @@ VPS 1 台、1 時間：[docs/self-hosting.md](../self-hosting.md)。三つの道
 <a href="https://github.com/ZxlDragonDoctor"><img src="https://avatars.githubusercontent.com/u/152901610?v=4&s=48" width="48" height="48" alt="ZxlDragonDoctor"></a>
 <a href="https://github.com/aliabbas6622"><img src="https://avatars.githubusercontent.com/u/193962983?v=4&s=48" width="48" height="48" alt="aliabbas6622"></a>
 <a href="https://github.com/DennyHo0917"><img src="https://avatars.githubusercontent.com/u/149746199?v=4&s=48" width="48" height="48" alt="DennyHo0917"></a>
-<a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
-<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
-<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
-<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
-<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
-<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
-<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
 <a href="https://github.com/jtboy80826"><img src="https://avatars.githubusercontent.com/u/243465398?v=4&s=48" width="48" height="48" alt="jtboy80826"></a>
+<a href="https://github.com/cypggs"><img src="https://avatars.githubusercontent.com/u/3694954?v=4&s=48" width="48" height="48" alt="cypggs"></a>
+<a href="https://github.com/cugbtang"><img src="https://avatars.githubusercontent.com/u/34121664?v=4&s=48" width="48" height="48" alt="cugbtang"></a>
+<a href="https://github.com/aiapienthusiast"><img src="https://avatars.githubusercontent.com/u/327629069?v=4&s=48" width="48" height="48" alt="aiapienthusiast"></a>
+<a href="https://github.com/mongo027"><img src="https://avatars.githubusercontent.com/u/275146281?v=4&s=48" width="48" height="48" alt="mongo027"></a>
+<a href="https://github.com/yatping"><img src="https://avatars.githubusercontent.com/u/15101928?v=4&s=48" width="48" height="48" alt="yatping"></a>
+<a href="https://github.com/ilya-bogin-keenable"><img src="https://avatars.githubusercontent.com/u/246701201?v=4&s=48" width="48" height="48" alt="ilya-bogin-keenable"></a>
+<a href="https://github.com/henrikdukefoss"><img src="https://avatars.githubusercontent.com/u/76407537?v=4&s=48" width="48" height="48" alt="henrikdukefoss"></a>
+<a href="https://github.com/Felixkw12"><img src="https://avatars.githubusercontent.com/u/151852644?v=4&s=48" width="48" height="48" alt="Felixkw12"></a>
+<a href="https://github.com/isHeSatoshi"><img src="https://avatars.githubusercontent.com/u/83160620?v=4&s=48" width="48" height="48" alt="isHeSatoshi"></a>
 </p>
 <!-- contributors:end -->
 
