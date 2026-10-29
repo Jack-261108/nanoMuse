@@ -8,19 +8,33 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
-- **A contact's card folds its long lines at 75 octets.** `render_vcard` wrote a long Chinese note as one oversized line, past what RFC 6350 allows a content line to be, so a strict importer could reject or truncate it; the card now folds with the same UTF-8-safe cut the calendar's lines already use, never splitting a character, and a folded card parses back without loss.
-
 ### Web
 
 ### Desktop
-
-- **The 1.0.8 desktop starts again when you are signed in.** The plugin pointed the `nanoMuse Cloud` provider row at the loopback door it opens for the relay and waited for that settings write while the plugins were still starting; the write waits for the plugins, so the Host never announced its address and the window sat on *Starting…* for good, with *nanoMuse is still starting* every ten minutes — on the first start after the 1.0.7 upgrade (the row named the relay itself) and on every start after a sign-in (the door's port was each start's own). Reported for the Mac in [#701](https://github.com/nano-muse/nanoMuse/issues/701); every platform had it. The door now asks for the port it had last, so the row is usually right as it is, and when it is not the row is rewritten once the Host is up, without being waited for. A fresh install was never affected, which is why the release check passed.
 
 ### Android
 
 ### iOS
 
 ### Project
+
+## [1.0.9] - 2026-10-29 · Tiller
+
+Tiller: a fix release the same day as Crew. The 1.0.8 desktop did not start for anyone who was signed in: the plugin waited for a settings write while the plugins were still starting, and the write waits for the plugins ([#703](https://github.com/nano-muse/nanoMuse/pull/703), for [#701](https://github.com/nano-muse/nanoMuse/issues/701)); the hosted relay's console stopped loading because one query of the *Usage* page walked the whole record while holding the read connection's lock ([#708](https://github.com/nano-muse/nanoMuse/pull/708)). Both are fixed, with the three runtime changes merged in between: a task can be given a budget and recall reads the whole memory store, by @hobostay ([#697](https://github.com/nano-muse/nanoMuse/pull/697), [#696](https://github.com/nano-muse/nanoMuse/pull/696)), and a contact's card folds its long lines, by @Yicheng-Mark ([#702](https://github.com/nano-muse/nanoMuse/pull/702)). Nothing changed on the phones. The relay is 0.31.1.
+
+### Cloud
+
+- **The console's pages load again on a large relay.** The *Usage* page's table of the turns people ran on keys of their own read a week of them from the record itself, where a turn's provider and cached count sit behind its request and answer; on a relay holding tens of gigabytes one call took minutes and, holding the read connection's lock, left *Overview* and every other page at "loading". The relay now keeps those figures in one small row per own turn (`own_figures`), written with the turn and filled in for older turns by a paced backfill after the restart, and the table reads them in milliseconds. The console's usage answer carries `own_keys_pending` while the backfill is still running.
+
+### Runtime
+
+- **A task can be given a budget: tokens, money, time, and the size of one request.** Off unless set. `[agent.budget]` in `config.toml` takes `max_total_tokens`, `max_cost_usd` (with your own `input_usd_per_million` and `output_usd_per_million` rates) and `max_seconds`; a task that reaches one stops with a sentence that says which, the unanswered tool calls get a result that says so, and the turn's usage is written to the audit log as a `task_budget` entry (only when a limit is set or reached). A phone or computer run inside the task shares the task's allowance; a standalone run reads `[gui.budget]`. `agent.max_context_tokens` caps the approximate size of one request: tool results are shortened to a labelled head and tail and old exchanges dropped as whole groups, the current task's requests and the tool-call arguments stay, and the saved conversation keeps the original text; each shortening is one INFO log line with the call id and the sizes, never the text. Text is counted at four UTF-8 bytes a token and a picture at 4,096, with the provider's own figures taking over after a call. The web app and the Python hands only; the Android agent and the desktop's own loop have their own engines. [Task budgets](docs/runtime-budgets.md); from [#697](https://github.com/nano-muse/nanoMuse/pull/697).
+- **Recall searches the whole memory store.** Keyword search and recall by meaning read every memory, not only the newest 1,000 the listing returns by default, so a fact written long ago — the landlord's name, a preference from the first week — is found again once the store has grown past that; the vectors of older memories are kept instead of being made again. The keyword index is built once and reused until the database changes (an edit, a forget, a restore, a write from another process), so a search over a large store is one pass over the index, not one over every row. From [#696](https://github.com/nano-muse/nanoMuse/pull/696).
+- **A contact's card folds its long lines at 75 octets.** `render_vcard` wrote a long Chinese note as one oversized line, past what RFC 6350 allows a content line to be, so a strict importer could reject or truncate it; the card now folds with the same UTF-8-safe cut the calendar's lines already use, never splitting a character, and a folded card parses back without loss.
+
+### Desktop
+
+- **The 1.0.8 desktop starts again when you are signed in.** The plugin pointed the `nanoMuse Cloud` provider row at the loopback door it opens for the relay and waited for that settings write while the plugins were still starting; the write waits for the plugins, so the Host never announced its address and the window sat on *Starting…* for good, with *nanoMuse is still starting* every ten minutes — on the first start after the 1.0.7 upgrade (the row named the relay itself) and on every start after a sign-in (the door's port was each start's own). Reported for the Mac in [#701](https://github.com/nano-muse/nanoMuse/issues/701); every platform had it. The door now asks for the port it had last, so the row is usually right as it is, and when it is not the row is rewritten once the Host is up, without being waited for. A fresh install was never affected, which is why the release check passed.
 
 ## [1.0.8] - 2026-10-29 · Crew
 
@@ -48,6 +62,7 @@ Crew: four days after Logbook, a fifth look at the whole project with the sevent
 - **A cloud console build on Windows no longer rewrites its index.html for nothing.** Git for Windows checks `cloud/console` out as CRLF by default, and Vite carries a source's line endings into the HTML it writes: `npm run build` took the admin `index.html` from LF to CRLF (585 to 600 bytes, one line's carriage return doubled) and left `cloud/nanomuse_cloud/console/admin/index.html` with 28 lines of diff on a build that changed nothing, so a Windows contributor could not rebuild the console without mixing that churn into their change. `cloud/console/**` keeps LF on every platform now, the way `web/` and `harness/` already do; built from the same sources, the admin pages come out byte for byte what the repository holds.
 
 ### Runtime
+
 
 - **An embedding can bring its own browser.** A program that embeds the runtime gives the `Browser` tool a `backend_factory`, a callable returning a `BrowserBackend`; a new session takes that backend instead of Playwright or the phone and is driven, shown, taken over and closed like the built-in ones, with the Sentinel in front of every URL as before. The app sees `custom` as the backend until the first session, then the backend's own kind. No setting; a Python integration point. ([#676](https://github.com/nano-muse/nanoMuse/issues/676))
 - **A file kept to its owner stays that way on Windows too.** Every private write in the runtime — the calendar cache, the address book (its cache and the own export), the channel tokens, the settings file, the ChatGPT token, the vault key and store, the push tokens, a contacts `.vcf` someone connected — ended with `chmod 0600`, and on Windows `chmod` clears a read-only flag and nothing else: the file kept the access rules its folder handed down, so on a machine with other local accounts each of those was readable by every one of them. One `keep_private()` ends those writes now: the mode where a mode exists, the ACL where it does not (inheritance off, the one account alone in full control). A service with no `USERNAME` keeps the file's default rules.
