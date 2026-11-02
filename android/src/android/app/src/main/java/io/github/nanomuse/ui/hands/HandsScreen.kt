@@ -40,6 +40,7 @@ import com.openminis.app.ui.settings.SettingsSection
 import com.openminis.app.ui.settings.SettingsSwitchRow
 import io.github.nanomuse.hands.AdbKeyboardHelper
 import io.github.nanomuse.hands.Hands
+import io.github.nanomuse.shell.SharedShell
 import io.github.nanomuse.ui.home.MuseTones
 
 const val ROUTE_HANDS = "nanomuse/hands"
@@ -164,6 +165,43 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                     title = stringResource(R.string.nm_models_hands_title),
                     subtitle = readiness.model?.let { m -> m.label + " · " + stringResource(whyText(m.why)) },
                     onClick = onOpenHandsModel,
+                    showDivider = false,
+                )
+            }
+        }
+
+        // ── virtual screen ──
+        val virtualScreenEnabled by remember(context) { Hands.virtualScreenEnabledFlow(context) }.collectAsState(initial = Hands.virtualScreenEnabled(context))
+        val shellInstance by SharedShell.shell.collectAsState()
+        SettingsSection(
+            header = stringResource(R.string.nm_hands_section_virtual_screen),
+            footer = stringResource(R.string.nm_hands_virtual_screen_footer),
+        ) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_hands_virtual_screen_title),
+                subtitle = when {
+                    shellInstance != null -> stringResource(R.string.nm_hands_virtual_screen_ready)
+                    else -> stringResource(R.string.nm_hands_virtual_screen_not_started)
+                },
+                checked = virtualScreenEnabled,
+                onCheckedChange = { Hands.setVirtualScreenEnabled(context, it) },
+                icon = Icons.Outlined.Layers,
+                iconColor = if (virtualScreenEnabled && shellInstance != null) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
+                showDivider = shellInstance == null,
+            )
+            if (shellInstance == null) {
+                SettingsRow(
+                    title = stringResource(R.string.nm_hands_virtual_screen_start_helper),
+                    subtitle = stringResource(R.string.nm_hands_virtual_screen_start_sub),
+                    onClick = {
+                        val started = SharedShell.startHelper(context)
+                        if (!started) {
+                            val cmd = SharedShell.getAdbCommand(context)
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                            cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb_cmd", cmd))
+                            android.widget.Toast.makeText(context, "Command copied: run via adb shell", android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
                     showDivider = false,
                 )
             }

@@ -568,6 +568,13 @@
     <string name="nm_hands_why_menu">модель экрана nanoMuse Cloud</string>
     <string name="nm_hands_why_vision_group">ваша Vision Group</string>
     <string name="nm_hands_why_any">единственная включённая модель, которая видит</string>
+    <string name="nm_hands_section_virtual_screen">Виртуальный экран в фоне</string>
+    <string name="nm_hands_virtual_screen_title">Работать на виртуальном экране</string>
+    <string name="nm_hands_virtual_screen_footer">При включении и готовности помощника приложения работают на виртуальном экране, не мешая обычному использованию. Требуется Shizuku, root или запуск с ПК.</string>
+    <string name="nm_hands_virtual_screen_ready">Помощник подключен</string>
+    <string name="nm_hands_virtual_screen_not_started">Помощник не запущен (нажмите для запуска или используйте основной экран)</string>
+    <string name="nm_hands_virtual_screen_start_helper">Запустить помощника</string>
+    <string name="nm_hands_virtual_screen_start_sub">Попытка запуска через Shizuku или root</string>
     <string name="nm_hands_section_rules">Как он себя ведёт</string>
     <string name="nm_hands_rule_ladder">Экран идёт последним: сначала навык, команда или браузер.</string>
     <string name="nm_hands_rule_secrets">Никогда не вводит пароли, коды и номера карт; передаёт телефон вам.</string>

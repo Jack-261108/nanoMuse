@@ -1,0 +1,203 @@
+package io.github.nanomuse.hands
+
+import android.accessibilityservice.AccessibilityService
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Path
+import android.os.Build
+import android.view.Display
+import android.view.KeyEvent
+import com.openminis.app.accessibility.MinisAccessibilityService
+import com.openminis.app.logging.AppLogger
+import io.github.nanomuse.display.AgentDisplay
+import io.github.nanomuse.shell.INanoMuseShell
+import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * 屏幕操作目标抽象：支持主屏 (MainDisplayTarget) 与虚拟屏 (VirtualDisplayTarget)。
+ */
+interface HandsDisplayTarget {
+    val displayId: Int
+    val isVirtual: Boolean
+    val width: Int
+    val height: Int
+
+    fun captureScreenshot(): Bitmap?
+    fun tap(x: Int, y: Int): Boolean
+    fun doubleTap(x: Int, y: Int): Boolean
+    fun longPress(x: Int, y: Int): Boolean
+    fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean
+    fun openApp(packageName: String): Int
+    fun pressBack(): Boolean
+    fun pressHome(): Boolean
+    fun injectKey(keyCode: Int): Boolean
+    val previewFrames: StateFlow<Bitmap?>?
+
+    fun onTakeoverStart(): Boolean = true
+    fun onTakeoverEnd(): Boolean = true
+    fun release() {}
+}
+
+/**
+ * 原有的主屏操作目标，依赖 MinisAccessibilityService。
+ */
+class MainDisplayTarget(
+    private val context: Context,
+    private val svc: MinisAccessibilityService,
+    override val width: Int,
+    override val height: Int,
+) : HandsDisplayTarget {
+    override val displayId: Int = Display.DEFAULT_DISPLAY
+    override val isVirtual: Boolean = false
+    override val previewFrames: StateFlow<Bitmap?>? = null
+
+    override fun captureScreenshot(): Bitmap? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val shot = svc.captureScreenshot(displayId = displayId, timeoutMs = 6_000)
+            return shot.bitmap
+        }
+        return null
+    }
+
+    override fun tap(x: Int, y: Int): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        return svc.dispatchSimpleGesture(path, 0, 60L)
+    }
+
+    override fun doubleTap(x: Int, y: Int): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        if (!svc.dispatchSimpleGesture(path, 0, 50L)) return false
+        Thread.sleep(80)
+        return svc.dispatchSimpleGesture(path, 0, 50L)
+    }
+
+    override fun longPress(x: Int, y: Int): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        return svc.dispatchSimpleGesture(path, 0, 900L)
+    }
+
+    override fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean {
+        val path = Path().apply {
+            moveTo(fromX.toFloat(), fromY.toFloat())
+            lineTo(toX.toFloat(), toY.toFloat())
+        }
+        return svc.dispatchSimpleGesture(path, 0, durationMs)
+    }
+
+    override fun openApp(packageName: String): Int {
+        val intent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return 2
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return runCatching {
+            context.startActivity(intent)
+            0
+        }.getOrDefault(3)
+    }
+
+    override fun pressBack(): Boolean =
+        svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+
+    override fun pressHome(): Boolean =
+        svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+
+    override fun injectKey(keyCode: Int): Boolean = false
+}
+
+/**
+ * Mika 风格的后台虚拟屏幕目标，依赖 AgentDisplay 与 INanoMuseShell。
+ */
+class VirtualDisplayTarget(
+    private val display: AgentDisplay,
+    private val shell: INanoMuseShell,
+) : HandsDisplayTarget {
+    private val tag = "VirtualDisplayTarget"
+
+    override val displayId: Int get() = display.displayId
+    override val isVirtual: Boolean = true
+    override val width: Int get() = display.width
+    override val height: Int get() = display.height
+    override val previewFrames: StateFlow<Bitmap?> get() = display.frames
+
+    private var activeTaskId: Int = -1
+
+    override fun captureScreenshot(): Bitmap? {
+        // 等待一小会儿确保首帧到达
+        repeat(5) {
+            val bmp = display.latestFrameBitmap()
+            if (bmp != null) return bmp
+            Thread.sleep(100)
+        }
+        return display.latestFrameBitmap()
+    }
+
+    override fun tap(x: Int, y: Int): Boolean =
+        shell.injectTap(displayId, x, y)
+
+    override fun doubleTap(x: Int, y: Int): Boolean {
+        if (!shell.injectTap(displayId, x, y)) return false
+        Thread.sleep(80)
+        return shell.injectTap(displayId, x, y)
+    }
+
+    override fun longPress(x: Int, y: Int): Boolean {
+        val xs = intArrayOf(x, x)
+        val ys = intArrayOf(y, y)
+        val times = longArrayOf(0, 900)
+        return shell.injectStroke(displayId, xs, ys, times)
+    }
+
+    override fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean {
+        val steps = 10
+        val xs = IntArray(steps)
+        val ys = IntArray(steps)
+        val times = LongArray(steps)
+        for (i in 0 until steps) {
+            val frac = i.toFloat() / (steps - 1)
+            xs[i] = (fromX + (toX - fromX) * frac).toInt()
+            ys[i] = (fromY + (toY - fromY) * frac).toInt()
+            times[i] = (durationMs * frac).toLong()
+        }
+        return shell.injectStroke(displayId, xs, ys, times)
+    }
+
+    override fun openApp(packageName: String): Int {
+        val res = shell.startApp(displayId, packageName)
+        if (res == 0) {
+            activeTaskId = shell.topTaskId(displayId)
+        }
+        return res
+    }
+
+    override fun pressBack(): Boolean =
+        shell.injectKey(displayId, KeyEvent.KEYCODE_BACK)
+
+    override fun pressHome(): Boolean =
+        shell.injectKey(displayId, KeyEvent.KEYCODE_HOME)
+
+    override fun injectKey(keyCode: Int): Boolean =
+        shell.injectKey(displayId, keyCode)
+
+    override fun onTakeoverStart(): Boolean {
+        val top = shell.topTaskId(displayId)
+        if (top > 0) {
+            activeTaskId = top
+            AppLogger.info(tag, "moving task $top to main screen for user takeover")
+            return shell.moveTask(top, Display.DEFAULT_DISPLAY)
+        }
+        return true
+    }
+
+    override fun onTakeoverEnd(): Boolean {
+        if (activeTaskId > 0) {
+            AppLogger.info(tag, "moving task $activeTaskId back to virtual display $displayId")
+            val ok = shell.moveTask(activeTaskId, displayId)
+            Thread.sleep(500)
+            return ok
+        }
+        return true
+    }
+
+    override fun release() {
+        display.release()
+    }
+}

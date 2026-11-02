@@ -548,6 +548,15 @@
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
+        <!-- nanoMuse: privileged shell helper handoff for background virtual screen -->
+        <provider
+            android:name="io.github.nanomuse.shell.HelperHandoffProvider"
+            android:authorities="${applicationId}.shell.helper"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+
         <!-- [T-android-privileged-backend] AXManager (Axeron) reuses this
              same `<applicationId>.shizuku` ShizukuProvider — its
              AxeronService#sendBinderToUserApp() resolves

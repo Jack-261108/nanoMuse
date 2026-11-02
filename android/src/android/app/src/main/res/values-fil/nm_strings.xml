@@ -562,6 +562,13 @@
     <string name="nm_hands_why_menu">ang screen model ng nanoMuse Cloud</string>
     <string name="nm_hands_why_vision_group">ang Vision Group mo</string>
     <string name="nm_hands_why_any">ang tanging naka-enable na modelong nakakakita</string>
+    <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
+    <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
+    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_ready">Helper connected</string>
+    <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
+    <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_section_rules">Paano ito kumikilos</string>
     <string name="nm_hands_rule_ladder">Nahuhuli ang screen: isang skill, isang command o ang browser muna.</string>
     <string name="nm_hands_rule_secrets">Hindi kailanman nagta-type ng mga password, code o numero ng card; iniaabot nito sa iyo ang telepono.</string>

@@ -559,6 +559,13 @@
     <string name="nm_hands_why_menu">model layar nanoMuse Cloud</string>
     <string name="nm_hands_why_vision_group">Grup Visimu</string>
     <string name="nm_hands_why_any">satu-satunya model aktif yang bisa melihat</string>
+    <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
+    <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
+    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_ready">Helper connected</string>
+    <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
+    <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_section_rules">Cara kerjanya</string>
     <string name="nm_hands_rule_ladder">Layar paling akhir: skill, perintah atau browser dulu.</string>
     <string name="nm_hands_rule_secrets">Tidak pernah mengetik kata sandi, kode atau nomor kartu; ia menyerahkan ponsel padamu.</string>

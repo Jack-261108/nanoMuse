@@ -11,6 +11,7 @@ import com.openminis.app.data.model.ProviderInstance
 import com.openminis.app.data.model.hasImageInput
 import com.openminis.app.data.repository.ProviderRepository
 import io.github.nanomuse.cloud.NanoMuseCloud
+import io.github.nanomuse.shell.SharedShell
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,7 @@ object Hands {
     private const val PREFS = "nanomuse"
     private const val KEY_ENABLED = "hands.enabled"
     private const val KEY_MODEL = "hands.model_entry"
+    private const val KEY_VIRTUAL_SCREEN = "hands.virtual_screen"
     const val DEEP_LINK = "minis://settings/hands"
     const val MIN_SDK = Build.VERSION_CODES.R
 
@@ -38,6 +40,19 @@ object Hands {
 
     fun enabled(context: Context): Boolean = prefs(context).getBoolean(KEY_ENABLED, false)
     fun setEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY_ENABLED, on).apply() }
+
+    fun virtualScreenEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_VIRTUAL_SCREEN, true)
+    fun setVirtualScreenEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY_VIRTUAL_SCREEN, on).apply() }
+
+    fun virtualScreenEnabledFlow(context: Context): Flow<Boolean> = callbackFlow {
+        val p = prefs(context.applicationContext)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_VIRTUAL_SCREEN) trySend(p.getBoolean(KEY_VIRTUAL_SCREEN, true))
+        }
+        p.registerOnSharedPreferenceChangeListener(listener)
+        trySend(p.getBoolean(KEY_VIRTUAL_SCREEN, true))
+        awaitClose { p.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
 
     /** The switch as a flow: the current value, then every change, wherever it is made. */
     fun enabledFlow(context: Context): Flow<Boolean> = callbackFlow {
@@ -65,6 +80,7 @@ object Hands {
         val overlayOk: Boolean,
         val model: ScreenModel?,
         val keyboardEnhanced: Boolean = false,
+        val virtualScreenReady: Boolean = false,
     ) {
         val ready: Boolean get() = androidOk && serviceOn && overlayOk && model != null
     }
@@ -75,6 +91,7 @@ object Hands {
         overlayOk = Settings.canDrawOverlays(context),
         model = screenModel(context),
         keyboardEnhanced = AdbKeyboardHelper.isAvailable(context),
+        virtualScreenReady = SharedShell.isReady(),
     )
 
     /** Usable right now: switched on and every prerequisite in place. */

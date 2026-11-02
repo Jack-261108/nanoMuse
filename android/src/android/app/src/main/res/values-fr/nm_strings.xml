@@ -563,6 +563,13 @@
     <string name="nm_hands_why_menu">le modèle d’écran de nanoMuse Cloud</string>
     <string name="nm_hands_why_vision_group">votre groupe Vision</string>
     <string name="nm_hands_why_any">le seul modèle activé qui voit</string>
+    <string name="nm_hands_section_virtual_screen">Écran virtuel d\'arrière-plan</string>
+    <string name="nm_hands_virtual_screen_title">Opérer sur l\'écran virtuel</string>
+    <string name="nm_hands_virtual_screen_footer">Activé avec l\'assistant prêt, les apps tournent sur un écran virtuel sans perturber votre usage. Nécessite Shizuku, root ou démarrage PC.</string>
+    <string name="nm_hands_virtual_screen_ready">Assistant connecté</string>
+    <string name="nm_hands_virtual_screen_not_started">Assistant non démarré (appuyez pour démarrer ou utiliser l\'écran principal)</string>
+    <string name="nm_hands_virtual_screen_start_helper">Démarrer l\'assistant</string>
+    <string name="nm_hands_virtual_screen_start_sub">Tenter de lancer l\'assistant via Shizuku ou root</string>
     <string name="nm_hands_section_rules">Comment il se comporte</string>
     <string name="nm_hands_rule_ladder">L’écran vient en dernier : une compétence, une commande ou le navigateur d’abord.</string>
     <string name="nm_hands_rule_secrets">Ne tape jamais de mots de passe, codes ou numéros de carte ; il vous tend le téléphone.</string>

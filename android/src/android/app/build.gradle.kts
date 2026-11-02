@@ -115,6 +115,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true // nanoMuse: support shell service IPC for virtual screen
     }
 
     androidResources {

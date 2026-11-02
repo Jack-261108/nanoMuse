@@ -559,6 +559,13 @@
     <string name="nm_hands_why_menu">nanoMuse Cloud의 화면 모델</string>
     <string name="nm_hands_why_vision_group">내 비전 그룹</string>
     <string name="nm_hands_why_any">볼 수 있는 유일하게 켜진 모델</string>
+    <string name="nm_hands_section_virtual_screen">백그라운드 가상 화면</string>
+    <string name="nm_hands_virtual_screen_title">가상 화면에서 작업</string>
+    <string name="nm_hands_virtual_screen_footer">활성화되고 권한 도우미가 준비되면 앱이 보이지 않는 가상 화면에서 실행되어 휴대폰 사용을 방해하지 않습니다. Shizuku, root 또는 PC 시작이 필요합니다.</string>
+    <string name="nm_hands_virtual_screen_ready">도우미 연결됨</string>
+    <string name="nm_hands_virtual_screen_not_started">도우미 시작되지 않음 (눌러서 시작하거나 메인 화면 사용)</string>
+    <string name="nm_hands_virtual_screen_start_helper">도우미 프로세스 시작</string>
+    <string name="nm_hands_virtual_screen_start_sub">Shizuku 또는 root를 통해 도우미 실행 시도</string>
     <string name="nm_hands_section_rules">동작 방식</string>
     <string name="nm_hands_rule_ladder">화면은 마지막입니다. 스킬, 명령, 브라우저가 먼저입니다.</string>
     <string name="nm_hands_rule_secrets">비밀번호, 인증 코드, 카드 번호는 절대 입력하지 않습니다. 휴대전화를 넘겨 드립니다.</string>

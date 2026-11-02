@@ -562,6 +562,13 @@
     <string name="nm_hands_why_menu">das Bildschirmmodell von nanoMuse Cloud</string>
     <string name="nm_hands_why_vision_group">deine Vision-Gruppe</string>
     <string name="nm_hands_why_any">das einzige aktivierte Modell, das sehen kann</string>
+    <string name="nm_hands_section_virtual_screen">Virtueller Hintergrundbildschirm</string>
+    <string name="nm_hands_virtual_screen_title">Auf virtuellem Bildschirm ausführen</string>
+    <string name="nm_hands_virtual_screen_footer">Wenn aktiviert und der Helfer bereit ist, laufen Apps auf einem virtuellen Bildschirm, ohne Ihre normale Nutzung zu stören. Erfordert Shizuku, Root oder PC-Start.</string>
+    <string name="nm_hands_virtual_screen_ready">Helfer verbunden</string>
+    <string name="nm_hands_virtual_screen_not_started">Helfer nicht gestartet (tippen zum Starten oder Hauptbildschirm nutzen)</string>
+    <string name="nm_hands_virtual_screen_start_helper">Helferprozess starten</string>
+    <string name="nm_hands_virtual_screen_start_sub">Versucht Helfer über Shizuku oder Root zu starten</string>
     <string name="nm_hands_section_rules">Wie er sich verhält</string>
     <string name="nm_hands_rule_ladder">Der Bildschirm kommt zuletzt: zuerst ein Skill, ein Befehl oder der Browser.</string>
     <string name="nm_hands_rule_secrets">Tippt nie Passwörter, Codes oder Kartennummern; er gibt dir das Telefon.</string>
