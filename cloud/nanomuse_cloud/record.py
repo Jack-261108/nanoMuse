@@ -31,6 +31,7 @@ import os
 import re
 import secrets
 import tempfile
+import threading
 import zlib
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,7 @@ class MediaStore:
             root = self._tmp.name
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        self._write_lock = threading.Lock()
 
     def path(self, sha: str) -> Path:
         if not is_sha256(sha):
@@ -97,12 +99,24 @@ class MediaStore:
         target = self.path(sha)
         if target.is_file():
             return sha, False
-        target.parent.mkdir(parents=True, exist_ok=True)
-        tmp = target.with_name(f".{sha}.{secrets.token_hex(4)}.part")
-        with open(tmp, "wb") as f:
-            f.write(data)
-        os.replace(tmp, target)
-        return sha, True
+        with self._write_lock:
+            if target.is_file():
+                return sha, False
+            target.parent.mkdir(parents=True, exist_ok=True)
+            tmp = target.with_name(f".{sha}.{secrets.token_hex(4)}.part")
+            with open(tmp, "wb") as f:
+                f.write(data)
+            try:
+                os.replace(tmp, target)
+            except OSError:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+                if target.is_file():
+                    return sha, False
+                raise
+            return sha, True
 
     def read(self, sha: str) -> bytes | None:
         try:

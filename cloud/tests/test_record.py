@@ -742,3 +742,39 @@ def test_pace_counts_within_a_sliding_window():
     for i in range(30):
         assert pace.allow(f"k{i}")
     assert len(pace._seen) <= 10
+
+
+def test_media_store_put_survives_concurrent_write_and_collision(tmp_path, monkeypatch):
+    import concurrent.futures
+    import os
+
+    store = MediaStore(tmp_path)
+    data = b"\x89PNG\r\n\x1a\n" + b"concurrent-test-data"
+    sha = hashlib.sha256(data).hexdigest()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(lambda _: store.put(data), range(20)))
+
+    assert results.count((sha, True)) == 1
+    assert results.count((sha, False)) == 19
+    assert store.has(sha)
+    assert store.path(sha).read_bytes() == data
+
+    parts = list((store.root / sha[:2]).glob(".*.part"))
+    assert parts == []
+
+    other_data = b"another-data"
+    other_sha = hashlib.sha256(other_data).hexdigest()
+    assert store.put(other_data) == (other_sha, True)
+
+    real_replace = os.replace
+
+    def fail_replace(src, dst):
+        if str(dst).endswith(other_sha):
+            raise PermissionError(5, "Access is denied")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+    assert store.put(other_data) == (other_sha, False)
+    other_parts = list((store.root / other_sha[:2]).glob(".*.part"))
+    assert other_parts == []
