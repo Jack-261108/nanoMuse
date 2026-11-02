@@ -1,6 +1,11 @@
 package io.github.nanomuse.ui.coding
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,14 +55,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -69,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openminis.app.R
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.ui.markdown.MarkdownText
 import io.github.nanomuse.coding.CodingBridge
 import io.github.nanomuse.coding.CodingBridge.Agent
 import io.github.nanomuse.coding.CodingBridge.LiveRun
@@ -85,9 +95,18 @@ import io.github.nanomuse.ui.muse.MuseRow
 import io.github.nanomuse.ui.muse.MuseRowDivider
 import io.github.nanomuse.ui.muse.MuseSectionLabel
 import io.github.nanomuse.ui.muse.MuseTopAppBar
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 const val ROUTE_CODING = "nanomuse/coding"
+
+// 会话运行状态跨页面保存，避免切换 Tab 或返回上层时丢失
+private val activeLiveRuns = mutableStateMapOf<String, LiveRun>()
+private val sessionDrafts = mutableStateMapOf<String, String>()
+private val codingScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
 /**
  * The coding agents on the account's computers — Cursor, Codex, Claude Code — seen and steered
@@ -133,6 +152,27 @@ fun CodingScreen(onBack: () -> Unit, onOpenDevices: () -> Unit) {
         }
     }
     LaunchedEffect(computer?.id) { if (computer != null) load() else { agents = emptyList(); sessions = emptyList() } }
+
+    // 停留在会话列表页面时，每 1 秒高频同步会话状态（更新绿点与“运行中”），静态 agents 每 15 秒低频刷新
+    LaunchedEffect(computer?.id, open) {
+        val dev = computer ?: return@LaunchedEffect
+        if (open != null) return@LaunchedEffect
+        var tick = 0
+        while (true) {
+            delay(1000)
+            if (open == null) {
+                try {
+                    tick++
+                    if (agents.isEmpty() || tick % 15 == 0) {
+                        agents = CodingBridge.agents(dev.id)
+                    }
+                    sessions = CodingBridge.sessions(dev.id, null)
+                } catch (e: Exception) {
+                    // 忽略偶发网络断连
+                }
+            }
+        }
+    }
 
     val current = open
     if (current != null && computer != null) {
@@ -448,18 +488,52 @@ private fun SessionScreen(computer: Device, session: Session, agentName: String,
     val scope = rememberCoroutineScope()
     var sessionId by remember { mutableStateOf(session.id) }
     var transcript by remember { mutableStateOf<List<Message>>(emptyList()) }
-    var live by remember { mutableStateOf<LiveRun?>(null) }
-    var draft by remember { mutableStateOf("") }
+    var live by remember { mutableStateOf(activeLiveRuns[sessionId]) }
+    var remoteStatus by remember { mutableStateOf("idle") }
+    var remoteTool by remember { mutableStateOf("") }
+    var draft by remember { mutableStateOf(sessionDrafts[sessionId] ?: "") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
 
+    // 监听全局 activeLiveRuns 中的该会话实时状态
+    val currentActiveRun = activeLiveRuns[sessionId]
+    LaunchedEffect(currentActiveRun) {
+        live = currentActiveRun
+    }
+
+    val mergedTranscript = remember(transcript) { mergeAssistantMessages(transcript) }
+
+    // 本地有 live 则用本地 live；若终端发起运行（remoteStatus == "running"），合成远程 live 状态
+    // 将当前回合已完成的部分步骤（mergedTranscript 尾部属于本次回复的 assistant 内容）吸纳进 output，共同构成图 #33 的一体化大卡片
+    val effectiveLive = live ?: if (remoteStatus == "running") {
+        val lastIsAssistant = mergedTranscript.lastOrNull()?.role == "assistant"
+        val liveOutput = if (lastIsAssistant) mergedTranscript.last().text else ""
+        LiveRun(
+            text = "",
+            status = "running",
+            output = liveOutput,
+            lastTool = remoteTool,
+            tools = if (remoteTool.isNotBlank()) 1 else 0,
+        )
+    } else null
+
+    fun onDraftChange(newDraft: String) {
+        draft = newDraft
+        sessionDrafts[sessionId] = newDraft
+    }
+
     fun reload() {
         if (sessionId.isBlank()) return
         loading = true
-        scope.launch {
+        codingScope.launch {
             try {
-                transcript = CodingBridge.transcript(computer.id, session.agent, sessionId)
+                val detail = CodingBridge.sessionDetail(computer.id, session.agent, sessionId)
+                if (detail.transcript != transcript) {
+                    transcript = detail.transcript
+                }
+                remoteStatus = detail.status
+                remoteTool = detail.lastTool
                 error = null
             } catch (e: Exception) {
                 AppLogger.info("CodingScreen", "transcript failed: ${e.message}")
@@ -469,19 +543,88 @@ private fun SessionScreen(computer: Device, session: Session, agentName: String,
         }
     }
     LaunchedEffect(sessionId) { reload() }
-    LaunchedEffect(transcript.size, live?.output?.length, live?.current?.length) {
-        val n = transcript.size + (if (live != null) 1 else 0)
-        if (n > 0) listState.animateScrollToItem(n - 1)
+
+    // 停留当前页面时自动温和轮询（2秒一次），实时跟进电脑终端的输入、运行状态与执行进度
+    LaunchedEffect(sessionId, live?.status) {
+        if (sessionId.isBlank()) return@LaunchedEffect
+        while (true) {
+            delay(2000)
+            try {
+                val detail = CodingBridge.sessionDetail(computer.id, session.agent, sessionId)
+                if (detail.transcript.isNotEmpty() && detail.transcript != transcript) {
+                    transcript = detail.transcript
+                }
+                remoteStatus = detail.status
+                remoteTool = detail.lastTool
+                if (detail.status != "running" && activeLiveRuns[sessionId]?.status == "running") {
+                    activeLiveRuns[sessionId] = activeLiveRuns[sessionId]?.copy(status = "done") ?: LiveRun(text = "", status = "done")
+                    live = live?.copy(status = "done")
+                }
+            } catch (e: Exception) {
+                // 静默忽略偶发网络断连
+            }
+        }
+    }
+
+    var autoScroll by remember(sessionId) { mutableStateOf(true) }
+
+    // 监听列表滑动：若用户主动向上滑动离开底部浏览历史，暂停吸底；滑回最底部时自动恢复吸底
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            val total = info.totalItemsCount
+            val atBottom = total > 0 && (lastVisible >= total - 1 || !listState.canScrollForward)
+            Pair(atBottom, listState.isScrollInProgress)
+        }.collect { (atBottom, inProgress) ->
+            if (atBottom) {
+                autoScroll = true
+            } else if (inProgress) {
+                autoScroll = false
+            }
+        }
+    }
+
+    // 消息列表或实时运行输出变动时，若处于吸底跟随状态则滚到底部
+    LaunchedEffect(mergedTranscript.size, effectiveLive?.output?.length, effectiveLive?.current?.length, effectiveLive?.status, effectiveLive?.lastTool) {
+        val total = listState.layoutInfo.totalItemsCount
+        if (total <= 0) return@LaunchedEffect
+        if (autoScroll) {
+            listState.scrollToItem(total - 1, 100_000)
+        }
+    }
+
+    val isAtBottom by remember(listState) {
+        derivedStateOf {
+            val info = listState.layoutInfo
+            val total = info.totalItemsCount
+            if (total <= 0) return@derivedStateOf true
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible >= total - 1 && !listState.canScrollForward
+        }
+    }
+    val canScroll by remember(listState) {
+        derivedStateOf {
+            listState.canScrollForward || listState.canScrollBackward
+        }
+    }
+    val showJumpToBottom by remember {
+        derivedStateOf {
+            canScroll && !isAtBottom && !autoScroll
+        }
     }
 
     fun send() {
         val text = draft.trim()
-        if (text.isEmpty() || live?.status == "running") return
+        if (text.isEmpty() || effectiveLive?.status == "running" || activeLiveRuns[sessionId]?.status == "running") return
         draft = ""
+        sessionDrafts[sessionId] = ""
         error = null
-        val run = LiveRun(text = text)
+        autoScroll = true
+        val run = LiveRun(text = text, sessionId = sessionId)
         live = run
-        scope.launch {
+        activeLiveRuns[sessionId] = run
+        codingScope.launch {
             try {
                 val final = CodingBridge.send(
                     device = computer.id,
@@ -489,13 +632,21 @@ private fun SessionScreen(computer: Device, session: Session, agentName: String,
                     text = text,
                     sessionId = sessionId,
                     workspace = session.workspace,
-                    onUpdate = { updated -> live = updated },
+                    onUpdate = { updated ->
+                        activeLiveRuns[sessionId] = updated
+                    },
                 )
-                live = final
-                if (final.sessionId.isNotBlank() && final.sessionId != sessionId) sessionId = final.sessionId else reload()
+                activeLiveRuns[sessionId] = final
+                if (final.sessionId.isNotBlank() && final.sessionId != sessionId) {
+                    sessionId = final.sessionId
+                }
+                reload()
+                delay(1500)
+                activeLiveRuns.remove(sessionId)
             } catch (e: Exception) {
                 AppLogger.info("CodingScreen", "send failed: ${e.message}")
-                live = live?.copy(status = "failed", error = HubErrors.describe(context, e))
+                val failedRun = (activeLiveRuns[sessionId] ?: run).copy(status = "failed", error = HubErrors.describe(context, e))
+                activeLiveRuns[sessionId] = failedRun
             }
         }
     }
@@ -536,71 +687,164 @@ private fun SessionScreen(computer: Device, session: Session, agentName: String,
         bottomBar = {
             // an IDE chat the CLI cannot reopen: the message opens a new chat in the same
             // workspace with the last exchange quoted — the placeholder says so
-            val continuesAsNew = !session.resumable && sessionId == session.id && live?.status != "running"
+            val isBusy = effectiveLive?.status == "running" || activeLiveRuns[sessionId]?.status == "running"
+            val continuesAsNew = !session.resumable && sessionId == session.id && !isBusy
             Composer(
                 draft = draft,
-                onDraft = { draft = it },
+                onDraft = { onDraftChange(it) },
                 hint = if (continuesAsNew) stringResource(R.string.nm_coding_continue_new_hint) else stringResource(R.string.nm_coding_send_hint, agentName),
-                running = live?.status == "running",
+                running = isBusy,
                 onSend = { send() },
                 onStop = {
-                    val id = live?.id ?: return@Composer
-                    scope.launch { runCatching { CodingBridge.stop(computer.id, id) } }
+                    val id = live?.id ?: activeLiveRuns[sessionId]?.id ?: sessionId
+                    codingScope.launch {
+                        runCatching { CodingBridge.stop(computer.id, id) }
+                        activeLiveRuns[sessionId] = activeLiveRuns[sessionId]?.copy(status = "stopped") ?: LiveRun(text = "", status = "stopped")
+                        live = live?.copy(status = "stopped")
+                        remoteStatus = "idle"
+                        remoteTool = ""
+                        reload()
+                        delay(1000)
+                        activeLiveRuns.remove(sessionId)
+                    }
                 },
             )
         },
     ) { padding ->
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
         ) {
-            if (transcript.isEmpty() && live == null) {
-                item {
-                    Text(
-                        text = when {
-                            loading -> stringResource(R.string.nm_cloud_refreshing)
-                            error != null -> error ?: ""
-                            sessionId.isBlank() -> stringResource(R.string.nm_coding_fresh_hint, agentName)
-                            else -> stringResource(R.string.nm_coding_no_transcript)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(8.dp),
-                    )
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val isRunning = effectiveLive?.status == "running"
+                val lastIsAssistant = mergedTranscript.lastOrNull()?.role == "assistant"
+                val currentUserInTranscript = effectiveLive != null && mergedTranscript.any {
+                    it.role == "user" && it.text.trim() == effectiveLive.text.trim()
+                }
+                val isAbsorbedByLive = isRunning && lastIsAssistant &&
+                    (effectiveLive?.text.isNullOrBlank() || currentUserInTranscript)
+                val displayTranscript = if (isAbsorbedByLive) {
+                    mergedTranscript.dropLast(1)
+                } else {
+                    mergedTranscript
+                }
+
+                if (displayTranscript.isEmpty() && effectiveLive == null) {
+                    item {
+                        Text(
+                            text = when {
+                                loading -> stringResource(R.string.nm_cloud_refreshing)
+                                error != null -> error ?: ""
+                                sessionId.isBlank() -> stringResource(R.string.nm_coding_fresh_hint, agentName)
+                                else -> stringResource(R.string.nm_coding_no_transcript)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp),
+                        )
+                    }
+                }
+                items(displayTranscript) { m -> Bubble(m.role, m.text) }
+                effectiveLive?.let { run ->
+                    val userAlreadyInTranscript = displayTranscript.any { it.role == "user" && it.text.trim() == run.text.trim() }
+                    if (!userAlreadyInTranscript && run.text.isNotBlank()) {
+                        item { Bubble("user", run.text) }
+                    }
+                    val absorbedAnswer = run.status != "running" && userAlreadyInTranscript && displayTranscript.lastOrNull()?.role == "assistant"
+                    if (!absorbedAnswer) {
+                        item { LiveBlock(run) }
+                    }
                 }
             }
-            items(transcript) { m -> Bubble(m.role, m.text) }
-            live?.let { run ->
-                // The exchange in flight, unless the transcript re-read already has it.
-                val absorbed = run.status != "running" && transcript.any { it.role == "user" && it.text.trim() == run.text.trim() }
-                if (!absorbed) {
-                    item { Bubble("user", run.text) }
-                    item { LiveBlock(run) }
+
+            AnimatedVisibility(
+                visible = showJumpToBottom,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .shadow(4.dp, RoundedCornerShape(6.dp))
+                        .background(Color(0xFF282828), RoundedCornerShape(6.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .clickable {
+                            autoScroll = true
+                            scope.launch {
+                                val total = listState.layoutInfo.totalItemsCount
+                                if (total > 0) {
+                                    listState.animateScrollToItem(total - 1)
+                                    listState.scrollToItem(total - 1, 100_000)
+                                }
+                            }
+                        }
+                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                ) {
+                    Text(
+                        text = "Jump to bottom (click) ↓",
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                    )
                 }
             }
         }
     }
 }
 
+/** 把相邻连续的 assistant 消息（命令块、diff、回答文本）合并为同一张卡片展示，与图 #33 视觉保持一致 */
+private fun mergeAssistantMessages(messages: List<Message>): List<Message> {
+    if (messages.isEmpty()) return emptyList()
+    val merged = mutableListOf<Message>()
+    for (m in messages) {
+        if (merged.isNotEmpty() && merged.last().role == "assistant" && m.role == "assistant") {
+            val prev = merged.removeAt(merged.size - 1)
+            merged.add(prev.copy(text = (prev.text.trim() + "\n\n" + m.text.trim()).trim()))
+        } else {
+            merged.add(m)
+        }
+    }
+    return merged
+}
+
 @Composable
 private fun Bubble(role: String, text: String) {
     val mine = role == "user"
+    val bubbleShape = RoundedCornerShape(
+        topStart = 18.dp,
+        topEnd = 18.dp,
+        bottomStart = if (mine) 18.dp else 6.dp,
+        bottomEnd = if (mine) 6.dp else 18.dp,
+    )
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Box(
             modifier = Modifier
-                .widthIn(max = 320.dp)
-                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = if (mine) 18.dp else 6.dp, bottomEnd = if (mine) 6.dp else 18.dp))
-                .background(if (mine) MaterialTheme.colorScheme.onSurface else MuseTones.surface)
+                .widthIn(max = if (mine) 320.dp else 340.dp)
+                .background(if (mine) MaterialTheme.colorScheme.onSurface else MuseTones.surface, bubbleShape)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Text(
-                text = text,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-                color = if (mine) MuseTones.surface else MaterialTheme.colorScheme.onSurface,
-            )
+            if (mine) {
+                Text(
+                    text = text,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    color = MuseTones.surface,
+                )
+            } else {
+                MarkdownText(
+                    markdown = text,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -608,28 +852,36 @@ private fun Bubble(role: String, text: String) {
 /** The agent's answer as it streams: finished paragraphs, the one being written, tool calls, the end. */
 @Composable
 private fun LiveBlock(run: LiveRun) {
+    val liveShape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 18.dp)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
         Column(
             modifier = Modifier
                 .widthIn(max = 340.dp)
-                .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 18.dp))
-                .background(MuseTones.surface)
-                .border(1.dp, if (run.status == "running") MuseTones.action.copy(alpha = 0.35f) else Color.Transparent, RoundedCornerShape(18.dp))
+                .background(MuseTones.surface, liveShape)
+                .border(1.dp, if (run.status == "running") MuseTones.action.copy(alpha = 0.35f) else Color.Transparent, liveShape)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
             val body = listOf(run.output, run.current).filter { it.isNotBlank() }.joinToString("\n")
             if (body.isNotBlank()) {
-                Text(text = body, fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurface)
+                MarkdownText(
+                    markdown = body,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             }
             if (run.lastTool.isNotBlank() && run.status == "running") {
+                val isThinking = run.lastTool.startsWith("Thinking") || run.lastTool.startsWith("Compacting") || run.lastTool.contains("思考") || run.lastTool.contains("压缩")
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = if (body.isNotBlank()) 8.dp else 0.dp)) {
-                    Icon(Icons.Outlined.Build, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                    if (isThinking) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp, color = MuseTones.action)
+                    } else {
+                        Icon(Icons.Outlined.Build, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                    }
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = run.lastTool,
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (isThinking) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )

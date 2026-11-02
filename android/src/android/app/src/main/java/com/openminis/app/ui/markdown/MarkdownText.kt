@@ -207,6 +207,7 @@ private fun CodeBlockView(block: MarkdownParser.Block.CodeBlock) {
     val context = LocalContext.current
     val codeColor = Color(0xFF4EC9B0) // Green code text
     val bgColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val isDiff = block.language.equals("diff", ignoreCase = true)
 
     Column(
         modifier = Modifier
@@ -247,19 +248,55 @@ private fun CodeBlockView(block: MarkdownParser.Block.CodeBlock) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 400.dp)
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(vertical = 8.dp),
         ) {
-            Text(
-                text = block.code,
-                style = TextStyle(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    color = codeColor,
-                    lineHeight = 18.sp,
-                ),
-            )
+            if (isDiff) {
+                DiffCodeContent(block.code)
+            } else {
+                Text(
+                    text = block.code,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    style = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        color = codeColor,
+                        lineHeight = 18.sp,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiffCodeContent(code: String) {
+    val lines = remember(code) { code.lines() }
+    Column(modifier = Modifier.width(IntrinsicSize.Max)) {
+        for (line in lines) {
+            val (bgColor, textColor) = when {
+                line.startsWith("---") || line.startsWith("+++") -> Color.Transparent to Color(0xFF8B949E)
+                line.startsWith("-") -> Color(0x35E05252) to Color(0xFFFFA198)
+                line.startsWith("+") -> Color(0x283FB950) to Color(0xFF7EE787)
+                line.startsWith("@@") -> Color(0x1F388BFD) to Color(0xFF79C0FF)
+                else -> Color.Transparent to Color(0xFFC9D1D9)
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (bgColor != Color.Transparent) Modifier.background(bgColor) else Modifier)
+                    .padding(horizontal = 12.dp, vertical = 1.dp),
+            ) {
+                Text(
+                    text = if (line.isEmpty()) " " else line,
+                    style = TextStyle(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 13.sp,
+                        color = textColor,
+                        lineHeight = 18.sp,
+                    ),
+                )
+            }
         }
     }
 }
