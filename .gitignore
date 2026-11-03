@@ -22,6 +22,8 @@ logs/
 __pycache__/
 *.py[cod]
 *.egg-info/
+# pyenv-virtualenv names are machine-local (e.g. `nanomuse-3.12`); contributors use uv (AGENTS.md), CI passes --python
+.python-version
 
 # typescript incremental build state (web/, harness/)
 *.tsbuildinfo
