@@ -23,5 +23,8 @@ interface INanoMuseShell {
     boolean injectStroke(int displayId, in int[] xs, in int[] ys, in long[] times) = 16;
     int watchMainScreen(int windowMs) = 17;
     Bundle mainArrivals(long sinceUptimeMs) = 18;
+    int restartApp(int displayId, String packageName) = 19;
+    Bundle finishDisplay(int displayId, in String[] keep, in String[] close) = 20;
+    boolean recoverMuted() = 21;
     void destroy() = 16777114;
 }

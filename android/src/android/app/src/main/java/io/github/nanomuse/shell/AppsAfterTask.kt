@@ -1,0 +1,121 @@
+package io.github.nanomuse.shell
+
+/**
+ * 任务结束时虚拟屏上的 App 处置规则 (纯逻辑，单元测试直接测)。
+ *
+ * 默认留下: 挪到主屏、排在最后面，用户在最近任务里看得到它停在操作完的那一页。
+ * 此刻正在出声 (播放音视频) 的默认关掉，免得任务结束、静音还原时突然响起来。
+ * nanoMuse 自己的页面、非普通 App 页面的 (桌面、最近任务一类) 一律随屏关掉。
+ */
+object AppsAfterTask {
+    /** 一个任务的去留为什么这样定; [wire] 写进结果和运行记录。 */
+    enum class Why(val wire: String) {
+        /** 标过。 */
+        Marked("marked"),
+        /** 此刻正在出声。 */
+        Playing("playing"),
+        /** 读不到在不在出声，而它正被静着: 还原静音时可能突然响，按出声算。 */
+        PlaybackUnknown("playback_unknown"),
+        /** 默认: 留下。 */
+        Default("default"),
+        /** nanoMuse 自己的页面。 */
+        Own("nanomuse"),
+        /** 不是普通 App 的页面。 */
+        NotApp("not_app"),
+        /** 这台系统挪不了任务，照旧随屏关掉。 */
+        MoveUnsupported("move_not_supported"),
+        /** 挪到一半没成，为了不留在用户眼前把它关了。 */
+        MoveFailed("move_failed"),
+    }
+
+    /**
+     * 屏上的一个任务: [keys] 是它的页面所属的包换成的键 (见 [keyOf])，[playing] 读不到时为 null，
+     * [muted] 是它此刻正被静着 (收尾时会还原)。
+     */
+    data class Task(
+        val id: Int,
+        val keys: List<String>,
+        val standard: Boolean,
+        val own: Boolean,
+        val playing: Boolean?,
+        val muted: Boolean = false,
+    )
+
+    data class Fate(val task: Task, val keep: Boolean, val why: Why) {
+        val key: String get() = task.keys.firstOrNull().orEmpty()
+    }
+
+    /** 键: 本来那份 (当前用户) 就是包名，另一份是 包名@用户，和静音记录同一种写法 ([AppAudioKey])。 */
+    fun keyOf(packageName: String, userId: Int, myUser: Int): String =
+        AppAudioKey.of(packageName, userId.takeIf { it != myUser && it >= 0 })
+
+    /** 标的键换成同一种写法: 写成当前用户的另一份等于本来那份; 不合格式的丢掉。 */
+    fun normalize(keys: Array<String>?, myUser: Int): Set<String> = keys.orEmpty().mapNotNull { k ->
+        AppAudioKey.parse(k)?.let { (pkg, user) -> AppAudioKey.of(pkg, user?.takeIf { it != myUser }) }
+    }.toSet()
+
+    fun decide(tasks: List<Task>, keep: Set<String> = emptySet(), close: Set<String> = emptySet()): List<Fate> = tasks.map { t ->
+        when {
+            t.own -> Fate(t, false, Why.Own)
+            !t.standard -> Fate(t, false, Why.NotApp)
+            t.keys.any { it in close } -> Fate(t, false, Why.Marked)
+            t.keys.any { it in keep } -> Fate(t, true, Why.Marked)
+            t.playing == true -> Fate(t, false, Why.Playing)
+            // 读不到在不在出声: 没被静着的留下 (它要出声早就有声了，收尾不改变什么); 静着的按出声算，免得还原时突然响
+            t.playing == null && t.muted -> Fate(t, false, Why.PlaybackUnknown)
+            else -> Fate(t, true, Why.Default)
+        }
+    }
+
+    /**
+     * 挪过去之后再看一眼: 没标过 keep、这会儿开始出声的，改成关掉 (静音一还原就会响)。标过 keep 的照留。
+     */
+    fun recheck(fate: Fate, playingNow: Boolean?): Fate =
+        if (fate.keep && fate.why != Why.Marked && playingNow == true) fate.copy(keep = false, why = Why.Playing) else fate
+
+    /**
+     * `dumpsys audio` 里正在播放的那些 uid: 每个播放器一行 `AudioPlaybackConfiguration piid:.. u/pid:<uid>/<pid> state:started ..`。
+     * 认不出是音频服务的输出 (没有播放记录那一段) 时为 null，调用方按「读不到」处理。
+     */
+    fun playingUids(dumpsys: String): Set<Int>? {
+        if (!dumpsys.contains(PLAYBACK_SECTION)) return null
+        return dumpsys.lineSequence().filter { "AudioPlaybackConfiguration" in it }
+            .mapNotNull { PLAYER.find(it) }
+            .filter { it.groupValues[2] == "started" }
+            .mapNotNull { it.groupValues[1].toIntOrNull() }
+            .filter { it >= 0 }
+            .toSet()
+    }
+
+    /** 结果里关掉的那一项: 键:原因。 */
+    fun closedEntry(f: Fate): String = "${f.key}:${f.why.wire}"
+
+    /**
+     * 诊断信息里的一行: 只数个数，不列包名。
+     * 如「kept 1, closed 1 (playing 1)」「closed 2 (move not supported)」「none」。
+     */
+    fun diagnosticsLine(kept: Int, closed: List<String>, note: String?): String {
+        if (kept == 0 && closed.isEmpty()) return note?.let { "none ($it)" } ?: "none"
+        val reasons = closed.map { it.substringAfterLast(':') }.groupingBy { it }.eachCount()
+            .entries.sortedBy { it.key }.joinToString(", ") { "${it.key.replace('_', ' ')} ${it.value}" }
+        val parts = listOfNotNull(
+            "kept $kept".takeIf { kept > 0 },
+            if (closed.isEmpty()) null else "closed ${closed.size}" + (if (reasons.isEmpty()) "" else " ($reasons)"),
+        )
+        return parts.joinToString(", ") + (note?.let { "; $it" } ?: "")
+    }
+
+    // finishDisplay 的 Bundle key
+    const val KEY_KEPT = "kept"
+    const val KEY_CLOSED = "closed"
+    const val KEY_NOTE = "note"
+
+    /** 挪不了时写进 note 的话。 */
+    const val NOTE_MOVE_UNSUPPORTED = "move not supported"
+    const val NOTE_PLAYBACK_UNKNOWN = "playback unknown"
+
+    // AudioPlaybackConfiguration.PLAYER_STATE_STARTED
+    const val PLAYER_STATE_STARTED = 2
+    private const val PLAYBACK_SECTION = "PlaybackActivityMonitor"
+    private val PLAYER = Regex("""u/pid:(-?\d+)/-?\d+\s+state:(\w+)""")
+}

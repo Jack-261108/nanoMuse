@@ -12,6 +12,7 @@ import android.view.KeyEvent
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.logging.AppLogger
 import io.github.nanomuse.display.AgentDisplay
+import io.github.nanomuse.shell.AppsAfterTask
 import io.github.nanomuse.shell.INanoMuseShell
 import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.MainScreenWatch
@@ -32,6 +33,7 @@ interface HandsDisplayTarget {
     fun longPress(x: Int, y: Int): Boolean
     fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean
     fun openApp(packageName: String): Int
+    fun restartApp(packageName: String): Int = openApp(packageName)
     fun pressBack(): Boolean
     fun pressHome(): Boolean
     fun injectKey(keyCode: Int): Boolean
@@ -189,6 +191,14 @@ class VirtualDisplayTarget(
         return res
     }
 
+    override fun restartApp(packageName: String): Int {
+        val res = shell.restartApp(displayId, packageName)
+        if (res == 0) {
+            activeTaskId = shell.topTaskId(displayId)
+        }
+        return res
+    }
+
     override fun armSpillWatch(windowMs: Int): HandsDisplayTarget.SpillWatch? {
         val since = SystemClock.uptimeMillis()
         val top = runCatching { shell.watchMainScreen(windowMs) }.getOrDefault(-1)
@@ -214,6 +224,7 @@ class VirtualDisplayTarget(
             }
         }
         return verdict
+    }
     }
 
     override fun pressBack(): Boolean =
@@ -246,6 +257,22 @@ class VirtualDisplayTarget(
     }
 
     override fun release() {
+        try {
+            val bundle = shell.finishDisplay(displayId, emptyArray(), emptyArray())
+            if (bundle != null) {
+                val kept = bundle.getStringArray(AppsAfterTask.KEY_KEPT)?.size ?: 0
+                val closed = bundle.getStringArray(AppsAfterTask.KEY_CLOSED)?.toList().orEmpty()
+                val note = bundle.getString(AppsAfterTask.KEY_NOTE)
+                AppLogger.info(tag, "finishDisplay: ${AppsAfterTask.diagnosticsLine(kept, closed, note)}")
+            }
+        } catch (t: Throwable) {
+            AppLogger.warning(tag, "finishDisplay failed: ${t.message}")
+        }
         display.release()
+        try {
+            shell.recoverMuted()
+        } catch (t: Throwable) {
+            AppLogger.warning(tag, "recoverMuted failed: ${t.message}")
+        }
     }
 }

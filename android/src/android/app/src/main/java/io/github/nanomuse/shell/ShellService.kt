@@ -7,6 +7,8 @@ import android.content.Context
 import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.AudioManager
+import android.media.AudioPlaybackConfiguration
 import android.os.Build
 import android.os.Bundle
 import android.os.Process
@@ -34,6 +36,7 @@ class ShellService(
 
     private val context: Context = ShellContext.create()
     private val displays = HashMap<Int, VirtualDisplay>()
+    private val kept = HashMap<Int, String>()
     private val muted = AudioMuteLedger(File(stateDir, "nanomuse_audio_mute_$allowedUid"))
     private val myUser = allowedUid / PER_USER_RANGE
 
@@ -161,6 +164,8 @@ class ShellService(
             return START_ERROR
         }
 
+        if (resumeKept(displayId, packageName, myUser)) return START_OK
+
         val intent = launchIntent(packageName, myUser) ?: return START_NOT_FOUND
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
@@ -206,6 +211,28 @@ class ShellService(
             START_OK
         } else {
             START_ERROR
+        }
+    }
+
+    override fun restartApp(displayId: Int, packageName: String): Int = synchronized(launchLock) {
+        if (!ownDisplay(displayId)) return START_ERROR
+        val decision = try {
+            dropKept(packageName, myUser)
+            val displayField = TASK_INFO.getField("displayId")
+            val taskDisplays = allTasks().filter { packageName in packagesOf(it) }.map { displayField.getInt(it) }
+            ColdStart.decide(taskDisplays, displayId, inUseOnMainScreen(packageName, myUser))
+        } catch (t: Throwable) {
+            Log.e(TAG, "cannot inspect tasks", t)
+            return START_ERROR
+        }
+        if (launchIntent(packageName, myUser) == null) return START_NOT_FOUND
+        when (decision) {
+            ColdStart.IN_USE -> START_IN_USE_ON_MAIN
+            ColdStart.WARM -> startApp(displayId, packageName)
+            ColdStart.RESTART -> {
+                exec("am", "force-stop", packageName)
+                startApp(displayId, packageName)
+            }
         }
     }
 
@@ -410,11 +437,232 @@ class ShellService(
         return sh(*cmd.toTypedArray())
     }
 
-    fun recoverMuted() {
-        synchronized(muted) {
-            muted.restoreAll { pkg, mode ->
-                appops("set", pkg, mode).first == 0
+    override fun finishDisplay(displayId: Int, keep: Array<String>?, close: Array<String>?): Bundle? = synchronized(launchLock) {
+        if (!ownDisplay(displayId)) return null
+        val closed = ArrayList<String>()
+        val notes = LinkedHashSet<String>()
+        val moved = ArrayList<AppsAfterTask.Fate>()
+        try {
+            val playing = playingUids()
+            if (playing == null) notes += AppsAfterTask.NOTE_PLAYBACK_UNKNOWN
+            val rows = tasksOn(displayId)
+            val idField = TASK_INFO.getField("taskId")
+            val byId = rows.associateBy { idField.getInt(it) }
+            val fates = AppsAfterTask.decide(
+                rows.map { afterTaskRow(it, playing) },
+                AppsAfterTask.normalize(keep, myUser),
+                AppsAfterTask.normalize(close, myUser),
+            )
+            val mainTop = topTaskId(Display.DEFAULT_DISPLAY)
+            var supported = true
+            for (f in fates) {
+                if (!f.keep) {
+                    closed += AppsAfterTask.closedEntry(f)
+                    continue
+                }
+                if (!supported) {
+                    closed += AppsAfterTask.closedEntry(f.copy(keep = false, why = AppsAfterTask.Why.MoveUnsupported))
+                    continue
+                }
+                when (keepBehind(byId.getValue(f.task.id))) {
+                    Behind.OK -> moved += f
+                    Behind.UNSUPPORTED -> {
+                        supported = false
+                        notes += AppsAfterTask.NOTE_MOVE_UNSUPPORTED
+                        closed += AppsAfterTask.closedEntry(f.copy(keep = false, why = AppsAfterTask.Why.MoveUnsupported))
+                    }
+                    Behind.FAILED -> closed += AppsAfterTask.closedEntry(f.copy(keep = false, why = AppsAfterTask.Why.MoveFailed))
+                }
             }
+            // 挪过去之后又出声的(没标过 keep): 挪回这块屏随屏关掉; 挪不回就直接关
+            val playingNow = if (moved.isEmpty()) null else playingUids()
+            val nowLoud = moved.map { f -> AppsAfterTask.recheck(f, task(f.task.id)?.let { playingIn(it, playingNow) }) }.filter { !it.keep }
+            for (f in nowLoud) {
+                if (!moveTask(f.task.id, displayId)) removeTask(f.task.id)
+                moved.removeAll { it.task.id == f.task.id }
+                closed += AppsAfterTask.closedEntry(f)
+            }
+            val removed = ensureBehind(moved.map { it.task.id }.toSet(), mainTop)
+            moved.filter { it.task.id in removed }.forEach {
+                closed += AppsAfterTask.closedEntry(it.copy(keep = false, why = AppsAfterTask.Why.MoveFailed))
+            }
+            moved.removeAll { it.task.id in removed }
+        } catch (t: Throwable) {
+            Log.e(TAG, "finishDisplay: cannot inspect tasks, closing the rest with the display", t)
+            notes += "error ${t.javaClass.simpleName}"
+        }
+        synchronized(kept) { moved.forEach { kept[it.task.id] = it.key } }
+        releaseDisplay(displayId)
+        Bundle().apply {
+            putStringArray(AppsAfterTask.KEY_KEPT, moved.map { it.key }.toTypedArray())
+            putStringArray(AppsAfterTask.KEY_CLOSED, closed.toTypedArray())
+            putString(AppsAfterTask.KEY_NOTE, notes.joinToString("; ").ifEmpty { null })
+        }
+    }
+
+    private enum class Behind { OK, UNSUPPORTED, FAILED }
+
+    private fun afterTaskRow(t: Any, playing: Map<Int, Set<String>>?): AppsAfterTask.Task {
+        val user = runCatching { TASK_INFO.getField("userId").getInt(t) }.getOrDefault(myUser)
+        val pkgs = packagesOf(t).distinct()
+        val type = runCatching { TASK_INFO.getField("topActivityType").getInt(t) }.getOrNull()
+        return AppsAfterTask.Task(
+            id = TASK_INFO.getField("taskId").getInt(t),
+            keys = pkgs.map { AppsAfterTask.keyOf(it, user, myUser) },
+            standard = type == null || type == ACTIVITY_TYPE_UNDEFINED || type == ACTIVITY_TYPE_STANDARD,
+            own = pkgs.any { it in ownPackages },
+            playing = playingIn(t, playing),
+            muted = synchronized(muted) { pkgs.any { muted.contains(AppsAfterTask.keyOf(it, user, myUser)) } },
+        )
+    }
+
+    private val ownPackages: Set<String> by lazy {
+        runCatching { context.packageManager.getPackagesForUid(allowedUid)?.toSet() }.getOrNull().orEmpty()
+    }
+
+    private fun playingIn(task: Any, playing: Map<Int, Set<String>>?): Boolean? {
+        playing ?: return null
+        val user = runCatching { TASK_INFO.getField("userId").getInt(task) }.getOrNull()
+        val pkgs = packagesOf(task)
+        return playing.any { (uid, owners) -> (user == null || uid / PER_USER_RANGE == user) && pkgs.any { it in owners } }
+    }
+
+    private fun playingUids(): Map<Int, Set<String>>? {
+        val uids = runCatching {
+            val configs = context.getSystemService(AudioManager::class.java).activePlaybackConfigurations
+            val uidOf = AudioPlaybackConfiguration::class.java.getMethod("getClientUid")
+            val stateOf = AudioPlaybackConfiguration::class.java.getMethod("getPlayerState")
+            val rows = configs.map { (uidOf.invoke(it) as Int) to (stateOf.invoke(it) as Int) }
+            if (rows.any { it.first < 0 }) null
+            else rows.filter { it.second == AppsAfterTask.PLAYER_STATE_STARTED }.map { it.first }.toSet()
+        }.onFailure { Log.w(TAG, "playback configurations unavailable", it) }.getOrNull()
+            ?: sh("dumpsys", "audio").takeIf { it.first == 0 }?.second?.let(AppsAfterTask::playingUids)
+            ?: return null
+        return uids.associateWith { uid ->
+            runCatching { context.packageManager.getPackagesForUid(uid)?.toSet() }.getOrNull().orEmpty()
+        }
+    }
+
+    private fun keepBehind(row: Any): Behind {
+        val id = TASK_INFO.getField("taskId").getInt(row)
+        val token = runCatching { TASK_INFO.getField("token").get(row) }.getOrNull()
+        if (token == null) {
+            return if (moveTask(id, Display.DEFAULT_DISPLAY)) Behind.OK else Behind.FAILED
+        }
+        if (!transact { wct -> wctCall(wct, "setHidden", token, true) }) {
+            return if (moveTask(id, Display.DEFAULT_DISPLAY)) Behind.OK else Behind.UNSUPPORTED
+        }
+        if (!moveTask(id, Display.DEFAULT_DISPLAY)) {
+            transact { wct -> wctCall(wct, "setHidden", token, false) }
+            return Behind.UNSUPPORTED
+        }
+        val behind = transact { wct -> wctCall(wct, "reorder", token, false) }
+        if (behind && transact { wct -> wctCall(wct, "setHidden", token, false) }) return Behind.OK
+        Log.w(TAG, "task $id could not be put behind on the main screen, removing it")
+        removeTask(id)
+        return Behind.FAILED
+    }
+
+    private fun ensureBehind(moved: Set<Int>, before: Int): Set<Int> {
+        if (moved.isEmpty()) return emptySet()
+        val removed = HashSet<Int>()
+        val visibleField = runCatching { TASK_INFO.getField("isVisible") }.getOrNull()
+        fun inFront(): List<Any> = if (visibleField != null) {
+            tasksOn(Display.DEFAULT_DISPLAY).filter { TASK_INFO.getField("taskId").getInt(it) in moved && visibleField.getBoolean(it) }
+        } else listOfNotNull(tasksOn(Display.DEFAULT_DISPLAY).firstOrNull()?.takeIf { TASK_INFO.getField("taskId").getInt(it) in moved })
+        repeat(2) { attempt ->
+            val front = inFront()
+            if (front.isEmpty()) return removed
+            for (row in front) {
+                val id = TASK_INFO.getField("taskId").getInt(row)
+                Log.w(TAG, "moved task $id is in front on the main screen (top was $before), sending it back")
+                val token = runCatching { TASK_INFO.getField("token").get(row) }.getOrNull()
+                if (attempt == 1 || token == null || !transact { wct -> wctCall(wct, "reorder", token, false) }) {
+                    removeTask(id)
+                    removed += id
+                }
+            }
+        }
+        return removed
+    }
+
+    private fun removeTask(taskId: Int): Boolean = try {
+        taskManager.javaClass.getMethod("removeTask", Int::class.java).invoke(taskManager, taskId) as Boolean
+    } catch (t: Throwable) {
+        Log.w(TAG, "removeTask unavailable, falling back to am", t)
+        exec("am", "stack", "remove", "$taskId") == 0
+    }
+
+    @SuppressLint("PrivateApi")
+    private fun transact(build: (Any) -> Unit): Boolean = try {
+        val wct = WCT.getConstructor().newInstance()
+        build(wct)
+        val controller = taskManager.javaClass.getMethod("getWindowOrganizerController").invoke(taskManager)!!
+        controller.javaClass.methods.first { it.name == "applyTransaction" && it.parameterTypes.size == 1 }.invoke(controller, wct)
+        true
+    } catch (t: Throwable) {
+        Log.w(TAG, "window container transaction failed", t)
+        false
+    }
+
+    @SuppressLint("PrivateApi")
+    private fun wctCall(wct: Any, method: String, token: Any, flag: Boolean) {
+        WCT.getMethod(method, Class.forName("android.window.WindowContainerToken"), Boolean::class.javaPrimitiveType).invoke(wct, token, flag)
+    }
+
+    private fun packagesOf(task: Any): List<String> = listOf("baseActivity", "topActivity").mapNotNull {
+        (TASK_INFO.getField(it).get(task) as? ComponentName)?.packageName
+    }
+
+    private fun allTasks(): List<Any> {
+        val methods = taskManager.javaClass.methods.filter { it.name == "getTasks" }
+        val withDisplay = methods.firstOrNull { it.parameterTypes.size == 4 }
+        val tasks = if (withDisplay != null) {
+            withDisplay.invoke(taskManager, MAX_TASKS, false, false, Display.INVALID_DISPLAY)
+        } else {
+            methods.first { it.parameterTypes.size == 3 }.invoke(taskManager, MAX_TASKS, false, false)
+        } as List<*>
+        return tasks.filterNotNull()
+    }
+
+    private fun task(taskId: Int): Any? {
+        val idField = TASK_INFO.getField("taskId")
+        return allTasks().firstOrNull { idField.getInt(it) == taskId }
+    }
+
+    private fun keptOnMain(packageName: String, userId: Int): List<Any> {
+        val ids = synchronized(kept) { kept.keys.toSet() }
+        if (ids.isEmpty()) return emptyList()
+        val idField = TASK_INFO.getField("taskId")
+        val displayField = TASK_INFO.getField("displayId")
+        val visibleField = runCatching { TASK_INFO.getField("isVisible") }.getOrNull()
+        val all = allTasks()
+        synchronized(kept) { kept.keys.retainAll(all.map { idField.getInt(it) }.toSet()) }
+        return all.filter { t ->
+            idField.getInt(t) in ids && displayField.getInt(t) == Display.DEFAULT_DISPLAY &&
+                packageName in packagesOf(t) && visibleField?.getBoolean(t) != true
+        }
+    }
+
+    private fun resumeKept(displayId: Int, packageName: String, userId: Int): Boolean {
+        val row = runCatching { keptOnMain(packageName, userId).firstOrNull() }.getOrNull() ?: return false
+        val id = TASK_INFO.getField("taskId").getInt(row)
+        if (!moveTask(id, displayId)) return false
+        synchronized(kept) { kept.remove(id) }
+        return true
+    }
+
+    private fun dropKept(packageName: String, userId: Int) {
+        keptOnMain(packageName, userId).forEach { t ->
+            val id = TASK_INFO.getField("taskId").getInt(t)
+            removeTask(id)
+            synchronized(kept) { kept.remove(id) }
+        }
+    }
+
+    override fun recoverMuted(): Boolean = synchronized(muted) {
+        muted.restoreAll { pkg, mode ->
+            appops("set", pkg, mode).first == 0
         }
     }
 
@@ -466,6 +714,9 @@ class ShellService(
         const val START_NOT_FOUND = 2
         const val START_ERROR = 3
 
+        private const val ACTIVITY_TYPE_UNDEFINED = 0
+        private const val ACTIVITY_TYPE_STANDARD = 1
+        private val WCT: Class<*> by lazy { Class.forName("android.window.WindowContainerTransaction") }
         private val TASK_INFO: Class<*> by lazy { Class.forName("android.app.TaskInfo") }
         private const val ACTIVITY_TYPE_UNDEFINED = 0
         private const val ACTIVITY_TYPE_STANDARD = 1

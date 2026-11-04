@@ -25,7 +25,7 @@ sealed class HandsAction {
     data class Scroll(val direction: String, val distance: String = "normal") : HandsAction()
     data class InputText(val text: String, val field: String) : HandsAction()
     object KeyboardEnter : HandsAction()
-    data class OpenApp(val appName: String) : HandsAction()
+    data class OpenApp(val appName: String, val cold: Boolean = false) : HandsAction()
     object Back : HandsAction()
     object Home : HandsAction()
     data class Wait(val seconds: Int) : HandsAction()
@@ -168,7 +168,10 @@ sealed class HandsAction {
                 }
                 "input_text" -> InputText(o.optString("text"), o.optString("field").ifBlank { target })
                 "keyboard_enter" -> KeyboardEnter
-                "open_app" -> OpenApp(o.optString("app_name").ifBlank { o.optString("app") }.ifBlank { o.optString("name") }.trim())
+                "open_app" -> OpenApp(
+                    o.optString("app_name").ifBlank { o.optString("app") }.ifBlank { o.optString("name") }.trim(),
+                    o.optBoolean("cold", false),
+                )
                 "navigate_back" -> Back
                 "navigate_home" -> Home
                 "wait" -> Wait(o.optDouble("seconds", 2.0).toInt().coerceIn(1, 10))

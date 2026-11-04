@@ -466,7 +466,7 @@ class HandsOperator(private val context: Context) {
                         val app = HandsApps.resolve(context, action.appName)
                         val spillWatch = target.armSpillWatch()
                         lastResult = if (app != null) {
-                            val res = target.openApp(app.packageName)
+                            val res = if (action.cold) target.restartApp(app.packageName) else target.openApp(app.packageName)
                             val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
                             if (spill is MainScreenSpill.PullBack) {
                                 // A note from a multi-app run must not be reused as one app's history.
