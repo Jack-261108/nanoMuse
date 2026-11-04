@@ -6,12 +6,15 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Path
 import android.os.Build
+import android.os.SystemClock
 import android.view.Display
 import android.view.KeyEvent
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.logging.AppLogger
 import io.github.nanomuse.display.AgentDisplay
 import io.github.nanomuse.shell.INanoMuseShell
+import io.github.nanomuse.shell.MainScreenSpill
+import io.github.nanomuse.shell.MainScreenWatch
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -37,6 +40,19 @@ interface HandsDisplayTarget {
     fun onTakeoverStart(): Boolean = true
     fun onTakeoverEnd(): Boolean = true
     fun release() {}
+
+    data class SpillWatch(val since: Long, val topBefore: Int)
+
+    fun armSpillWatch(windowMs: Int = SPILL_WINDOW_MS.toInt()): SpillWatch? = null
+    fun checkSpill(
+        watch: SpillWatch?,
+        excluded: Set<String> = emptySet(),
+        userTaps: List<MainScreenSpill.Tap> = emptyList(),
+    ): MainScreenSpill.Verdict? = null
+
+    companion object {
+        const val SPILL_WINDOW_MS = 6_000L
+    }
 }
 
 /**
@@ -161,11 +177,43 @@ class VirtualDisplayTarget(
     }
 
     override fun openApp(packageName: String): Int {
+        val watch = armSpillWatch()
         val res = shell.startApp(displayId, packageName)
         if (res == 0) {
             activeTaskId = shell.topTaskId(displayId)
         }
+        val spill = checkSpill(watch)
+        if (spill is MainScreenSpill.PullBack) {
+            activeTaskId = spill.arrival.taskId
+        }
         return res
+    }
+
+    override fun armSpillWatch(windowMs: Int): HandsDisplayTarget.SpillWatch? {
+        val since = SystemClock.uptimeMillis()
+        val top = runCatching { shell.watchMainScreen(windowMs) }.getOrDefault(-1)
+        return HandsDisplayTarget.SpillWatch(since, top)
+    }
+
+    override fun checkSpill(
+        watch: HandsDisplayTarget.SpillWatch?,
+        excluded: Set<String>,
+        userTaps: List<MainScreenSpill.Tap>,
+    ): MainScreenSpill.Verdict? {
+        if (watch == null) return null
+        val b = runCatching { shell.mainArrivals(watch.since) }.getOrNull() ?: return null
+        val arrivals = MainScreenWatch.parseArrivals(b)
+        val verdicts = MainScreenSpill.decide(arrivals, watch.since, HandsDisplayTarget.SPILL_WINDOW_MS, watch.topBefore, excluded, userTaps)
+        val verdict = verdicts.lastOrNull() ?: return null
+        if (verdict is MainScreenSpill.PullBack) {
+            val taskId = verdict.arrival.taskId
+            AppLogger.info(tag, "pulling back spilled task $taskId (${verdict.arrival.packageName}) to virtual display $displayId")
+            val moved = runCatching { shell.moveTask(taskId, displayId) }.getOrDefault(false)
+            if (moved) {
+                activeTaskId = taskId
+            }
+        }
+        return verdict
     }
 
     override fun pressBack(): Boolean =

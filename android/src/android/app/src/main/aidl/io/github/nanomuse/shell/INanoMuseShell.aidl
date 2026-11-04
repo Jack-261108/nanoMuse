@@ -1,5 +1,6 @@
 package io.github.nanomuse.shell;
 
+import android.os.Bundle;
 import android.view.Surface;
 
 interface INanoMuseShell {
@@ -20,5 +21,7 @@ interface INanoMuseShell {
     void releaseAll() = 14;
     String topActivity(int displayId) = 15;
     boolean injectStroke(int displayId, in int[] xs, in int[] ys, in long[] times) = 16;
+    int watchMainScreen(int windowMs) = 17;
+    Bundle mainArrivals(long sinceUptimeMs) = 18;
     void destroy() = 16777114;
 }

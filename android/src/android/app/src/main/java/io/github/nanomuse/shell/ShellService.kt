@@ -8,6 +8,7 @@ import android.content.Intent
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.os.Build
+import android.os.Bundle
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
@@ -45,6 +46,22 @@ class ShellService(
 
     private val taskManager: Any by lazy {
         Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null)!!
+    }
+
+    private val mainWatch by lazy { MainScreenWatch({ taskManager }, ::taskRows) }
+
+    override fun watchMainScreen(windowMs: Int): Int = try {
+        mainWatch.watch(windowMs)
+    } catch (t: Throwable) {
+        Log.e(TAG, "watchMainScreen failed", t)
+        -1
+    }
+
+    override fun mainArrivals(sinceUptimeMs: Long): Bundle? = try {
+        mainWatch.arrivals(sinceUptimeMs)
+    } catch (t: Throwable) {
+        Log.e(TAG, "mainArrivals failed", t)
+        null
     }
 
     private val awake by lazy {
@@ -220,6 +237,35 @@ class ShellService(
         return tasks.filterNotNull().filter { displayField.getInt(it) == displayId }
     }
 
+    private fun allTasks(): List<Any> {
+        val methods = taskManager.javaClass.methods.filter { it.name == "getTasks" }
+        val withDisplay = methods.firstOrNull { it.parameterTypes.size == 4 }
+        val tasks = if (withDisplay != null) {
+            withDisplay.invoke(taskManager, MAX_TASKS, false, false, Display.INVALID_DISPLAY)
+        } else {
+            methods.first { it.parameterTypes.size == 3 }.invoke(taskManager, MAX_TASKS, false, false)
+        } as List<*>
+        return tasks.filterNotNull()
+    }
+
+    private fun taskRows(): List<MainScreenLog.Task> {
+        val id = TASK_INFO.getField("taskId")
+        val display = TASK_INFO.getField("displayId")
+        val user = runCatching { TASK_INFO.getField("userId") }.getOrNull()
+        val type = runCatching { TASK_INFO.getField("topActivityType") }.getOrNull()
+        return allTasks().map { t ->
+            val top = TASK_INFO.getField("topActivity").get(t) as? ComponentName
+            MainScreenLog.Task(
+                taskId = id.getInt(t),
+                displayId = display.getInt(t),
+                packageName = top?.packageName ?: (TASK_INFO.getField("baseActivity").get(t) as? ComponentName)?.packageName,
+                userId = user?.getInt(t) ?: -1,
+                topActivity = top?.className,
+                standard = type?.getInt(t)?.let { it == ACTIVITY_TYPE_UNDEFINED || it == ACTIVITY_TYPE_STANDARD } ?: true,
+            )
+        }
+    }
+
     override fun topTaskId(displayId: Int): Int = try {
         tasksOn(displayId).firstOrNull()?.let { TASK_INFO.getField("taskId").getInt(it) } ?: -1
     } catch (t: Throwable) {
@@ -378,6 +424,7 @@ class ShellService(
         recoverMuted()
         val ids = synchronized(displays) { displays.keys.toList() }
         ids.forEach(::releaseDisplay)
+        runCatching { mainWatch.close() }
     }
 
     override fun destroy() {
@@ -420,6 +467,8 @@ class ShellService(
         const val START_ERROR = 3
 
         private val TASK_INFO: Class<*> by lazy { Class.forName("android.app.TaskInfo") }
+        private const val ACTIVITY_TYPE_UNDEFINED = 0
+        private const val ACTIVITY_TYPE_STANDARD = 1
         private const val INJECT_MODE_ASYNC = 0
         private const val INJECT_MODE_WAIT_FOR_RESULT = 1
 

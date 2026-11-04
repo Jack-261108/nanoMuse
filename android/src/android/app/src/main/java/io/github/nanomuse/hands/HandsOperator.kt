@@ -4,12 +4,14 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Path
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
@@ -23,6 +25,7 @@ import com.openminis.app.service.SessionActivityTracker
 import io.github.nanomuse.cloud.ClientEvents
 import io.github.nanomuse.cloud.Provenance
 import io.github.nanomuse.display.AgentDisplay
+import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.SharedShell
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.guard.GuardKind
@@ -46,6 +49,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedDeque
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -109,6 +113,14 @@ class HandsOperator(private val context: Context) {
     /** The chat the run came from, for the record's events (null for a run without one). */
     @Volatile private var eventSession: String? = null
 
+    private val notSpills: Set<String> by lazy {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        val launchers = runCatching {
+            context.packageManager.queryIntentActivities(home, 0).mapNotNull { it.activityInfo?.packageName }
+        }.getOrDefault(emptyList())
+        (launchers + context.packageName).toSet()
+    }
+
     /**
      * The approval card waiting on this run, if the one on top is ours: a tap or an Enter the
      * hands asked about, not a shell or browser request of some other conversation.
@@ -157,9 +169,23 @@ class HandsOperator(private val context: Context) {
         val started = System.currentTimeMillis()
         var displayTarget: HandsDisplayTarget? = null
         var frameForwardJob: Job? = null
+        var tapListener: ((MinisAccessibilityService.RecordedEvent) -> Unit)? = null
+        var a11ySvc: MinisAccessibilityService? = null
+        val userTaps = ConcurrentLinkedDeque<MainScreenSpill.Tap>()
         try {
             val svc = MinisAccessibilityService.getInstance()
                 ?: return finish(Outcome.Failed("the accessibility service is not running"), steps, runId, lastScreen, traceDir, log, model?.label)
+            a11ySvc = svc
+            val listener: (MinisAccessibilityService.RecordedEvent) -> Unit = { rec ->
+                if (rec.type == "TYPE_VIEW_CLICKED" || rec.type == "TYPE_VIEW_LONG_CLICKED") {
+                    if (rec.packageName != context.packageName) {
+                        userTaps.addLast(MainScreenSpill.Tap(SystemClock.uptimeMillis(), rec.packageName))
+                        while (userTaps.size > 50) userTaps.pollFirst()
+                    }
+                }
+            }
+            svc.addEventListener(listener)
+            tapListener = listener
             if (Build.VERSION.SDK_INT < Hands.MIN_SDK) {
                 return finish(Outcome.Failed("screenshots need Android 11"), steps, runId, lastScreen, traceDir, log, model?.label)
             }
@@ -207,9 +233,18 @@ class HandsOperator(private val context: Context) {
             // The app the caller named comes first, before the model looks.
             opts.appHint?.takeIf { it.isNotBlank() }?.let { hint ->
                 val app = HandsApps.resolve(context, hint)
+                val spillWatch = target.armSpillWatch()
                 lastResult = if (app != null) {
                     val res = target.openApp(app.packageName)
-                    if (res == 0) {
+                    val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
+                    if (spill is MainScreenSpill.PullBack) {
+                        memoryApp = app.packageName
+                        memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
+                        Thread.sleep(OPEN_APP_SETTLE_MS)
+                        "opened ${app.label} (restored to virtual screen)."
+                    } else if (spill is MainScreenSpill.InUse) {
+                        "app ${app.label} is currently in use on the main screen; left on main screen."
+                    } else if (res == 0) {
                         memoryApp = app.packageName
                         memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
                         Thread.sleep(OPEN_APP_SETTLE_MS)
@@ -346,6 +381,7 @@ class HandsOperator(private val context: Context) {
                         // sees it in the log and tells the user where it lives.
                         gate.notice?.let { log += it }
                         if (stop.get()) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
+                        val spillWatch = target.armSpillWatch()
                         val ok = if (target.isVirtual) {
                             when (action) {
                                 is HandsAction.LongPress -> target.longPress(px, py)
@@ -366,8 +402,18 @@ class HandsOperator(private val context: Context) {
                             capsule.stage.ripple(px, py)
                             tapOk
                         }
-                        lastResult = if (ok) "${action.describe()} at ($px, $py) was performed." else "the gesture at ($px, $py) was rejected by the system; try again or another way."
                         Thread.sleep(TAP_SETTLE_MS)
+                        val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
+                        lastResult = when {
+                            spill is MainScreenSpill.PullBack ->
+                                "${action.describe()} at ($px, $py) opened ${spill.arrival.packageName ?: "app"} on main screen, restored to virtual screen."
+                            spill is MainScreenSpill.InUse ->
+                                "${action.describe()} at ($px, $py) opened ${spill.arrival.packageName ?: "app"} on main screen where it is currently in use; left on main screen."
+                            ok ->
+                                "${action.describe()} at ($px, $py) was performed."
+                            else ->
+                                "the gesture at ($px, $py) was rejected by the system; try again or another way."
+                        }
                     }
                     is HandsAction.Swipe -> {
                         val (x1, y1) = action.from.toPixels(screenW, screenH)
@@ -418,12 +464,21 @@ class HandsOperator(private val context: Context) {
                     }
                     is HandsAction.OpenApp -> {
                         val app = HandsApps.resolve(context, action.appName)
+                        val spillWatch = target.armSpillWatch()
                         lastResult = if (app != null) {
                             val res = target.openApp(app.packageName)
-                            if (res == 0) {
+                            val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
+                            if (spill is MainScreenSpill.PullBack) {
                                 // A note from a multi-app run must not be reused as one app's history.
                                 if (app.packageName != memoryApp) memoryTicket = null
                                 if (!target.isVirtual) capsule.stage.say(context.getString(com.openminis.app.R.string.nm_hands_fx_open, app.label))
+                                Thread.sleep(OPEN_APP_SETTLE_MS)
+                                "opened ${app.label} (restored to virtual screen)."
+                            } else if (spill is MainScreenSpill.InUse) {
+                                "cannot open ${app.label}: user is currently using it on the main screen."
+                            } else if (res == 0) {
+                                // A note from a multi-app run must not be reused as one app's history.
+                                if (app.packageName != memoryApp) memoryTicket = null
                                 Thread.sleep(OPEN_APP_SETTLE_MS)
                                 "opened ${app.label}."
                             } else if (res == 1) {
@@ -462,6 +517,7 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "run failed: ${t.javaClass.simpleName} ${t.message}")
             return finish(Outcome.Failed("${t.javaClass.simpleName}: ${t.message}"), steps, runId, lastScreen, traceDir, log, model?.label)
         } finally {
+            tapListener?.let { a11ySvc?.removeEventListener(it) }
             frameForwardJob?.cancel()
             capsule.setPreviewFlow(null)
             Hands.setLiveFrames(null)
