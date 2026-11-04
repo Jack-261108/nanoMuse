@@ -440,6 +440,7 @@ fun NanoMuseHome(
                             // nanoMuse: preserve the full-size blur source, but keep
                             // the chat footer above the bar measured by Scaffold.
                             nmBottomOverlay = bottom,
+                            nmConversationVisible = chatVisible,
                         )
                     }
                 }

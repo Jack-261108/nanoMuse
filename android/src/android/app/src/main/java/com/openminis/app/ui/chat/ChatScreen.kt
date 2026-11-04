@@ -1,5 +1,9 @@
 package com.openminis.app.ui.chat
 
+// nanoMuse: equipment rows reuse the file mention picker.
+import androidx.compose.material.icons.filled.Computer
+import androidx.compose.material.icons.filled.Smartphone
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -435,6 +439,8 @@ fun ChatScreen(
     // nanoMuse: height of the floating pill bar overlaying the bottom. The
     // composer sits above it; the message list slides behind it for the blur.
     nmBottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
+    // nanoMuse: retained Muse tabs must not mark their hidden conversation as read.
+    nmConversationVisible: Boolean = true,
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -456,6 +462,9 @@ fun ChatScreen(
             mcpRepository = mcpRepository,
         ),
     )
+    // nanoMuse: one lifecycle-aware presence hook for Muse and classic, including draft promotion.
+    val nmDisplayedSessionId by viewModel.displayedSessionId.collectAsState()
+    io.github.nanomuse.ui.chat.ReplyPresenceEffect(nmDisplayedSessionId, nmConversationVisible)
     // [T-android-larky-longsession-followup] Consume the tail-windowed
     // view instead of the canonical full list. For sessions with ≤300
     // messages this is the SAME reference (zero overhead); for longer
@@ -5214,16 +5223,7 @@ fun ChatScreen(
                 val isMentionScanning by viewModel.isMentionScanning.collectAsState()
                 val mentionSelectedIndex by viewModel.mentionSelectedIndex.collectAsState()
 
-                // nanoMuse: @<device> mention suggestions (contract C7, rule 8)
-                val nmHubDevices by io.github.nanomuse.hub.Hub.devices.collectAsState()
-                val nmDeviceSuggestions = remember(inputText, nmHubDevices) {
-                    io.github.nanomuse.sync.DeviceMention.suggestions(inputText, io.github.nanomuse.hub.Hub.others(context))
-                }
-                val nmDeviceTarget = remember(inputText, nmHubDevices) {
-                    io.github.nanomuse.sync.DeviceMention.target(inputText, io.github.nanomuse.hub.Hub.others(context))
-                }
-
-                if (showMentionMenu && inputFocused) {
+                if (showMentionMenu) {
                     androidx.compose.ui.window.Popup(
                         popupPositionProvider = remember {
                             object : androidx.compose.ui.window.PopupPositionProvider {
@@ -5274,7 +5274,7 @@ fun ChatScreen(
                                 .background(ChatColors.inputBg, RoundedCornerShape(10.dp))
                                 .border(0.5.dp, ChatColors.toolBorder, RoundedCornerShape(10.dp)),
                         ) {
-                            if (mentionEntries.isEmpty() && nmDeviceSuggestions.isEmpty()) {
+                            if (mentionEntries.isEmpty()) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -5311,10 +5311,7 @@ fun ChatScreen(
                                 LaunchedEffect(mentionSelectedIndex, mentionEntries.size) {
                                     val idx = mentionSelectedIndex
                                     if (idx in mentionEntries.indices) {
-                                        val deviceOffset = if (nmDeviceSuggestions.isNotEmpty()) {
-                                            nmDeviceSuggestions.size + (if (mentionEntries.isNotEmpty()) 3 else 1)
-                                        } else 0
-                                        mentionListState.animateScrollToItem(idx + deviceOffset)
+                                        mentionListState.animateScrollToItem(idx)
                                     }
                                 }
                                 LazyColumn(
@@ -5337,25 +5334,7 @@ fun ChatScreen(
                                         )
                                         .verticalScrollbar(mentionListState),
                                 ) {
-                                    // nanoMuse: devices section above files (contract C7, rule 8)
-                                    io.github.nanomuse.ui.chat.NmDeviceMentionView.renderSection(
-                                        scope = this,
-                                        suggestions = nmDeviceSuggestions,
-                                        hasFiles = mentionEntries.isNotEmpty(),
-                                        onSelectDevice = { d ->
-                                            val newText = "@${d.name} "
-                                            viewModel.setInputText(newText)
-                                            inputFieldValue = androidx.compose.ui.text.input.TextFieldValue(
-                                                text = newText,
-                                                selection = androidx.compose.ui.text.TextRange(newText.length),
-                                            )
-                                            viewModel.dismissMentionMenu()
-                                        },
-                                    )
-                                    if (nmDeviceSuggestions.isNotEmpty() && mentionEntries.isNotEmpty()) {
-                                        io.github.nanomuse.ui.chat.NmDeviceMentionView.renderFileHeader(this)
-                                    }
-                                    itemsIndexed(mentionEntries, key = { _, e -> e.linuxPath }) { i, entry ->
+                                    itemsIndexed(mentionEntries, key = { _, e -> e.nmDevice?.let { "device:${it.id}" } ?: e.linuxPath }) { i, entry ->
                                         val isSelected = i == mentionSelectedIndex
                                         Row(
                                             modifier = Modifier
@@ -5389,7 +5368,8 @@ fun ChatScreen(
                                             // we keep it uniform here so the row stays
                                             // visually consistent at small sizes on Pixel 4a.
                                             Icon(
-                                                imageVector = Icons.Default.Description,
+                                                // nanoMuse: distinguish equipment from file entries.
+                                                imageVector = entry.nmDevice?.let { if (it.isPhone) Icons.Default.Smartphone else Icons.Default.Computer } ?: Icons.Default.Description,
                                                 contentDescription = null,
                                                 tint = ChatColors.secondaryText,
                                                 modifier = Modifier.size(16.dp),
@@ -5397,7 +5377,7 @@ fun ChatScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = entry.basename,
+                                                    text = entry.nmDevice?.name ?: entry.basename, // nanoMuse
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Medium,
                                                     color = ChatColors.primaryText,
@@ -5405,7 +5385,7 @@ fun ChatScreen(
                                                     overflow = TextOverflow.Ellipsis,
                                                 )
                                                 Text(
-                                                    text = entry.displayPath,
+                                                    text = entry.nmDevice?.let { listOf(it.os, stringResource(R.string.nm_profile_online), it.id).filter(String::isNotBlank).joinToString(" · ") } ?: entry.displayPath, // nanoMuse
                                                     fontSize = 11.sp,
                                                     color = ChatColors.secondaryText,
                                                     maxLines = 1,
@@ -5415,7 +5395,7 @@ fun ChatScreen(
                                             Spacer(modifier = Modifier.width(6.dp))
                                             // Scope / mount badge — matches iOS capsule.
                                             Text(
-                                                text = entry.mountName ?: entry.scope.displayLabel,
+                                                text = if (entry.nmDevice != null) stringResource(R.string.nm_devices_title) else entry.mountName ?: entry.scope.displayLabel, // nanoMuse
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = ChatColors.secondaryText,
@@ -5638,13 +5618,6 @@ fun ChatScreen(
                                 }
                             }
                         }
-                    }
-                    // nanoMuse: indicator when the message addresses another device (contract C7, rule 8)
-                    if (nmDeviceTarget != null && nmDeviceSuggestions.isEmpty()) {
-                        io.github.nanomuse.ui.chat.NmDeviceTargetBadge(
-                            target = nmDeviceTarget,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
-                        )
                     }
                     // Attachment thumbnails inside the box (iOS: 64×64 squares)
                     // [T-android-paste-placeholder] One chip per folded paste,
