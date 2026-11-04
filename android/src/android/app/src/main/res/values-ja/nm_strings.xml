@@ -566,6 +566,10 @@
     <string name="nm_hands_virtual_screen_not_started">ヘルパー未起動（タップして起動、未起動時はメイン画面を使用）</string>
     <string name="nm_hands_virtual_screen_start_helper">特権ヘルパーを起動</string>
     <string name="nm_hands_virtual_screen_start_sub">Shizukuまたはrootでヘルパープロセスを起動します</string>
+    <string name="nm_hands_preview_screen">画面</string>
+    <string name="nm_hands_preview_live">ライブ画面</string>
+    <string name="nm_hands_preview_collapse">閉じる</string>
+    <string name="nm_hands_preview_zoom_hint">タップで縮小</string>
     <string name="nm_hands_section_rules">ふるまい</string>
     <string name="nm_hands_rule_ladder">画面は最後です: まずスキル、コマンド、ブラウザーを使います。</string>
     <string name="nm_hands_rule_secrets">パスワード、コード、カード番号は決して入力しません。端末をあなたに渡します。</string>

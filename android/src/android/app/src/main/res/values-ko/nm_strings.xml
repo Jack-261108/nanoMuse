@@ -566,6 +566,10 @@
     <string name="nm_hands_virtual_screen_not_started">도우미 시작되지 않음 (눌러서 시작하거나 메인 화면 사용)</string>
     <string name="nm_hands_virtual_screen_start_helper">도우미 프로세스 시작</string>
     <string name="nm_hands_virtual_screen_start_sub">Shizuku 또는 root를 통해 도우미 실행 시도</string>
+    <string name="nm_hands_preview_screen">화면</string>
+    <string name="nm_hands_preview_live">라이브 화면</string>
+    <string name="nm_hands_preview_collapse">접기</string>
+    <string name="nm_hands_preview_zoom_hint">탭하여 축소</string>
     <string name="nm_hands_section_rules">동작 방식</string>
     <string name="nm_hands_rule_ladder">화면은 마지막입니다. 스킬, 명령, 브라우저가 먼저입니다.</string>
     <string name="nm_hands_rule_secrets">비밀번호, 인증 코드, 카드 번호는 절대 입력하지 않습니다. 휴대전화를 넘겨 드립니다.</string>

@@ -569,6 +569,10 @@
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
+    <string name="nm_hands_preview_screen">Screen</string>
+    <string name="nm_hands_preview_live">Live screen</string>
+    <string name="nm_hands_preview_collapse">I-collapse</string>
+    <string name="nm_hands_preview_zoom_hint">I-tap para lumiit</string>
     <string name="nm_hands_section_rules">Paano ito kumikilos</string>
     <string name="nm_hands_rule_ladder">Nahuhuli ang screen: isang skill, isang command o ang browser muna.</string>
     <string name="nm_hands_rule_secrets">Hindi kailanman nagta-type ng mga password, code o numero ng card; iniaabot nito sa iyo ang telepono.</string>

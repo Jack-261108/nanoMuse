@@ -33,6 +33,10 @@ import io.github.nanomuse.guard.RiskGate
 import io.github.nanomuse.guard.RiskRequest
 import io.github.nanomuse.guard.TapWords
 import io.github.nanomuse.status.KeepAwake
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.EmptyCoroutineContext
@@ -152,6 +156,7 @@ class HandsOperator(private val context: Context) {
         capsule.onDeny = { ownPendingRequest()?.let { RiskGate.decide(it.id, RiskDecision.DENY) } }
         val started = System.currentTimeMillis()
         var displayTarget: HandsDisplayTarget? = null
+        var frameForwardJob: Job? = null
         try {
             val svc = MinisAccessibilityService.getInstance()
                 ?: return finish(Outcome.Failed("the accessibility service is not running"), steps, runId, lastScreen, traceDir, log, model?.label)
@@ -185,6 +190,19 @@ class HandsOperator(private val context: Context) {
                 MainDisplayTarget(context, svc, dm.widthPixels, dm.heightPixels)
             }
             displayTarget = target
+            frameForwardJob = if (target.isVirtual) {
+                capsule.setPreviewFlow(target.previewFrames)
+                Hands.setLiveFrames(target.previewFrames?.value)
+                target.previewFrames?.let { flow ->
+                    CoroutineScope(Dispatchers.Default).launch {
+                        flow.collect { Hands.setLiveFrames(it) }
+                    }
+                }
+            } else {
+                capsule.setPreviewFlow(null)
+                Hands.setLiveFrames(null)
+                null
+            }
 
             // The app the caller named comes first, before the model looks.
             opts.appHint?.takeIf { it.isNotBlank() }?.let { hint ->
@@ -444,6 +462,9 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "run failed: ${t.javaClass.simpleName} ${t.message}")
             return finish(Outcome.Failed("${t.javaClass.simpleName}: ${t.message}"), steps, runId, lastScreen, traceDir, log, model?.label)
         } finally {
+            frameForwardJob?.cancel()
+            capsule.setPreviewFlow(null)
+            Hands.setLiveFrames(null)
             displayTarget?.release()
             capsule.hide()
             Hands.current = null

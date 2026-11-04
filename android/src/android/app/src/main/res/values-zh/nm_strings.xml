@@ -556,6 +556,10 @@
     <string name="nm_hands_virtual_screen_not_started">特权助手未启动（点击启动，未启动时自动使用主屏）</string>
     <string name="nm_hands_virtual_screen_start_helper">启动特权助手</string>
     <string name="nm_hands_virtual_screen_start_sub">尝试通过 Shizuku 或 root 拉起特权助手进程</string>
+    <string name="nm_hands_preview_screen">画面</string>
+    <string name="nm_hands_preview_live">实时画面</string>
+    <string name="nm_hands_preview_collapse">收起</string>
+    <string name="nm_hands_preview_zoom_hint">点击缩小</string>
     <string name="nm_hands_section_rules">它会怎么做</string>
     <string name="nm_hands_rule_ladder">屏幕排最后：先试技能、命令行、浏览器。</string>
     <string name="nm_hands_rule_secrets">从不代输密码、验证码、卡号；遇到就把手机交还给你。</string>

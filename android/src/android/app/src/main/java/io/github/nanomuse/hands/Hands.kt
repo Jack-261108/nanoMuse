@@ -2,6 +2,7 @@ package io.github.nanomuse.hands
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.os.Build
 import android.provider.Settings
 import com.openminis.app.MinisApp
@@ -203,6 +204,11 @@ object Hands {
     private val _active = MutableStateFlow(false)
     val active: StateFlow<Boolean> = _active.asStateFlow()
     internal fun setActive(on: Boolean) { _active.value = on }
+
+    /** 实时虚拟屏画面 (宽 <= 360)，供悬浮胶囊小窗及应用内画中画观察。 */
+    private val _liveFrames = MutableStateFlow<Bitmap?>(null)
+    val liveFrames: StateFlow<Bitmap?> = _liveFrames.asStateFlow()
+    internal fun setLiveFrames(frame: Bitmap?) { _liveFrames.value = frame }
 
     /**
      * Takes the hands for a run: true when they were free, false when another run holds them.

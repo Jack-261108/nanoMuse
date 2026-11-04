@@ -570,6 +570,10 @@
     <string name="nm_hands_virtual_screen_not_started">Assistant non démarré (appuyez pour démarrer ou utiliser l\'écran principal)</string>
     <string name="nm_hands_virtual_screen_start_helper">Démarrer l\'assistant</string>
     <string name="nm_hands_virtual_screen_start_sub">Tenter de lancer l\'assistant via Shizuku ou root</string>
+    <string name="nm_hands_preview_screen">Écran</string>
+    <string name="nm_hands_preview_live">Écran en direct</string>
+    <string name="nm_hands_preview_collapse">Réduire</string>
+    <string name="nm_hands_preview_zoom_hint">Appuyer pour réduire</string>
     <string name="nm_hands_section_rules">Comment il se comporte</string>
     <string name="nm_hands_rule_ladder">L’écran vient en dernier : une compétence, une commande ou le navigateur d’abord.</string>
     <string name="nm_hands_rule_secrets">Ne tape jamais de mots de passe, codes ou numéros de carte ; il vous tend le téléphone.</string>

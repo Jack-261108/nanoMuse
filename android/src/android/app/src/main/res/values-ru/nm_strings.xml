@@ -575,6 +575,10 @@
     <string name="nm_hands_virtual_screen_not_started">Помощник не запущен (нажмите для запуска или используйте основной экран)</string>
     <string name="nm_hands_virtual_screen_start_helper">Запустить помощника</string>
     <string name="nm_hands_virtual_screen_start_sub">Попытка запуска через Shizuku или root</string>
+    <string name="nm_hands_preview_screen">Экран</string>
+    <string name="nm_hands_preview_live">Экран в реальном времени</string>
+    <string name="nm_hands_preview_collapse">Свернуть</string>
+    <string name="nm_hands_preview_zoom_hint">Нажмите для уменьшения</string>
     <string name="nm_hands_section_rules">Как он себя ведёт</string>
     <string name="nm_hands_rule_ladder">Экран идёт последним: сначала навык, команда или браузер.</string>
     <string name="nm_hands_rule_secrets">Никогда не вводит пароли, коды и номера карт; передаёт телефон вам.</string>

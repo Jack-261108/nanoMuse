@@ -569,6 +569,10 @@
     <string name="nm_hands_virtual_screen_not_started">Asistente no iniciado (toque para iniciar o usar pantalla principal)</string>
     <string name="nm_hands_virtual_screen_start_helper">Iniciar asistente</string>
     <string name="nm_hands_virtual_screen_start_sub">Intentar iniciar asistente vía Shizuku o root</string>
+    <string name="nm_hands_preview_screen">Pantalla</string>
+    <string name="nm_hands_preview_live">Pantalla en vivo</string>
+    <string name="nm_hands_preview_collapse">Contraer</string>
+    <string name="nm_hands_preview_zoom_hint">Tocar para reducir</string>
     <string name="nm_hands_section_rules">Cómo se comporta</string>
     <string name="nm_hands_rule_ladder">La pantalla va al final: primero una habilidad, un comando o el navegador.</string>
     <string name="nm_hands_rule_secrets">Nunca escribe contraseñas, códigos ni números de tarjeta; te pasa el teléfono a ti.</string>

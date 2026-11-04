@@ -575,6 +575,10 @@
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
+    <string name="nm_hands_preview_screen">Ekran</string>
+    <string name="nm_hands_preview_live">Ekran na żywo</string>
+    <string name="nm_hands_preview_collapse">Zwiń</string>
+    <string name="nm_hands_preview_zoom_hint">Dotknij, aby zmniejszyć</string>
     <string name="nm_hands_section_rules">Jak się zachowuje</string>
     <string name="nm_hands_rule_ladder">Ekran na końcu: najpierw umiejętność, polecenie albo przeglądarka.</string>
     <string name="nm_hands_rule_secrets">Nigdy nie wpisuje haseł, kodów ani numerów kart; oddaje telefon tobie.</string>
