@@ -58,6 +58,8 @@ object MarkdownParser {
 
     /** Regex for a standalone `![alt](url)` node on its own line. */
     private val standaloneImageRegex = Regex("""^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$""")
+    /** Regex matching an opening code block fence (``` or ~~~), requiring no inline closing delimiter on the same line. */
+    private val blockFenceOpenRegex = Regex("""^\s{0,3}(`{3,}|~{3,})[^`~]*$""")
 
     /**
      * Classify a media URL by file extension. Extracts the extension from the
@@ -103,20 +105,29 @@ object MarkdownParser {
         while (i < lines.size) {
             val line = lines[i]
 
-            // Fenced code block
-            if (line.trimStart().startsWith("```")) {
-                val indent = line.indexOf('`')
-                val fence = line.trimStart()
-                val lang = fence.removePrefix("```").trim()
+            // Fenced code block (支持 ``` 与 ~~~，动态匹配闭合长度，剥离前导缩进空白)
+            val topFenceMatch = Regex("""^\s*(`{3,}|~{3,})(.*)$""").find(line)
+            if (topFenceMatch != null) {
+                val fenceChars = topFenceMatch.groupValues[1]
+                val fenceChar = fenceChars[0]
+                val fenceLen = fenceChars.length
+                val lang = topFenceMatch.groupValues[2].trim()
+                val indentPrefix = line.takeWhile { it.isWhitespace() }
                 val codeLines = mutableListOf<String>()
                 i++
                 while (i < lines.size) {
                     val cl = lines[i]
-                    if (cl.trimStart().startsWith("```") && cl.trim() == "```") {
+                    val trimmed = cl.trim()
+                    if (trimmed.startsWith(fenceChars) && trimmed.all { it == fenceChar } && trimmed.length >= fenceLen) {
                         i++
                         break
                     }
-                    codeLines.add(cl)
+                    val stripped = if (indentPrefix.isNotEmpty() && cl.startsWith(indentPrefix)) {
+                        cl.removePrefix(indentPrefix)
+                    } else {
+                        cl
+                    }
+                    codeLines.add(stripped)
                     i++
                 }
                 blocks.add(Block.CodeBlock(lang, codeLines.joinToString("\n")))
@@ -154,7 +165,7 @@ object MarkdownParser {
             }
 
             // Table (must have at least header + separator)
-            if (i + 1 < lines.size && isTableSeparator(lines[i + 1])) {
+            if (line.isNotBlank() && line.contains('|') && i + 1 < lines.size && isTableSeparator(lines[i + 1])) {
                 val table = parseTable(lines, i)
                 if (table != null) {
                     blocks.add(table.first)
@@ -174,7 +185,13 @@ object MarkdownParser {
                     items.add(parseListItem(content))
                     i++
                     // Collect continuation lines (indented)
-                    while (i < lines.size && lines[i].startsWith("  ") && !Regex("^\\s{0,3}[-*+]\\s").matches(lines[i])) {
+                    // 若遇到块级多行代码块开启行，立即跳出列表，由顶层解析器处理成带高亮和复制的 CodeBlock
+                    while (
+                        i < lines.size &&
+                        lines[i].startsWith("  ") &&
+                        !Regex("^\\s{0,3}[-*+]\\s").matches(lines[i]) &&
+                        !blockFenceOpenRegex.matches(lines[i])
+                    ) {
                         items[items.lastIndex] = items.last().copy(
                             content = items.last().content + "\n" + lines[i].trimStart()
                         )
@@ -261,9 +278,9 @@ object MarkdownParser {
 
     private fun isTableSeparator(line: String): Boolean {
         val trimmed = line.trim()
-        if (!trimmed.contains('-')) return false
+        if (!trimmed.contains('-') || !trimmed.contains('|')) return false
         val cells = trimmed.split('|').filter { it.isNotBlank() }
-        return cells.all { it.trim().matches(Regex("^:?-+:?$")) }
+        return cells.isNotEmpty() && cells.all { it.trim().matches(Regex("^:?-+:?$")) }
     }
 
     private fun parseTable(lines: List<String>, startIdx: Int): Pair<Block.Table, Int>? {

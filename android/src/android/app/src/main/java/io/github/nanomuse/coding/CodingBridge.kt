@@ -82,13 +82,26 @@ object CodingBridge {
         resumable = o.optBoolean("resumable", true),
     )
 
-    suspend fun transcript(device: String, agent: String, sessionId: String): List<Message> = withContext(Dispatchers.IO) {
+    data class SessionDetail(
+        val transcript: List<Message>,
+        val status: String = "idle",
+        val lastTool: String = "",
+    )
+
+    suspend fun sessionDetail(device: String, agent: String, sessionId: String): SessionDetail = withContext(Dispatchers.IO) {
         val args = JSONObject().put("agent", agent).put("session_id", sessionId)
-        val arr = Hub.call(device, "coding.session", args, LIST_TIMEOUT).optJSONArray("transcript") ?: JSONArray()
-        (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+        val obj = Hub.call(device, "coding.session", args, LIST_TIMEOUT)
+        val arr = obj.optJSONArray("transcript") ?: JSONArray()
+        val transcript = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
             .map { Message(role = it.optString("role"), text = it.optString("text")) }
             .filter { it.text.isNotBlank() }
+        val status = obj.optString("status", "idle")
+        val lastTool = obj.optString("last_tool", "")
+        SessionDetail(transcript = transcript, status = status, lastTool = lastTool)
     }
+
+    suspend fun transcript(device: String, agent: String, sessionId: String): List<Message> =
+        sessionDetail(device, agent, sessionId).transcript
 
     /**
      * Send [text] to the agent and follow the run. [onUpdate] is called with every step (any
