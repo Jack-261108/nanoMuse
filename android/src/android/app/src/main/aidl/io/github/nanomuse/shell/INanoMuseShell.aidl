@@ -26,5 +26,9 @@ interface INanoMuseShell {
     int restartApp(int displayId, String packageName) = 19;
     Bundle finishDisplay(int displayId, in String[] keep, in String[] close) = 20;
     boolean recoverMuted() = 21;
+    boolean injectText(int displayId, String text) = 22;
+    int setClipText(String text) = 23;
+    void restoreClip() = 24;
+    boolean injectCtrlKey(int displayId, int keyCode) = 25;
     void destroy() = 16777114;
 }

@@ -2,6 +2,7 @@ package io.github.nanomuse.shell
 
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
+import android.content.ClipData
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -11,12 +12,14 @@ import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
 import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.InputDevice
 import android.view.InputEvent
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
@@ -39,6 +42,11 @@ class ShellService(
     private val kept = HashMap<Int, String>()
     private val muted = AudioMuteLedger(File(stateDir, "nanomuse_audio_mute_$allowedUid"))
     private val myUser = allowedUid / PER_USER_RANGE
+    private val clipboard = ShellClipboard(context)
+    private val clipLock = Any()
+    private var savedClip: ClipData? = null
+    private var clipSaved = false
+    private var ourText: String? = null
 
     @SuppressLint("PrivateApi")
     private val displayManager: DisplayManager =
@@ -381,6 +389,81 @@ class ShellService(
         return send(n - 1, MotionEvent.ACTION_UP) || send(n - 1, MotionEvent.ACTION_UP)
     }
 
+    override fun injectText(displayId: Int, text: String): Boolean {
+        if (!ownDisplay(displayId)) return false
+        val map = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD)
+        val events = map.getEvents(text.toCharArray())
+        if (events != null) {
+            var allOk = true
+            for (event in events) {
+                if (!inject(event, displayId)) {
+                    allOk = false
+                    break
+                }
+            }
+            if (allOk) return true
+        }
+        val escaped = text.replace(" ", "%s").replace("'", "\\'")
+        return exec("input", "-d", "$displayId", "text", escaped) == 0
+    }
+
+    override fun setClipText(text: String): Int = synchronized(clipLock) {
+        try {
+            if (!clipSaved) {
+                savedClip = clipboard.primaryClip
+                clipSaved = true
+            }
+            val clip = ClipData.newPlainText(CLIP_LABEL, text)
+            suppressOverlay(clip)
+            markSensitive(clip)
+            clipboard.setPrimaryClip(clip)
+            ourText = text
+            CLIP_SET
+        } catch (t: Throwable) {
+            Log.w(TAG, "setClipText failed", t)
+            CLIP_FAILED
+        }
+    }
+
+    override fun restoreClip() = synchronized(clipLock) {
+        if (!clipSaved) return
+        runCatching {
+            val prior = savedClip
+            if (prior != null) {
+                clipboard.setPrimaryClip(suppressOverlay(prior))
+            } else {
+                clipboard.clearPrimaryClip()
+            }
+        }.onFailure { Log.w(TAG, "restoreClip failed", it) }
+        savedClip = null
+        clipSaved = false
+        ourText = null
+    }
+
+    override fun injectCtrlKey(displayId: Int, keyCode: Int): Boolean {
+        if (!ownDisplay(displayId)) return false
+        val now = SystemClock.uptimeMillis()
+        val meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        val down = KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0, InputDevice.SOURCE_KEYBOARD)
+        val up = KeyEvent.changeAction(down, KeyEvent.ACTION_UP)
+        return injectPair(down, up, displayId) { false }
+    }
+
+    private fun suppressOverlay(clip: ClipData): ClipData {
+        val extras = clip.description.extras?.let { PersistableBundle(it) } ?: PersistableBundle()
+        extras.putBoolean(EXTRA_SUPPRESS_CLIPBOARD_OVERLAY, true)
+        clip.description.extras = extras
+        return clip
+    }
+
+    private fun markSensitive(clip: ClipData): ClipData {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return clip
+        val extras = clip.description.extras?.let { PersistableBundle(it) } ?: PersistableBundle()
+        extras.putBoolean(EXTRA_IS_SENSITIVE, true)
+        clip.description.extras = extras
+        return clip
+    }
+
     private inline fun injectPair(down: InputEvent, up: InputEvent, displayId: Int, fallback: () -> Boolean): Boolean =
         sendPair({ inject(down, displayId) }, { inject(up, displayId) }, fallback)
 
@@ -669,6 +752,7 @@ class ShellService(
     override fun identity(): IntArray = intArrayOf(Process.myUid(), Process.myPid())
 
     override fun releaseAll() {
+        restoreClip()
         recoverMuted()
         val ids = synchronized(displays) { displays.keys.toList() }
         ids.forEach(::releaseDisplay)
@@ -717,9 +801,13 @@ class ShellService(
         private const val ACTIVITY_TYPE_UNDEFINED = 0
         private const val ACTIVITY_TYPE_STANDARD = 1
         private val WCT: Class<*> by lazy { Class.forName("android.window.WindowContainerTransaction") }
+        const val CLIP_SET = 0
+        const val CLIP_FAILED = 2
+        private const val CLIP_LABEL = "nanoMuse"
+        private const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
+        private const val EXTRA_SUPPRESS_CLIPBOARD_OVERLAY = "com.android.systemui.SUPPRESS_CLIPBOARD_OVERLAY"
+
         private val TASK_INFO: Class<*> by lazy { Class.forName("android.app.TaskInfo") }
-        private const val ACTIVITY_TYPE_UNDEFINED = 0
-        private const val ACTIVITY_TYPE_STANDARD = 1
         private const val INJECT_MODE_ASYNC = 0
         private const val INJECT_MODE_WAIT_FOR_RESULT = 1
 

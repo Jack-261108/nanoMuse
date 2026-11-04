@@ -39,6 +39,11 @@ interface HandsDisplayTarget {
     fun injectKey(keyCode: Int): Boolean
     val previewFrames: StateFlow<Bitmap?>?
 
+    fun injectText(text: String): Boolean = false
+    fun setClipText(text: String): Boolean = false
+    fun restoreClip() {}
+    fun injectCtrlKey(keyCode: Int): Boolean = false
+
     fun onTakeoverStart(): Boolean = true
     fun onTakeoverEnd(): Boolean = true
     fun release() {}
@@ -235,6 +240,19 @@ class VirtualDisplayTarget(
 
     override fun injectKey(keyCode: Int): Boolean =
         shell.injectKey(displayId, keyCode)
+
+    override fun injectText(text: String): Boolean =
+        shell.injectText(displayId, text)
+
+    override fun setClipText(text: String): Boolean =
+        shell.setClipText(text) == 0
+
+    override fun restoreClip() {
+        shell.restoreClip()
+    }
+
+    override fun injectCtrlKey(keyCode: Int): Boolean =
+        shell.injectCtrlKey(displayId, keyCode)
 
     override fun onTakeoverStart(): Boolean {
         val top = shell.topTaskId(displayId)

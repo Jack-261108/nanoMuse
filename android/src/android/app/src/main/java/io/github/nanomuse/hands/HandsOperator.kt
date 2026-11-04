@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
@@ -450,7 +451,7 @@ class HandsOperator(private val context: Context) {
                     }
                     HandsAction.KeyboardEnter -> {
                         // Enter in a messenger's field *is* the send button: the same card a tap on “Send” gets.
-                        val gate = approveEnter(svc, opts.sessionId)
+                        val gate = approveEnter(svc, opts.sessionId, target)
                         if (gate.denied != null) {
                             trace(traceDir, steps, parsed.thought, reply, "refused: ${gate.denied}", lastScreen)
                             step(runId, steps, "enter", "refused", thoughtMs)
@@ -631,10 +632,14 @@ class HandsOperator(private val context: Context) {
      * when the field's hint says so, it takes the outbound card a tap on “Send” would. Enter in
      * a search box, a form or a terminal is an ordinary key.
      */
-    private fun approveEnter(svc: MinisAccessibilityService, sessionId: String?): TapGate {
-        val node = focusedField(svc) ?: return TapGate()
+    private fun approveEnter(svc: MinisAccessibilityService, sessionId: String?, target: HandsDisplayTarget? = null): TapGate {
+        val node = focusedField(svc, target) ?: return TapGate()
         val hint = listOfNotNull(node.hintText?.toString(), node.contentDescription?.toString()).joinToString(" ")
-        val (pkg, _) = svc.foregroundPackage()
+        val pkg = if (target?.isVirtual == true) {
+            node.packageName?.toString() ?: svc.foregroundPackage().first
+        } else {
+            svc.foregroundPackage().first
+        }
         if (!TapWords.entersSend(pkg, hint)) return TapGate()
         val appLabel = HandsApps.labelOf(context, pkg)
         val where = appLabel ?: context.getString(com.openminis.app.R.string.nm_hands_this_phone)
@@ -644,7 +649,7 @@ class HandsOperator(private val context: Context) {
             RiskGate.check(sessionId ?: "hands", GuardKind.SCREEN, assessment, preview = "Enter → send", pageUrl = appLabel, elementText = context.getString(com.openminis.app.R.string.nm_hands_fx_enter))
         }
         val (nowPkg, _) = svc.foregroundPackage()
-        if (nowPkg == context.packageName && pkg != null && pkg != context.packageName) {
+        if (nowPkg == context.packageName && pkg != null && pkg != context.packageName && target?.isVirtual != true) {
             HandsApps.launchable(context).firstOrNull { it.packageName == pkg }?.let { HandsApps.open(context, it) }
             Thread.sleep(OPEN_APP_SETTLE_MS)
         }
@@ -732,6 +737,39 @@ class HandsOperator(private val context: Context) {
             AppLogger.warning(TAG, "ADBKeyBoard typing failed, falling back to setNodeText")
         }
 
+        if (target?.isVirtual == true) {
+            // When on a virtual display and ADB keyboard isn't enabled, avoid displaying soft keyboard (IME) on the main screen:
+            // a. First try direct accessibility ACTION_SET_TEXT if node is editable (sets text without IME)
+            if (node != null && svc.setNodeText(node, action.text)) {
+                return "typed “${action.text.take(60)}” into the field."
+            }
+
+            // b. Try clipboard injection via INanoMuseShell (overlay suppressed, sensitive marked)
+            val clipSet = target.setClipText(action.text)
+            if (clipSet) {
+                try {
+                    val pasted = if (node != null && node.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
+                        true
+                    } else {
+                        target.injectCtrlKey(KeyEvent.KEYCODE_A) && target.injectCtrlKey(KeyEvent.KEYCODE_V)
+                    }
+                    if (pasted) {
+                        return "typed “${action.text.take(60)}” into the field."
+                    }
+                } finally {
+                    target.restoreClip()
+                }
+            }
+
+            // c. Direct shell text injection to the virtual display
+            if (target.injectText(action.text)) {
+                return "typed “${action.text.take(60)}” into the field."
+            }
+
+            if (node == null) return "no text field has the cursor; tap the field first, then type in the next turn."
+            return "the field did not accept text on virtual display; tap it and try again."
+        }
+
         if (node == null) return "no text field has the cursor; tap the field first, then type in the next turn."
 
         // 2. Standard Accessibility ACTION_SET_TEXT
@@ -761,8 +799,15 @@ class HandsOperator(private val context: Context) {
 
     private fun pressEnter(svc: MinisAccessibilityService, target: HandsDisplayTarget? = null): String {
         if (target?.isVirtual == true) {
-            val ok = target.injectKey(android.view.KeyEvent.KEYCODE_ENTER)
-            return if (ok) "pressed Enter." else "failed to inject Enter key."
+            val ok = target.injectKey(KeyEvent.KEYCODE_ENTER)
+            if (ok) return "pressed Enter."
+            val node = focusedField(svc, target)
+            if (node != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                if (node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)) {
+                    return "pressed Enter."
+                }
+            }
+            return "failed to inject Enter key."
         }
         val node = focusedField(svc, target) ?: return "no text field has the cursor, so there is nothing to submit; tap the search or send button instead."
         val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

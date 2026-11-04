@@ -91,6 +91,16 @@ The agent does not have to run on the phone. A *device* connects to the nanoMuse
 
   The service does nothing on its own: it takes a screen only when a `phone_*` tool asks for one, and every task shows a capsule at the top of the screen: the red panda, the step in progress and a **Stop** button (see below).
 
+### Background virtual screen on Android
+
+When paired with the privileged shell helper (started through Shizuku, root `su`, or USB `adb`), the Android hands can run entirely in the background on an isolated virtual display instead of driving the physical screen:
+
+- **Non-disturbing background execution**: The target application launches into a private trusted virtual display with its own display group and local input method policy. The user's main screen remains untouched and interactive. If a requested app is already running on the physical screen, the operator avoids launching it to prevent collision.
+- **Audio muting**: Background tasks have their audio playback muted through `appops` so media or sound effects do not play over the user's audio.
+- **Text input and keys**: When ADB keyboard is not enabled, text is entered via accessibility `ACTION_SET_TEXT` or injected through the privileged shell clipboard with SystemUI overlay suppression and sensitive marking, followed by paste or Ctrl+V key events on the virtual display. Key events like Enter route directly to the virtual display without displaying an on-screen keyboard on the main screen.
+- **User takeover**: When an interaction requires manual intervention (such as entering credentials or solving a CAPTCHA), the task root activity moves seamlessly to the main display. Once the user finishes and taps Continue, the task moves back to the virtual display.
+- **Live preview capsule**: The floating capsule on the main screen provides a live preview of the background virtual display, throttled up to 5 fps and updated only when the frame changes. The mini-screen can be collapsed to a minimal pill or tapped to zoom in for inspection without switching away from the user's foreground app.
+
 *Connections → Phone* shows which device is connected and how many apps it lists. `GET /api/phone` returns the same plus the last screen read.
 
 ## The tools
@@ -232,7 +242,7 @@ After an action the executor waits for the UI to settle (650 ms on MobileGym; on
 
 ### The capsule
 
-On a device with a capsule (the Android app, and the MobileGym module, which draws the same pill in the simulated phone), a task is never silent: a pill at the top of the screen shows the red panda, the step in progress (*Muse · 点击「查询车票」*) and a **Stop** button, over whatever app is being operated. It appears on `task begin`, follows every step, and goes on `task end`: a tick for a moment, then the phone comes back to nanoMuse, where the agent's report is (the Android app brings itself to the front; the MobileGym module resumes the nanoMuse app); it is not part of the screenshot. Stop is the user's brake; no long press, no menu: one tap, the action in flight fails with `nanomuse:stop`, the pill says *Stopped* and hides itself, the phone comes back to nanoMuse, and the agent asks what to do next instead of carrying on. When the agent needs the user (`ask`, `blocked`) the pill grows into a card with the question and an *Open* button that brings nanoMuse to the front; it stays a minute, then folds away.
+On a device with a capsule (the Android app, and the MobileGym module, which draws the same pill in the simulated phone), a task is never silent: a pill at the top of the screen shows the red panda, the step in progress (*Muse · 点击「查询车票」*) and a **Stop** button, over whatever app is being operated. It appears on `task begin`, follows every step, and goes on `task end`: a tick for a moment, then the phone comes back to nanoMuse, where the agent's report is (the Android app brings itself to the front; the MobileGym module resumes the nanoMuse app); it is not part of the screenshot. Stop is the user's brake; no long press, no menu: one tap, the action in flight fails with `nanomuse:stop`, the pill says *Stopped* and hides itself, the phone comes back to nanoMuse, and the agent asks what to do next instead of carrying on. When the agent needs the user (`ask`, `blocked`) the pill grows into a card with the question and an *Open* button that brings nanoMuse to the front; it stays a minute, then folds away. When running on a virtual display, the capsule adds a live mini-screen with a live badge, a collapse button and a tap-to-zoom card, showing the background screen as it changes without taking over the device.
 
 ### The same on the desktop
 

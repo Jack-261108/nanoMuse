@@ -22,9 +22,15 @@ class DisplayPreviewTest {
 
     @Test
     fun testPreviewFramesDeduplication() = runBlocking {
-        // Feed duplicate numbers: 1, 1, 2, 2, 3, 3
+        // Feed duplicate numbers: 1, 1, 2, 2, 3, 3 with small gap
         val input = listOf(1, 1, 2, 2, 3, 3)
-        val result = input.asFlow().previewFrames(intervalMs = 1L, same = { a, b -> a == b }).toList()
+        val flow = kotlinx.coroutines.flow.flow {
+            for (item in input) {
+                emit(item)
+                kotlinx.coroutines.delay(10L)
+            }
+        }
+        val result = flow.previewFrames(intervalMs = 1L, same = { a, b -> a == b }).toList()
         assertEquals(listOf(1, 2, 3), result)
     }
 }
