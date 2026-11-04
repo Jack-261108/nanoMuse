@@ -230,7 +230,6 @@ class VirtualDisplayTarget(
         }
         return verdict
     }
-    }
 
     override fun pressBack(): Boolean =
         shell.injectKey(displayId, KeyEvent.KEYCODE_BACK)

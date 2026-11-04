@@ -697,17 +697,6 @@ class ShellService(
         (TASK_INFO.getField(it).get(task) as? ComponentName)?.packageName
     }
 
-    private fun allTasks(): List<Any> {
-        val methods = taskManager.javaClass.methods.filter { it.name == "getTasks" }
-        val withDisplay = methods.firstOrNull { it.parameterTypes.size == 4 }
-        val tasks = if (withDisplay != null) {
-            withDisplay.invoke(taskManager, MAX_TASKS, false, false, Display.INVALID_DISPLAY)
-        } else {
-            methods.first { it.parameterTypes.size == 3 }.invoke(taskManager, MAX_TASKS, false, false)
-        } as List<*>
-        return tasks.filterNotNull()
-    }
-
     private fun task(taskId: Int): Any? {
         val idField = TASK_INFO.getField("taskId")
         return allTasks().firstOrNull { idField.getInt(it) == taskId }
