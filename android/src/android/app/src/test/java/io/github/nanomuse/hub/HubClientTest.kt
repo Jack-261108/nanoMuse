@@ -59,4 +59,13 @@ class HubClientTest {
         assertFalse(c.connected)
         assertTrue(states.isEmpty())
     }
+
+    @Test fun `reconnect can be called safely on unstarted or stopped client`() {
+        val c = client()
+        c.reconnect(resetBackoff = true)
+        assertFalse(c.connected)
+        c.stop()
+        c.reconnect(resetBackoff = true)
+        assertFalse(c.connected)
+    }
 }

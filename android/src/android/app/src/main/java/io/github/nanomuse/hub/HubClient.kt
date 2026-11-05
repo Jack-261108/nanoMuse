@@ -131,6 +131,7 @@ class HubClient(
     private val timer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "hub-timer").apply { isDaemon = true } }
     private val pending = ConcurrentHashMap<String, Pending>()
     @Volatile private var ws: WebSocket? = null
+    @Volatile private var generation = 0L
     @Volatile private var stopped = false
     @Volatile var connected = false
         private set
@@ -146,8 +147,29 @@ class HubClient(
         connect()
     }
 
+    /**
+     * Wakes the client and attempts connection immediately (for example when the network
+     * comes back online), optionally resetting the backoff delay.
+     */
+    @Synchronized
+    fun reconnect(resetBackoff: Boolean = false) {
+        if (stopped) return
+        retry?.cancel(false)
+        retry = null
+        if (resetBackoff) {
+            delayMs = 1000L
+        }
+        val oldWs = ws
+        ws = null
+        oldWs?.cancel()
+        if (!timer.isShutdown) {
+            timer.execute { connect() }
+        }
+    }
+
     fun stop() {
         stopped = true
+        generation++
         retry?.cancel(false)
         ws?.close(1000, "bye")
         ws = null
@@ -160,11 +182,18 @@ class HubClient(
         http.connectionPool.evictAll()
     }
 
+    @Synchronized
     private fun connect() {
         if (stopped) return
+        val gen = ++generation
         onState(false, "connecting")
-        val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "nanoMuse-Android/${Hub.VERSION}").build()
-        ws = http.newWebSocket(req, listener)
+        try {
+            val req = Request.Builder().url(url).header("Authorization", "Bearer $key").header("User-Agent", "nanoMuse-Android/${Hub.VERSION}").build()
+            ws = http.newWebSocket(req, createListener(gen))
+        } catch (t: Throwable) {
+            AppLogger.warning(TAG, "connect failed: ${t.message}")
+            scheduleReconnect(t.message ?: t.javaClass.simpleName)
+        }
     }
 
     /**
@@ -172,6 +201,7 @@ class HubClient(
      * [atLeastMs] when the relay said to wait: a paused hub, a replaced connection, a key it
      * refused at the handshake.
      */
+    @Synchronized
     private fun scheduleReconnect(reason: String, atLeastMs: Long = 0L) {
         connected = false
         ws = null
@@ -182,16 +212,28 @@ class HubClient(
         onState(false, reason)
         retry?.cancel(false)
         val wait = maxOf(delayMs, atLeastMs)
-        retry = timer.schedule({ connect() }, wait, TimeUnit.MILLISECONDS)
+        if (!timer.isShutdown) {
+            retry = timer.schedule({ connect() }, wait, TimeUnit.MILLISECONDS)
+        }
         delayMs = (delayMs * 2).coerceAtMost(30_000L)
     }
 
-    private val listener = object : WebSocketListener() {
+    private fun createListener(gen: Long) = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            webSocket.send(hello().toString())
+            if (stopped || gen != generation) {
+                runCatching { webSocket.close(1000, "stale") }
+                return
+            }
+            try {
+                webSocket.send(hello().toString())
+            } catch (t: Throwable) {
+                AppLogger.warning(TAG, "onOpen hello failed: ${t.message}")
+                scheduleReconnect(t.message ?: t.javaClass.simpleName)
+            }
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            if (stopped || gen != generation) return
             // a frame past the limit (the relay's own, or this phone's ceiling when the relay
             // named a larger one) is not parsed: a relay of someone else's cannot make the
             // phone build a JSON tree of tens of megabytes
@@ -208,18 +250,15 @@ class HubClient(
             // Acknowledge with a normal close: echoing the relay's own code back (4003, say)
             // means nothing to it, and OkHttp refuses codes outside the ranges it knows.
             runCatching { webSocket.close(1000, null) }
+            if (stopped || gen != generation) return
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            if (stopped) return // our own close after stop(); see scheduleReconnect
+            if (stopped || gen != generation) return
             if (code == 4001 || code == 4002) {
-                // Bad key or bad device: the relay will say the same thing next time. Stop here
-                // and say why; a new sign-in makes a new client.
-                stopped = true
-                connected = false
-                ws = null
-                failAll("bad_key", "the hub refused this device")
-                onState(false, if (code == 4001) "bad_key" else "bad_device")
+                // The relay refused the key or device. Keep trying slowly (60 s) as the runtime
+                // does, so when the key or relay recovers it connects without restarting the app.
+                scheduleReconnect(if (code == 4001) "bad_key" else "bad_device", atLeastMs = REFUSED_RETRY_MS)
                 return
             }
             // 4003: replaced by a newer connection of this device (wait 30 s, as the desktop
@@ -233,6 +272,7 @@ class HubClient(
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            if (stopped || gen != generation) return
             val status = response?.code
             AppLogger.info(TAG, "hub socket failed: ${t.message}" + (status?.let { " (HTTP $it)" } ?: ""))
             if (status == 401 || status == 403) {

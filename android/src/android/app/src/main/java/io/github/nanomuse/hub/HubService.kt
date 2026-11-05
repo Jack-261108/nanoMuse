@@ -8,6 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -29,6 +33,7 @@ import kotlinx.coroutines.launch
 class HubService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var watch: Job? = null
+    private var netCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -39,33 +44,65 @@ class HubService : Service() {
             return START_NOT_STICKY
         }
         try {
+            val notif = build(Hub.connected.value, Hub.detail.value, Hub.others(this).count { it.online })
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, build(Hub.connected.value, Hub.others(this).count { it.online }), ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING)
+                startForeground(NOTIFICATION_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING)
             } else {
-                startForeground(NOTIFICATION_ID, build(Hub.connected.value, Hub.others(this).count { it.online }))
+                startForeground(NOTIFICATION_ID, notif)
             }
         } catch (e: Exception) {
             AppLogger.warning(TAG, "startForeground: ${e.message}")
             stopSelf()
             return START_NOT_STICKY
         }
+        registerNetworkCallback()
         if (watch == null) {
             watch = scope.launch {
-                combine(Hub.connected, Hub.devices) { on, list -> on to list.count { it.online && it.kind != "web" && it.id != Hub.deviceId(this@HubService) } }
-                    .collect { (on, n) -> notificationManager().notify(NOTIFICATION_ID, build(on, n)) }
+                combine(Hub.connected, Hub.detail, Hub.devices) { on, detail, list ->
+                    Triple(on, detail, list.count { it.online && it.kind != "web" && it.id != Hub.deviceId(this@HubService) })
+                }.collect { (on, detail, n) ->
+                    notificationManager().notify(NOTIFICATION_ID, build(on, detail, n))
+                }
             }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
+        unregisterNetworkCallback()
         scope.cancel()
         super.onDestroy()
     }
 
+    private fun registerNetworkCallback() {
+        if (netCallback != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (!Hub.isConnected) {
+                    AppLogger.info(TAG, "network became available; reconnecting hub")
+                    Hub.reconnect(resetBackoff = true)
+                }
+            }
+        }
+        netCallback = callback
+        runCatching { cm.registerNetworkCallback(request, callback) }
+    }
+
+    private fun unregisterNetworkCallback() {
+        netCallback?.let { cb ->
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            runCatching { cm?.unregisterNetworkCallback(cb) }
+            netCallback = null
+        }
+    }
+
     private fun notificationManager() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-    private fun build(connected: Boolean, others: Int): Notification {
+    private fun build(connected: Boolean, detail: String, others: Int): Notification {
         val nm = notificationManager()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
@@ -80,7 +117,11 @@ class HubService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val text = when {
-            !connected -> getString(R.string.nm_hub_service_connecting)
+            !connected -> when (detail) {
+                "bad_key", "bad_device" -> getString(R.string.nm_devices_refused)
+                "hub_paused" -> getString(R.string.nm_devices_paused)
+                else -> getString(R.string.nm_hub_service_connecting)
+            }
             others == 0 -> getString(R.string.nm_hub_service_alone)
             else -> resources.getQuantityString(R.plurals.nm_hub_service_devices, others, others)
         }
