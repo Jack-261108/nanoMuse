@@ -28,6 +28,7 @@ import io.github.nanomuse.cloud.Provenance
 import io.github.nanomuse.display.AgentDisplay
 import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.SharedShell
+import io.github.nanomuse.shell.SystemPickers
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.guard.GuardKind
 import io.github.nanomuse.guard.RiskAssessment
@@ -119,7 +120,7 @@ class HandsOperator(private val context: Context) {
         val launchers = runCatching {
             context.packageManager.queryIntentActivities(home, 0).mapNotNull { it.activityInfo?.packageName }
         }.getOrDefault(emptyList())
-        (launchers + context.packageName).toSet()
+        (launchers + context.packageName + SystemPickers.resolve(context)).toSet()
     }
 
     /**
@@ -208,7 +209,7 @@ class HandsOperator(private val context: Context) {
                 try {
                     val shell = SharedShell.shell.value!!
                     val agentDisplay = AgentDisplay(shell, dm.widthPixels, dm.heightPixels, dm.densityDpi)
-                    VirtualDisplayTarget(agentDisplay, shell)
+                    VirtualDisplayTarget(agentDisplay, shell, context)
                 } catch (t: Throwable) {
                     AppLogger.warning(TAG, "failed to create virtual display target: ${t.message}")
                     MainDisplayTarget(context, svc, dm.widthPixels, dm.heightPixels)
@@ -279,9 +280,11 @@ class HandsOperator(private val context: Context) {
                     blackScreens++
                     if (blackScreens > 2) return finish(Outcome.Infeasible("the screen stays protected (black screenshot); the app does not allow it to be read"), steps, runId, lastScreen, traceDir, log, model.label)
                     log += "step $steps: protected screen — handed to the user"
+                    target.onTakeoverStart()
                     val cont = waitForUser(context.getString(com.openminis.app.R.string.nm_hands_protected_screen))
+                    target.onTakeoverEnd()
                     if (!cont) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                    lastResult = "the screen was protected (payment or banking); the user did that part and says to continue."
+                    lastResult = "the screen was protected (payment, authorization or banking); the user did that part and says to continue."
                     continue
                 }
                 blackScreens = 0
@@ -730,8 +733,11 @@ class HandsOperator(private val context: Context) {
         val hint = listOfNotNull(node?.hintText?.toString(), node?.contentDescription?.toString()).joinToString(" ")
         if (hint.isNotBlank() && TapWords.looksSecret(hint)) return HANDOFF
 
-        // 1. Try ADB Keyboard if available (Open-AutoGLM pattern: triggers TextWatcher & commitText, restores on finally)
-        if (AdbKeyboardHelper.isAvailable(context)) {
+        // 1. Try ADB Keyboard if available (Open-AutoGLM pattern: triggers TextWatcher & commitText, restores on finally).
+        // Note: ADB Keyboard operates on the global system IME and expects main display IME focus.
+        // It is strictly reserved for the physical main screen (target?.isVirtual != true) to avoid hijacking
+        // the user's foreground keyboard or failing to bind to the background virtual display.
+        if (target?.isVirtual != true && AdbKeyboardHelper.isAvailable(context)) {
             val typed = AdbKeyboardHelper.typeText(action.text)
             if (typed) return "typed “${action.text.take(60)}” into the field."
             AppLogger.warning(TAG, "ADBKeyBoard typing failed, falling back to setNodeText")

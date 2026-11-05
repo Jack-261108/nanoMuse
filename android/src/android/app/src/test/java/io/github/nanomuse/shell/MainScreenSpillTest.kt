@@ -55,6 +55,15 @@ class MainScreenSpillTest {
     }
 
     @Test
+    fun systemPermissionControllersAreExcludedFromPullBack() {
+        val permissions = setOf("com.android.permissioncontroller", "com.google.android.permissioncontroller", "com.android.packageinstaller")
+        val excludedWithPerms = home + permissions
+        val permArrival = arrival(pkg = "com.android.permissioncontroller")
+        val verdicts = MainScreenSpill.decide(listOf(permArrival), since, window, 3, excludedWithPerms)
+        assertTrue(verdicts.isEmpty())
+    }
+
+    @Test
     fun taskMovedFromAnotherDisplayIsATakeoverNotASpill() {
         assertTrue(decide(arrival(from = 5)).isEmpty())
     }

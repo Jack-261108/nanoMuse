@@ -16,6 +16,7 @@ import io.github.nanomuse.shell.AppsAfterTask
 import io.github.nanomuse.shell.INanoMuseShell
 import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.MainScreenWatch
+import io.github.nanomuse.shell.SystemPickers
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -132,6 +133,7 @@ class MainDisplayTarget(
 class VirtualDisplayTarget(
     private val display: AgentDisplay,
     private val shell: INanoMuseShell,
+    private val context: Context? = null,
 ) : HandsDisplayTarget {
     private val tag = "VirtualDisplayTarget"
 
@@ -189,7 +191,8 @@ class VirtualDisplayTarget(
         if (res == 0) {
             activeTaskId = shell.topTaskId(displayId)
         }
-        val spill = checkSpill(watch)
+        val excluded = context?.let { SystemPickers.resolve(it) } ?: emptySet()
+        val spill = checkSpill(watch, excluded = excluded)
         if (spill is MainScreenSpill.PullBack) {
             activeTaskId = spill.arrival.taskId
         }
@@ -197,9 +200,15 @@ class VirtualDisplayTarget(
     }
 
     override fun restartApp(packageName: String): Int {
+        val watch = armSpillWatch()
         val res = shell.restartApp(displayId, packageName)
         if (res == 0) {
             activeTaskId = shell.topTaskId(displayId)
+        }
+        val excluded = context?.let { SystemPickers.resolve(it) } ?: emptySet()
+        val spill = checkSpill(watch, excluded = excluded)
+        if (spill is MainScreenSpill.PullBack) {
+            activeTaskId = spill.arrival.taskId
         }
         return res
     }
@@ -218,7 +227,8 @@ class VirtualDisplayTarget(
         if (watch == null) return null
         val b = runCatching { shell.mainArrivals(watch.since) }.getOrNull() ?: return null
         val arrivals = MainScreenWatch.parseArrivals(b)
-        val verdicts = MainScreenSpill.decide(arrivals, watch.since, HandsDisplayTarget.SPILL_WINDOW_MS, watch.topBefore, excluded, userTaps)
+        val allExcluded = if (context != null) excluded + SystemPickers.resolve(context) else excluded
+        val verdicts = MainScreenSpill.decide(arrivals, watch.since, HandsDisplayTarget.SPILL_WINDOW_MS, watch.topBefore, allExcluded, userTaps)
         val verdict = verdicts.lastOrNull() ?: return null
         if (verdict is MainScreenSpill.PullBack) {
             val taskId = verdict.arrival.taskId

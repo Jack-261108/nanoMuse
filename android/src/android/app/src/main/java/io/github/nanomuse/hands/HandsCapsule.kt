@@ -81,24 +81,11 @@ class HandsCapsule(private val context: Context) {
     private var ring: RingView? = null
     private var bars: BarsView? = null
 
-    // ── Virtual screen preview ──
+    // ── Virtual screen preview (Mika-style PiP Window) ──
     private var previewToggleBtn: TextView? = null
-    private var previewCard: LinearLayout? = null
-    private var miniScreenBox: FrameLayout? = null
-    private var previewImage: ImageView? = null
-    private var liveBadge: TextView? = null
-    private var zoomHint: TextView? = null
-    private var cardInfo: LinearLayout? = null
-    private var cardTitleView: TextView? = null
-    private var cardDetailView: TextView? = null
-    private var cardContinueBtn: TextView? = null
-    private var cardOpenBtn: TextView? = null
-    private var cardAllowBtn: TextView? = null
-    private var cardDenyBtn: TextView? = null
+    private var pipWindow: HandsPipWindow? = null
+    private var pipVisible: Boolean = true
     private var isVirtualScreen: Boolean = false
-    private var expanded: Boolean = false
-    private var zoomed: Boolean = false
-    private var currentFrame: Bitmap? = null
     private var previewJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
@@ -123,16 +110,11 @@ class HandsCapsule(private val context: Context) {
         val stepText = context.getString(R.string.nm_hands_step, step)
         titleView?.text = stepText
         detailView?.text = detail
-        cardTitleView?.text = stepText
-        cardDetailView?.text = detail
         continueBtn?.visibility = View.GONE
         openBtn?.visibility = View.GONE
         allowBtn?.visibility = View.GONE
         denyBtn?.visibility = View.GONE
-        cardContinueBtn?.visibility = View.GONE
-        cardOpenBtn?.visibility = View.GONE
-        cardAllowBtn?.visibility = View.GONE
-        cardDenyBtn?.visibility = View.GONE
+        pipWindow?.setNeedsYou(false)
     }
 
     /** The hands wait for the user to do something on the phone. */
@@ -146,16 +128,11 @@ class HandsCapsule(private val context: Context) {
         val turnDetail = reason.ifBlank { context.getString(R.string.nm_hands_your_turn_detail) }
         titleView?.text = turnTitle
         detailView?.text = turnDetail
-        cardTitleView?.text = turnTitle
-        cardDetailView?.text = turnDetail
         continueBtn?.visibility = View.VISIBLE
         openBtn?.visibility = View.GONE
         allowBtn?.visibility = View.GONE
         denyBtn?.visibility = View.GONE
-        cardContinueBtn?.visibility = View.VISIBLE
-        cardOpenBtn?.visibility = View.GONE
-        cardAllowBtn?.visibility = View.GONE
-        cardDenyBtn?.visibility = View.GONE
+        pipWindow?.setNeedsYou(true)
     }
 
     /**
@@ -171,16 +148,11 @@ class HandsCapsule(private val context: Context) {
         val appTitle = context.getString(R.string.nm_hands_approval_title)
         titleView?.text = appTitle
         detailView?.text = what
-        cardTitleView?.text = appTitle
-        cardDetailView?.text = what
         continueBtn?.visibility = View.GONE
         openBtn?.visibility = if (decidable) View.GONE else View.VISIBLE
         allowBtn?.visibility = if (decidable) View.VISIBLE else View.GONE
         denyBtn?.visibility = if (decidable) View.VISIBLE else View.GONE
-        cardContinueBtn?.visibility = View.GONE
-        cardOpenBtn?.visibility = if (decidable) View.GONE else View.VISIBLE
-        cardAllowBtn?.visibility = if (decidable) View.VISIBLE else View.GONE
-        cardDenyBtn?.visibility = if (decidable) View.VISIBLE else View.GONE
+        pipWindow?.setNeedsYou(true)
     }
 
     /** 订阅后台虚拟屏的实时画面流（限速 <= 5 fps，有变化才推）。 */
@@ -189,102 +161,47 @@ class HandsCapsule(private val context: Context) {
         previewJob = null
         if (flow == null) {
             isVirtualScreen = false
-            expanded = false
-            zoomed = false
-            currentFrame = null
             previewToggleBtn?.visibility = View.GONE
-            previewCard?.visibility = View.GONE
-            previewImage?.setImageBitmap(null)
-            updateWindowLayout()
+            pipWindow?.hide()
+            pipWindow = null
             return@onMain
         }
         isVirtualScreen = true
-        expanded = true // 虚拟屏下默认展开画面小窗，方便观察后台进展
         previewToggleBtn?.visibility = View.VISIBLE
-        updateExpandedState()
+        previewToggleBtn?.text = context.getString(R.string.nm_hands_preview_collapse)
+        pipVisible = true
+
+        if (pipWindow == null) {
+            pipWindow = HandsPipWindow(context).apply { show() }
+        } else {
+            pipWindow?.setVisible(true)
+        }
 
         previewJob = scope.launch {
             flow.filterNotNull().previewFrames(same = ::sameFrame).collect { frame ->
                 if (isVirtualScreen && !frame.isRecycled) {
-                    currentFrame = frame
-                    previewImage?.setImageBitmap(frame)
-                    updateMiniScreenRatio(frame)
+                    pipWindow?.updateFrame(frame)
                 }
             }
         }
     }
 
-    private fun toggleExpanded() {
+    private fun togglePip() {
         if (!isVirtualScreen) return
-        expanded = !expanded
-        updateExpandedState()
-    }
-
-    private fun updateExpandedState() {
-        val card = previewCard ?: return
-        if (expanded && isVirtualScreen) {
-            card.visibility = View.VISIBLE
-            previewToggleBtn?.text = context.getString(R.string.nm_hands_preview_collapse)
-        } else {
-            card.visibility = View.GONE
-            zoomed = false
-            zoomHint?.visibility = View.GONE
-            cardInfo?.visibility = View.VISIBLE
-            previewToggleBtn?.text = context.getString(R.string.nm_hands_preview_screen)
-        }
-        updateWindowLayout()
-    }
-
-    private fun toggleZoom() {
-        if (!isVirtualScreen || !expanded) return
-        zoomed = !zoomed
-        zoomHint?.visibility = if (zoomed) View.VISIBLE else View.GONE
-        cardInfo?.visibility = if (zoomed) View.GONE else View.VISIBLE
-        currentFrame?.let { updateMiniScreenRatio(it) } ?: run {
-            val w = if (zoomed) zoomedWidth() else dp(MINI_SCREEN_WIDTH_DP)
-            val h = if (zoomed) dp(320) else dp(160)
-            miniScreenBox?.layoutParams?.width = w
-            miniScreenBox?.layoutParams?.height = h
-            miniScreenBox?.requestLayout()
-        }
-        updateWindowLayout()
-    }
-
-    private fun updateMiniScreenRatio(frame: Bitmap) {
-        val box = miniScreenBox ?: return
-        val ar = frameAspectRatio(frame)
-        val w = if (zoomed) zoomedWidth() else dp(MINI_SCREEN_WIDTH_DP)
-        val h = (w / ar).toInt().coerceIn(dp(MINI_SCREEN_MIN_H_DP), if (zoomed) dp(ZOOMED_MAX_H_DP) else dp(MINI_SCREEN_MAX_H_DP))
-        if (box.layoutParams.width != w || box.layoutParams.height != h) {
-            box.layoutParams.width = w
-            box.layoutParams.height = h
-            box.requestLayout()
-            updateWindowLayout()
-        }
-    }
-
-    private fun zoomedWidth(): Int {
-        val dm = context.resources.displayMetrics
-        return minOf((dm.widthPixels * 0.85f).toInt(), dp(ZOOMED_MAX_W_DP))
-    }
-
-    private fun updateWindowLayout() {
-        val v = root ?: return
-        val p = params ?: return
-        runCatching { wm.updateViewLayout(v, p) }
+        pipVisible = !pipVisible
+        pipWindow?.setVisible(pipVisible)
+        previewToggleBtn?.text = context.getString(if (pipVisible) R.string.nm_hands_preview_collapse else R.string.nm_hands_preview_screen)
     }
 
     fun hide() = onMain {
         previewJob?.cancel()
         previewJob = null
-        currentFrame = null
         isVirtualScreen = false
-        expanded = false
-        zoomed = false
+        pipWindow?.hide()
+        pipWindow = null
         val v = root
         root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null
-        previewToggleBtn = null; previewCard = null; miniScreenBox = null; previewImage = null; liveBadge = null; zoomHint = null
-        cardInfo = null; cardTitleView = null; cardDetailView = null; cardContinueBtn = null; cardOpenBtn = null; cardAllowBtn = null; cardDenyBtn = null
+        previewToggleBtn = null
         ring?.turning(false); ring = null
         bars?.stop(); bars = null
         if (v != null) {
@@ -301,6 +218,7 @@ class HandsCapsule(private val context: Context) {
         val latch = CountDownLatch(1)
         main.post {
             root?.visibility = View.INVISIBLE
+            pipWindow?.setVisible(false)
             stage.setVisible(false)
             latch.countDown()
         }
@@ -311,6 +229,9 @@ class HandsCapsule(private val context: Context) {
 
     fun restore() = onMain {
         root?.visibility = View.VISIBLE
+        if (pipVisible && isVirtualScreen) {
+            pipWindow?.setVisible(true)
+        }
         stage.setVisible(true)
     }
 
@@ -423,7 +344,7 @@ class HandsCapsule(private val context: Context) {
                 }
             }
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             )
         }
@@ -466,7 +387,7 @@ class HandsCapsule(private val context: Context) {
         texts.addView(title); texts.addView(detail)
 
         val previewBtn = TextView(context).apply {
-            text = context.getString(if (expanded) R.string.nm_hands_preview_collapse else R.string.nm_hands_preview_screen)
+            text = context.getString(if (pipVisible) R.string.nm_hands_preview_collapse else R.string.nm_hands_preview_screen)
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -481,7 +402,7 @@ class HandsCapsule(private val context: Context) {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ).apply { marginStart = dp(6) }
             visibility = if (isVirtualScreen) View.VISIBLE else View.GONE
-            setOnClickListener { toggleExpanded() }
+            setOnClickListener { togglePip() }
         }
 
         val cont = button(context.getString(R.string.nm_hands_continue), ACCENT) { onContinue?.invoke() }.apply { visibility = View.GONE }
@@ -491,142 +412,12 @@ class HandsCapsule(private val context: Context) {
         val stop = button(context.getString(R.string.nm_hands_stop), STOP_RED) { onStop?.invoke() }
         pill.addView(faceBox); pill.addView(barsView); pill.addView(texts); pill.addView(previewBtn); pill.addView(cont); pill.addView(open); pill.addView(allow); pill.addView(deny); pill.addView(stop)
 
-        // ── Preview Card for Virtual Screen (MiniScreen + Info) ──
-        val cardRadius = dp(16).toFloat()
-        val card = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            visibility = if (expanded && isVirtualScreen) View.VISIBLE else View.GONE
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = cardRadius
-                setColor(INK)
-                setStroke(dp(1), EDGE)
-            }
-            elevation = dp(8).toFloat()
-            clipToOutline = true
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(v: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, v.width, v.height, cardRadius)
-                }
-            }
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dp(6) }
-        }
-
-        val screenBox = FrameLayout(context).apply {
-            val ar = currentFrame?.let { frameAspectRatio(it) } ?: (9f / 16f)
-            val w = if (zoomed) zoomedWidth() else dp(MINI_SCREEN_WIDTH_DP)
-            val h = (w / ar).toInt().coerceIn(dp(MINI_SCREEN_MIN_H_DP), if (zoomed) dp(ZOOMED_MAX_H_DP) else dp(MINI_SCREEN_MAX_H_DP))
-            layoutParams = LinearLayout.LayoutParams(w, h)
-            clipToOutline = true
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(v: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, v.width, v.height, dp(10).toFloat())
-                }
-            }
-            setOnClickListener { toggleZoom() }
-        }
-        val img = ImageView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setBackgroundColor(Color.BLACK)
-            currentFrame?.let { setImageBitmap(it) }
-        }
-        val badge = TextView(context).apply {
-            text = "● " + context.getString(R.string.nm_hands_preview_live)
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            setPadding(dp(5), dp(2), dp(5), dp(2))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(4).toFloat()
-                setColor(0xB3000000.toInt())
-            }
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.START,
-            ).apply {
-                leftMargin = dp(5)
-                bottomMargin = dp(5)
-            }
-        }
-        val zHint = TextView(context).apply {
-            text = context.getString(R.string.nm_hands_preview_zoom_hint)
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
-            setPadding(dp(8), dp(3), dp(8), dp(3))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(6).toFloat()
-                setColor(0xB3000000.toInt())
-            }
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
-            ).apply { bottomMargin = dp(6) }
-            visibility = if (zoomed) View.VISIBLE else View.GONE
-        }
-        screenBox.addView(img)
-        screenBox.addView(badge)
-        screenBox.addView(zHint)
-
-        val infoCol = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) }
-            visibility = if (zoomed) View.GONE else View.VISIBLE
-        }
-        val infoTitle = TextView(context).apply {
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-            maxLines = 1
-            text = title.text
-        }
-        val infoDetail = TextView(context).apply {
-            setTextColor(0xCCFFFFFF.toInt())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
-            maxLines = 3
-            text = detail.text
-        }
-        val cardBtnRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(6) }
-        }
-        val cardCont = button(context.getString(R.string.nm_hands_continue), ACCENT) { onContinue?.invoke() }.apply { visibility = View.GONE }
-        val cardOp = button(context.getString(R.string.nm_hands_open), ACCENT) { onOpenApp?.invoke() }.apply { visibility = View.GONE }
-        val cardAl = button(context.getString(R.string.nm_hands_allow_once), ACCENT) { onAllow?.invoke() }.apply { visibility = View.GONE }
-        val cardDe = button(context.getString(R.string.nm_hands_deny), STOP_RED) { onDeny?.invoke() }.apply { visibility = View.GONE }
-        val cardCol = button(context.getString(R.string.nm_hands_preview_collapse), 0x33FFFFFF) { toggleExpanded() }
-        val cardSt = button(context.getString(R.string.nm_hands_stop), STOP_RED) { onStop?.invoke() }
-
-        cardBtnRow.addView(cardCont)
-        cardBtnRow.addView(cardOp)
-        cardBtnRow.addView(cardAl)
-        cardBtnRow.addView(cardDe)
-        cardBtnRow.addView(cardCol)
-        cardBtnRow.addView(cardSt)
-
-        infoCol.addView(infoTitle)
-        infoCol.addView(infoDetail)
-        infoCol.addView(cardBtnRow)
-
-        card.addView(screenBox)
-        card.addView(infoCol)
-
         rootLayout.addView(pill)
-        rootLayout.addView(card)
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
-        val dm = context.resources.displayMetrics
         val params = WindowManager.LayoutParams(
-            minOf((dm.widthPixels * 0.94f).toInt(), dp(420)),
+            WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -649,14 +440,12 @@ class HandsCapsule(private val context: Context) {
         ringView.turning(true)
         barsView.start()
         root = rootLayout; this.params = params; titleView = title; detailView = detail; continueBtn = cont; openBtn = open; allowBtn = allow; denyBtn = deny
-        previewToggleBtn = previewBtn; previewCard = card; miniScreenBox = screenBox; previewImage = img; liveBadge = badge; zoomHint = zHint
-        cardInfo = infoCol; cardTitleView = infoTitle; cardDetailView = infoDetail
-        cardContinueBtn = cardCont; cardOpenBtn = cardOp; cardAllowBtn = cardAl; cardDenyBtn = cardDe
+        previewToggleBtn = previewBtn
         ring = ringView; bars = barsView
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun setupDrag(pill: View, params: WindowManager.LayoutParams, root: View) {
+    private fun setupDrag(target: View, params: WindowManager.LayoutParams, root: View) {
         val slop = ViewConfiguration.get(context).scaledTouchSlop
         var downRawX = 0f
         var downRawY = 0f
@@ -664,7 +453,7 @@ class HandsCapsule(private val context: Context) {
         var initY = 0
         var isDragging = false
 
-        pill.setOnTouchListener { _, event ->
+        target.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = event.rawX
@@ -687,14 +476,7 @@ class HandsCapsule(private val context: Context) {
                     }
                     true
                 }
-                MotionEvent.ACTION_UP -> {
-                    if (!isDragging && isVirtualScreen) {
-                        toggleExpanded()
-                    }
-                    isDragging = false
-                    true
-                }
-                MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     isDragging = false
                     true
                 }
@@ -853,12 +635,6 @@ class HandsCapsule(private val context: Context) {
     }
 
     companion object {
-        private const val MINI_SCREEN_WIDTH_DP = 104
-        private const val MINI_SCREEN_MIN_H_DP = 120
-        private const val MINI_SCREEN_MAX_H_DP = 220
-        private const val ZOOMED_MAX_W_DP = 300
-        private const val ZOOMED_MAX_H_DP = 480
-
         private const val TAG = "HandsCapsule"
         /** The stage's three hues (HandsStage, the desktop stage's --accent / --violet / --cyan). */
         private const val ACCENT = 0xFF0A66E4.toInt()
