@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,10 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
@@ -89,6 +89,7 @@ import io.github.nanomuse.ui.muse.MuseRow
 import io.github.nanomuse.ui.muse.MuseRowDivider
 import io.github.nanomuse.ui.muse.MuseSectionLabel
 import io.github.nanomuse.ui.muse.MuseTopAppBar
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.text.NumberFormat
@@ -128,6 +129,7 @@ fun CloudAccountScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
     val numbers = remember { NumberFormat.getIntegerInstance() }
+    var starAsk by remember { mutableStateOf(io.github.nanomuse.community.StarPrompt.due(context, io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN)) }
 
     fun refresh() {
         if (refreshing) return
@@ -147,13 +149,19 @@ fun CloudAccountScreen(
             refreshing = false
         }
     }
-    LaunchedEffect(Unit) { if (signedIn) refresh() }
+    LaunchedEffect(Unit) {
+        if (signedIn) {
+            delay(320L)
+            refresh()
+        }
+    }
 
     fun leave() {
         account = null
         signedIn = false
         sessions = emptyList()
         events = emptyList()
+        starAsk = false
     }
 
     Scaffold(
@@ -169,427 +177,447 @@ fun CloudAccountScreen(
             )
         },
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .padding(padding),
+            contentPadding = PaddingValues(bottom = 24.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
+            item { Spacer(Modifier.height(8.dp)) }
             if (!signedIn) {
-                MuseCard {
-                    Column(Modifier.padding(16.dp)) {
-                        Text(stringResource(R.string.nm_cloud_not_signed_in), style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            stringResource(R.string.nm_cloud_not_signed_in_sub),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                        if (NanoMuseCloud.signInEnded(context)) {
-                            // the relay refused the key; the account's data waits for its return (contract C12)
+                item {
+                    MuseCard {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(stringResource(R.string.nm_cloud_not_signed_in), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                stringResource(R.string.nm_cloud_sign_in_ended),
+                                stringResource(R.string.nm_cloud_not_signed_in_sub),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(top = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp),
                             )
+                            if (NanoMuseCloud.signInEnded(context)) {
+                                // the relay refused the key; the account's data waits for its return (contract C12)
+                                Text(
+                                    stringResource(R.string.nm_cloud_sign_in_ended),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
                         }
-                    }
-                    MuseRowDivider(inset = 16.dp)
-                    MuseRow(title = stringResource(R.string.nm_cloud_sign_in), onClick = onSignIn, titleColor = MuseTones.action)
-                    val base = NanoMuseCloud.baseUrl(context)
-                    if (!RelayAddress.isDefault(base)) {
-                        // pointed at someone's own relay: say which, so a sign-in that fails is understood
                         MuseRowDivider(inset = 16.dp)
-                        MuseRow(title = stringResource(R.string.nm_cloud_server_row), value = RelayAddress.display(base), chevron = false, onClick = onSignIn)
+                        MuseRow(title = stringResource(R.string.nm_cloud_sign_in), onClick = onSignIn, titleColor = MuseTones.action)
+                        val base = NanoMuseCloud.baseUrl(context)
+                        if (!RelayAddress.isDefault(base)) {
+                            // pointed at someone's own relay: say which, so a sign-in that fails is understood
+                            MuseRowDivider(inset = 16.dp)
+                            MuseRow(title = stringResource(R.string.nm_cloud_server_row), value = RelayAddress.display(base), chevron = false, onClick = onSignIn)
+                        }
                     }
                 }
             } else {
                 val a = account
 
                 // -- who ---------------------------------------------------------------------
-                MuseCard {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier.size(44.dp).clip(CircleShape).background(MuseTones.fill),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = (a?.hint?.firstOrNull { it.isLetterOrDigit() } ?: 'n').uppercaseChar().toString(),
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MuseTones.action,
-                            )
-                        }
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(text = a?.hint ?: stringResource(R.string.nm_cloud_title), style = MaterialTheme.typography.titleMedium)
-                            val channel = when (a?.channel) {
-                                "phone" -> stringResource(R.string.nm_cloud_channel_phone)
-                                "email" -> stringResource(R.string.nm_cloud_channel_email)
-                                else -> ""
-                            }
-                            val since = a?.createdAt?.takeIf { it > 0 }?.let {
-                                stringResource(R.string.nm_cloud_since, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it * 1000)))
-                            }
-                            Text(
-                                text = listOfNotNull(channel.takeIf { it.isNotEmpty() }, since).joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                    MuseRowDivider(inset = 16.dp)
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_password),
-                        icon = Icons.Outlined.Password,
-                        value = stringResource(if (a?.hasPassword == true) R.string.nm_cloud_password_set else R.string.nm_cloud_password_unset),
-                        onClick = { passwordDialog = true },
-                    )
-                    MuseRowDivider()
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_devices_signed_in),
-                        icon = Icons.Outlined.PhoneAndroid,
-                        value = (if (sessions.isNotEmpty()) sessions.size else a?.sessions ?: 0).toString(),
-                        chevron = false,
-                        onClick = { refresh() },
-                    )
-                    MuseRowDivider()
-                    // the relay the key belongs to (0.1.38: people who run their own); changing it means signing out first
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_server_row),
-                        icon = Icons.Outlined.Storage,
-                        value = RelayAddress.display(NanoMuseCloud.baseUrl(context)),
-                        chevron = false,
-                        trailing = {
-                            TextButton(onClick = { changeServer = true }) {
-                                Text(stringResource(R.string.nm_cloud_server_change), color = MuseTones.action, fontSize = 13.sp)
-                            }
-                        },
-                        onClick = { changeServer = true },
-                    )
-                    if (a?.accountId?.isNotEmpty() == true) {
-                        Text(
-                            text = stringResource(R.string.nm_cloud_account_id, a.accountId.take(8)),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 10.dp),
-                        )
-                    }
-                }
-                notice?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MuseTones.action,
-                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-                    )
-                }
-
-                // -- the ask for a star, the first time this page is seen signed in: the
-                // allowance was just claimed. Once on a phone; gone for good after either button.
-                var starAsk by remember { mutableStateOf(io.github.nanomuse.community.StarPrompt.due(context, io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN)) }
-                if (starAsk) {
-                    LaunchedEffect(Unit) { io.github.nanomuse.community.StarPrompt.markShown(context, io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN) }
-                    MuseGap()
-                    io.github.nanomuse.community.StarNudgeCard(
-                        text = remember { io.github.nanomuse.community.StarPrompt.text(context, io.github.nanomuse.community.StarPrompt.Ask(io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN)) },
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        onDone = { starAsk = false },
-                    )
-                }
-
-                // -- allowance ---------------------------------------------------------------
-                MuseGap()
-                MuseCard {
-                    Column(Modifier.padding(16.dp)) {
-                        if (a != null && a.pricesInMoney) {
-                            // The relay prices requests in money (0.5: one pool for the account's
-                            // lifetime): used of the pool in both currencies, what is left, the
-                            // token line, and how the pool grows.
-                            Row(Modifier.fillMaxWidth()) {
+                item {
+                    MuseCard {
+                        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier.size(44.dp).clip(CircleShape).background(MuseTones.fill),
+                                contentAlignment = Alignment.Center,
+                            ) {
                                 Text(
-                                    text = if (a.limited) stringResource(R.string.nm_cloud_allowance_used, money(a.spentTotalCny), money(a.toUsd(a.spentTotalCny)))
-                                    else stringResource(R.string.nm_cloud_spent_total, money(a.spentTotalCny), money(a.toUsd(a.spentTotalCny))),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
+                                    text = (a?.hint?.firstOrNull { it.isLetterOrDigit() } ?: 'n').uppercaseChar().toString(),
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MuseTones.action,
                                 )
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(text = a?.hint ?: stringResource(R.string.nm_cloud_title), style = MaterialTheme.typography.titleMedium)
+                                val channel = when (a?.channel) {
+                                    "phone" -> stringResource(R.string.nm_cloud_channel_phone)
+                                    "email" -> stringResource(R.string.nm_cloud_channel_email)
+                                    else -> ""
+                                }
+                                val since = a?.createdAt?.takeIf { it > 0 }?.let {
+                                    stringResource(R.string.nm_cloud_since, DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it * 1000)))
+                                }
                                 Text(
-                                    text = if (a.limited) stringResource(R.string.nm_cloud_allowance_of, money(a.grantCny), money(a.toUsd(a.grantCny)))
-                                    else stringResource(R.string.nm_cloud_spend_member),
+                                    text = listOfNotNull(channel.takeIf { it.isNotEmpty() }, since).joinToString(" · "),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            if (a.limited) {
+                        }
+                        MuseRowDivider(inset = 16.dp)
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_password),
+                            icon = Icons.Outlined.Password,
+                            value = stringResource(if (a?.hasPassword == true) R.string.nm_cloud_password_set else R.string.nm_cloud_password_unset),
+                            onClick = { passwordDialog = true },
+                        )
+                        MuseRowDivider()
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_devices_signed_in),
+                            icon = Icons.Outlined.PhoneAndroid,
+                            value = (if (sessions.isNotEmpty()) sessions.size else a?.sessions ?: 0).toString(),
+                            chevron = false,
+                            onClick = { refresh() },
+                        )
+                        MuseRowDivider()
+                        // the relay the key belongs to (0.1.38: people who run their own); changing it means signing out first
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_server_row),
+                            icon = Icons.Outlined.Storage,
+                            value = RelayAddress.display(NanoMuseCloud.baseUrl(context)),
+                            chevron = false,
+                            trailing = {
+                                TextButton(onClick = { changeServer = true }) {
+                                    Text(stringResource(R.string.nm_cloud_server_change), color = MuseTones.action, fontSize = 13.sp)
+                                }
+                            },
+                            onClick = { changeServer = true },
+                        )
+                        if (a?.accountId?.isNotEmpty() == true) {
+                            Text(
+                                text = stringResource(R.string.nm_cloud_account_id, a.accountId.take(8)),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 10.dp),
+                            )
+                        }
+                    }
+                }
+
+                notice?.let { noticeText ->
+                    item {
+                        Text(
+                            text = noticeText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MuseTones.action,
+                            modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
+                        )
+                    }
+                }
+
+                // -- the ask for a star, the first time this page is seen signed in: the
+                // allowance was just claimed. Once on a phone; gone for good after either button.
+                if (starAsk) {
+                    item {
+                        LaunchedEffect(Unit) { io.github.nanomuse.community.StarPrompt.markShown(context, io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN) }
+                        MuseGap()
+                        io.github.nanomuse.community.StarNudgeCard(
+                            text = remember { io.github.nanomuse.community.StarPrompt.text(context, io.github.nanomuse.community.StarPrompt.Ask(io.github.nanomuse.community.StarPrompt.Moment.SIGNED_IN)) },
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            onDone = { starAsk = false },
+                        )
+                    }
+                }
+
+                // -- allowance ---------------------------------------------------------------
+                item {
+                    MuseGap()
+                    MuseCard {
+                        Column(Modifier.padding(16.dp)) {
+                            if (a != null && a.pricesInMoney) {
+                                // The relay prices requests in money (0.5: one pool for the account's
+                                // lifetime): used of the pool in both currencies, what is left, the
+                                // token line, and how the pool grows.
+                                Row(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = if (a.limited) stringResource(R.string.nm_cloud_allowance_used, money(a.spentTotalCny), money(a.toUsd(a.spentTotalCny)))
+                                        else stringResource(R.string.nm_cloud_spent_total, money(a.spentTotalCny), money(a.toUsd(a.spentTotalCny))),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = if (a.limited) stringResource(R.string.nm_cloud_allowance_of, money(a.grantCny), money(a.toUsd(a.grantCny)))
+                                        else stringResource(R.string.nm_cloud_spend_member),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (a.limited) {
+                                    Spacer(Modifier.height(8.dp))
+                                    LinearProgressIndicator(
+                                        progress = { a.spendFraction },
+                                        color = when {
+                                            a.exhausted -> MaterialTheme.colorScheme.error
+                                            a.warn || a.spendFraction >= 0.8f -> Color(0xFFD97706)
+                                            else -> MuseTones.action
+                                        },
+                                        trackColor = MuseTones.fill,
+                                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_allowance_left, money(a.leftCny.coerceAtLeast(0.0)), money(a.toUsd(a.leftCny.coerceAtLeast(0.0)))),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (a.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                } else {
+                                    Spacer(Modifier.height(8.dp))
+                                }
+                                Text(
+                                    text = stringResource(R.string.nm_cloud_tokens_line, numbers.format(a.used), numbers.format(a.usedToday)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (a.limited && a.allowanceCny > 0) {
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_allowance_why, money(a.allowanceCny), money(a.inviteBonusCny)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else if (a != null && a.unlimited) {
+                                // No ceiling on this relay: what was used, nothing to run out of.
+                                Row(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_unlimited),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_used_total, numbers.format(a.used)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.nm_cloud_used_today_open, numbers.format(a.usedToday)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            } else if (a != null) {
+                                Row(Modifier.fillMaxWidth()) {
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_remaining, numbers.format(a.remaining)),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.nm_cloud_of_granted, numbers.format(a.granted)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                                 Spacer(Modifier.height(8.dp))
                                 LinearProgressIndicator(
-                                    progress = { a.spendFraction },
-                                    color = when {
-                                        a.exhausted -> MaterialTheme.colorScheme.error
-                                        a.warn || a.spendFraction >= 0.8f -> Color(0xFFD97706)
-                                        else -> MuseTones.action
-                                    },
+                                    progress = { a.fraction },
+                                    color = MuseTones.action,
                                     trackColor = MuseTones.fill,
                                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = stringResource(R.string.nm_cloud_allowance_left, money(a.leftCny.coerceAtLeast(0.0)), money(a.toUsd(a.leftCny.coerceAtLeast(0.0)))),
+                                    text = if (a.dailyCap > 0) {
+                                        stringResource(R.string.nm_cloud_used_today, numbers.format(a.usedToday), numbers.format(a.dailyCap))
+                                    } else {
+                                        stringResource(R.string.nm_cloud_used_today_open, numbers.format(a.usedToday))
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (a.exhausted) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             } else {
+                                Text(
+                                    text = stringResource(R.string.nm_cloud_refreshing),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            error?.let {
                                 Spacer(Modifier.height(8.dp))
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                             }
-                            Text(
-                                text = stringResource(R.string.nm_cloud_tokens_line, numbers.format(a.used), numbers.format(a.usedToday)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            if (a.limited && a.allowanceCny > 0) {
-                                Spacer(Modifier.height(8.dp))
-                                Text(
-                                    text = stringResource(R.string.nm_cloud_allowance_why, money(a.allowanceCny), money(a.inviteBonusCny)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        } else if (a != null && a.unlimited) {
-                            // No ceiling on this relay: what was used, nothing to run out of.
-                            Row(Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = stringResource(R.string.nm_cloud_unlimited),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    text = stringResource(R.string.nm_cloud_used_total, numbers.format(a.used)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = stringResource(R.string.nm_cloud_used_today_open, numbers.format(a.usedToday)),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else if (a != null) {
-                            Row(Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = stringResource(R.string.nm_cloud_remaining, numbers.format(a.remaining)),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    text = stringResource(R.string.nm_cloud_of_granted, numbers.format(a.granted)),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(
-                                progress = { a.fraction },
-                                color = MuseTones.action,
-                                trackColor = MuseTones.fill,
-                                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = if (a.dailyCap > 0) {
-                                    stringResource(R.string.nm_cloud_used_today, numbers.format(a.usedToday), numbers.format(a.dailyCap))
-                                } else {
-                                    stringResource(R.string.nm_cloud_used_today_open, numbers.format(a.usedToday))
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.nm_cloud_refreshing),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
                         }
-                        error?.let {
-                            Spacer(Modifier.height(8.dp))
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                        }
+                        MuseRowDivider(inset = 16.dp)
+                        MuseRow(
+                            title = if (refreshing) stringResource(R.string.nm_cloud_refreshing) else stringResource(R.string.nm_cloud_refresh),
+                            icon = Icons.Outlined.Refresh,
+                            chevron = false,
+                            onClick = { refresh() },
+                        )
                     }
-                    MuseRowDivider(inset = 16.dp)
-                    MuseRow(
-                        title = if (refreshing) stringResource(R.string.nm_cloud_refreshing) else stringResource(R.string.nm_cloud_refresh),
-                        icon = Icons.Outlined.Refresh,
-                        chevron = false,
-                        onClick = { refresh() },
-                    )
                 }
 
                 // -- invitations: the code, the link, what came of it -------------------------
                 if (a != null && a.inviteCode.isNotBlank()) {
-                    MuseSectionLabel(stringResource(R.string.nm_cloud_invite_title))
-                    InviteCard(a)
+                    item {
+                        MuseSectionLabel(stringResource(R.string.nm_cloud_invite_title))
+                        InviteCard(a)
+                    }
                 }
 
                 // -- usage by kind and by model ---------------------------------------------
                 val usage = a?.usage
                 val priced = a?.pricesInMoney == true
                 if (usage != null) {
-                    MuseSectionLabel(stringResource(R.string.nm_cloud_usage_title))
-                    MuseCard {
-                        Row(
-                            modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                                .fillMaxWidth()
-                                .background(MuseTones.fill, RoundedCornerShape(10.dp))
-                                .padding(3.dp),
-                        ) {
-                            SegmentTab(stringResource(R.string.nm_cloud_usage_today), showToday, Modifier.weight(1f)) { showToday = true }
-                            SegmentTab(stringResource(R.string.nm_cloud_usage_total), !showToday, Modifier.weight(1f)) { showToday = false }
-                        }
-                        val rows = (if (showToday) usage.todayByKind else usage.totalByKind).filter { it.requests > 0 }
-                        if (rows.isEmpty()) {
-                            Text(
-                                text = stringResource(R.string.nm_cloud_usage_empty),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                            )
-                        } else {
-                            rows.forEachIndexed { i, r ->
-                                if (i > 0) MuseRowDivider()
-                                UsageLine(
-                                    icon = kindIcon(r.kind),
-                                    title = kindLabel(r.kind),
-                                    detail = if (r.tokens > 0) {
-                                        stringResource(R.string.nm_cloud_usage_row, r.requests, numbers.format(r.tokens))
-                                    } else {
-                                        stringResource(R.string.nm_cloud_usage_row_notokens, r.requests)
-                                    },
-                                    amount = if (priced) "¥" + money(r.costCny) else numbers.format(r.charged),
-                                )
+                    item {
+                        MuseSectionLabel(stringResource(R.string.nm_cloud_usage_title))
+                        MuseCard {
+                            Row(
+                                modifier = Modifier
+                                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    .fillMaxWidth()
+                                    .background(MuseTones.fill, RoundedCornerShape(10.dp))
+                                    .padding(3.dp),
+                            ) {
+                                SegmentTab(stringResource(R.string.nm_cloud_usage_today), showToday, Modifier.weight(1f)) { showToday = true }
+                                SegmentTab(stringResource(R.string.nm_cloud_usage_total), !showToday, Modifier.weight(1f)) { showToday = false }
                             }
-                        }
-                        val models = if (showToday) emptyList() else usage.byModel.filter { it.requests > 0 }
-                        if (models.isNotEmpty()) {
-                            MuseRowDivider(inset = 16.dp)
-                            Text(
-                                text = stringResource(R.string.nm_cloud_usage_by_model),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
-                            )
-                            models.forEach { r ->
-                                UsageLine(
-                                    icon = null,
-                                    title = r.model,
-                                    detail = if (r.tokens > 0) {
-                                        stringResource(R.string.nm_cloud_usage_row, r.requests, numbers.format(r.tokens))
-                                    } else {
-                                        stringResource(R.string.nm_cloud_usage_row_notokens, r.requests)
-                                    },
-                                    amount = if (priced) "¥" + money(r.costCny) else numbers.format(r.charged),
-                                    compact = true,
+                            val rows = (if (showToday) usage.todayByKind else usage.totalByKind).filter { it.requests > 0 }
+                            if (rows.isEmpty()) {
+                                Text(
+                                    text = stringResource(R.string.nm_cloud_usage_empty),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                                 )
+                            } else {
+                                rows.forEachIndexed { i, r ->
+                                    if (i > 0) MuseRowDivider()
+                                    UsageLine(
+                                        icon = kindIcon(r.kind),
+                                        title = kindLabel(r.kind),
+                                        detail = if (r.tokens > 0) {
+                                            stringResource(R.string.nm_cloud_usage_row, r.requests, numbers.format(r.tokens))
+                                        } else {
+                                            stringResource(R.string.nm_cloud_usage_row_notokens, r.requests)
+                                        },
+                                        amount = if (priced) "¥" + money(r.costCny) else numbers.format(r.charged),
+                                    )
+                                }
                             }
-                            Spacer(Modifier.height(8.dp))
+                            val models = if (showToday) emptyList() else usage.byModel.filter { it.requests > 0 }
+                            if (models.isNotEmpty()) {
+                                MuseRowDivider(inset = 16.dp)
+                                Text(
+                                    text = stringResource(R.string.nm_cloud_usage_by_model),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 4.dp),
+                                )
+                                models.forEach { r ->
+                                    UsageLine(
+                                        icon = null,
+                                        title = r.model,
+                                        detail = if (r.tokens > 0) {
+                                            stringResource(R.string.nm_cloud_usage_row, r.requests, numbers.format(r.tokens))
+                                        } else {
+                                            stringResource(R.string.nm_cloud_usage_row_notokens, r.requests)
+                                        },
+                                        amount = if (priced) "¥" + money(r.costCny) else numbers.format(r.charged),
+                                        compact = true,
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                            }
                         }
                     }
                 }
 
                 // -- the two ways on, when the pool is spent or nearly --------------------------
                 if (a != null && a.limited && (a.exhausted || a.warn)) {
-                    MuseGap()
-                    AllowanceWaysCard(
-                        info = AllowanceSignal.Exhausted(
-                            leftCny = a.leftCny.coerceAtLeast(0.0),
-                            grantCny = a.grantCny,
-                            inviteUrl = a.inviteUrl,
-                            inviteBonusCny = a.inviteBonusCny,
-                            inviteeBonusCny = a.inviteeBonusCny,
-                            ownKeyDocs = a.ownKeyDocs,
-                            guidance = NanoMuseCloud.guidance(context), // the relay's list for the region first (contract C11)
-                        ),
-                        exhausted = a.exhausted,
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                    )
+                    item {
+                        MuseGap()
+                        AllowanceWaysCard(
+                            info = AllowanceSignal.Exhausted(
+                                leftCny = a.leftCny.coerceAtLeast(0.0),
+                                grantCny = a.grantCny,
+                                inviteUrl = a.inviteUrl,
+                                inviteBonusCny = a.inviteBonusCny,
+                                inviteeBonusCny = a.inviteeBonusCny,
+                                ownKeyDocs = a.ownKeyDocs,
+                                guidance = NanoMuseCloud.guidance(context), // the relay's list for the region first (contract C11)
+                            ),
+                            exhausted = a.exhausted,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                    }
                 }
 
                 // -- data controls: the switch lives under Settings; here, how it stands ---------
                 if (a != null) {
-                    MuseSectionLabel(stringResource(R.string.nm_data_title))
-                    MuseCard {
-                        MuseRow(
-                            title = stringResource(R.string.nm_data_improve),
-                            icon = Icons.Outlined.Storage,
-                            // the count is what the relay holds of this account: the record's turns
-                            // (relay 0.29) or, on an older relay, the training set's
-                            value = stringResource(if (a.contribute) R.string.nm_data_status_on else R.string.nm_data_status_off) +
-                                maxOf(a.samples, a.record?.takeIf { it.on }?.turns ?: 0).let { held ->
-                                    if (held > 0) " · " + stringResource(R.string.nm_data_turns, held) else ""
-                                },
-                            onClick = onOpenDataControls,
-                        )
+                    item {
+                        MuseSectionLabel(stringResource(R.string.nm_data_title))
+                        MuseCard {
+                            MuseRow(
+                                title = stringResource(R.string.nm_data_improve),
+                                icon = Icons.Outlined.Storage,
+                                // the count is what the relay holds of this account: the record's turns
+                                // (relay 0.29) or, on an older relay, the training set's
+                                value = stringResource(if (a.contribute) R.string.nm_data_status_on else R.string.nm_data_status_off) +
+                                    maxOf(a.samples, a.record?.takeIf { it.on }?.turns ?: 0).let { held ->
+                                        if (held > 0) " · " + stringResource(R.string.nm_data_turns, held) else ""
+                                    },
+                                onClick = onOpenDataControls,
+                            )
+                        }
                     }
                 }
 
                 // -- sign-ins ---------------------------------------------------------------
                 if (sessions.isNotEmpty()) {
-                    MuseSectionLabel(stringResource(R.string.nm_cloud_devices_signed_in))
-                    MuseCard {
-                        sessions.forEachIndexed { i, s ->
-                            if (i > 0) MuseRowDivider()
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Icon(
-                                    imageVector = if (s.device.contains("web", ignoreCase = true)) Icons.Outlined.Language
-                                    else if (s.device.contains("mac", true) || s.device.contains("windows", true) || s.device.contains("linux", true)) Icons.Outlined.Computer
-                                    else Icons.Outlined.PhoneAndroid,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(22.dp),
-                                )
-                                Spacer(Modifier.width(14.dp))
-                                Column(Modifier.weight(1f)) {
-                                    val deviceName = s.device.ifBlank { stringResource(R.string.nm_cloud_device_unknown) }
-                                    val thisOne = if (s.current) "  ·  " + stringResource(R.string.nm_cloud_this_device) else ""
-                                    Text(
-                                        text = deviceName + thisOne,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurface,
+                    item {
+                        MuseSectionLabel(stringResource(R.string.nm_cloud_devices_signed_in))
+                        MuseCard {
+                            sessions.forEachIndexed { i, s ->
+                                if (i > 0) MuseRowDivider()
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        imageVector = if (s.device.contains("web", ignoreCase = true)) Icons.Outlined.Language
+                                        else if (s.device.contains("mac", true) || s.device.contains("windows", true) || s.device.contains("linux", true)) Icons.Outlined.Computer
+                                        else Icons.Outlined.PhoneAndroid,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(22.dp),
                                     )
-                                    Text(
-                                        text = listOf(
-                                            stringResource(if (s.via == "password") R.string.nm_cloud_via_password else R.string.nm_cloud_via_code),
-                                            stringResource(
-                                                R.string.nm_cloud_last_used,
-                                                SystemFiles.relative(context, (if (s.lastUsedAt > 0) s.lastUsedAt else s.createdAt) * 1000),
-                                            ),
-                                        ).joinToString(" · "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (!s.current) {
-                                    TextButton(
-                                        enabled = !busy,
-                                        onClick = {
-                                            busy = true
-                                            scope.launch {
-                                                try {
-                                                    NanoMuseCloud.revokeSession(context, s.prefix)
-                                                    sessions = sessions.filterNot { it.prefix == s.prefix }
-                                                } catch (e: Exception) {
-                                                    error = NanoMuseCloud.describe(context, e)
+                                    Spacer(Modifier.width(14.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        val deviceName = s.device.ifBlank { stringResource(R.string.nm_cloud_device_unknown) }
+                                        val thisOne = if (s.current) "  ·  " + stringResource(R.string.nm_cloud_this_device) else ""
+                                        Text(
+                                            text = deviceName + thisOne,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                        )
+                                        Text(
+                                            text = listOf(
+                                                stringResource(if (s.via == "password") R.string.nm_cloud_via_password else R.string.nm_cloud_via_code),
+                                                stringResource(
+                                                    R.string.nm_cloud_last_used,
+                                                    SystemFiles.relative(context, (if (s.lastUsedAt > 0) s.lastUsedAt else s.createdAt) * 1000),
+                                                ),
+                                            ).joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                    if (!s.current) {
+                                        TextButton(
+                                            enabled = !busy,
+                                            onClick = {
+                                                busy = true
+                                                scope.launch {
+                                                    try {
+                                                        NanoMuseCloud.revokeSession(context, s.prefix)
+                                                        sessions = sessions.filterNot { it.prefix == s.prefix }
+                                                    } catch (e: Exception) {
+                                                        error = NanoMuseCloud.describe(context, e)
+                                                    }
+                                                    busy = false
                                                 }
-                                                busy = false
-                                            }
-                                        },
-                                    ) { Text(stringResource(R.string.nm_cloud_sign_out), color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
+                                            },
+                                        ) { Text(stringResource(R.string.nm_cloud_sign_out), color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
+                                    }
                                 }
                             }
                         }
@@ -598,97 +626,105 @@ fun CloudAccountScreen(
 
                 // -- history ----------------------------------------------------------------
                 if (events.isNotEmpty()) {
-                    MuseSectionLabel(stringResource(R.string.nm_cloud_activity))
-                    MuseCard {
-                        events.take(12).forEachIndexed { i, e ->
-                            if (i > 0) MuseRowDivider(inset = 16.dp)
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(
-                                        text = eventLabel(e.kind),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (e.kind == "sign_in.failed" || e.kind == "budget.refused" || e.kind == "upstream.error") {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        },
-                                    )
-                                    if (e.detail.isNotBlank() && !e.kind.startsWith("password")) {
+                    item {
+                        MuseSectionLabel(stringResource(R.string.nm_cloud_activity))
+                        MuseCard {
+                            events.take(12).forEachIndexed { i, e ->
+                                if (i > 0) MuseRowDivider(inset = 16.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(Modifier.weight(1f)) {
                                         Text(
-                                            text = e.detail,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            text = eventLabel(e.kind),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (e.kind == "sign_in.failed" || e.kind == "budget.refused" || e.kind == "upstream.error") {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
                                         )
+                                        if (e.detail.isNotBlank() && !e.kind.startsWith("password")) {
+                                            Text(
+                                                text = e.detail,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
                                     }
+                                    Text(
+                                        text = SystemFiles.relative(context, e.ts * 1000),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                                 }
-                                Text(
-                                    text = SystemFiles.relative(context, e.ts * 1000),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             }
                         }
                     }
                 }
 
-                MuseGap()
-                CommunityNoticeCard()
-                MuseGap()
-                MuseCard {
-                    Text(
-                        text = stringResource(R.string.nm_cloud_how_it_works),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                    MuseRowDivider(inset = 16.dp)
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_open_provider),
-                        icon = Icons.Outlined.Tune,
-                        onClick = { NanoMuseCloud.instance(context)?.let { onOpenProvider(it.id) } },
-                    )
-                    MuseRowDivider()
-                    MuseRow(title = stringResource(R.string.settings_model_groups), onClick = onOpenModelGroups)
+                item {
+                    MuseGap()
+                    CommunityNoticeCard()
+                    MuseGap()
+                    MuseCard {
+                        Text(
+                            text = stringResource(R.string.nm_cloud_how_it_works),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp),
+                        )
+                        MuseRowDivider(inset = 16.dp)
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_open_provider),
+                            icon = Icons.Outlined.Tune,
+                            onClick = { NanoMuseCloud.instance(context)?.let { onOpenProvider(it.id) } },
+                        )
+                        MuseRowDivider()
+                        MuseRow(title = stringResource(R.string.settings_model_groups), onClick = onOpenModelGroups)
+                    }
                 }
-                MuseGap()
-                DevicesSection(onAsk = onAskDevice?.let { ask -> { d -> ask(d.name) } })
+
+                item {
+                    MuseGap()
+                    DevicesSection(onAsk = onAskDevice?.let { ask -> { d -> ask(d.name) } })
+                }
 
                 // -- the ways out -----------------------------------------------------------
-                MuseGap()
-                MuseCard {
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_sign_out_here),
-                        icon = Icons.AutoMirrored.Outlined.Logout,
-                        chevron = false,
-                        onClick = { confirm = Confirm.SIGN_OUT },
-                    )
-                    MuseRowDivider()
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_sign_out_everywhere),
-                        icon = Icons.AutoMirrored.Outlined.Logout,
-                        chevron = false,
-                        onClick = { confirm = Confirm.SIGN_OUT_ALL },
-                    )
-                    MuseRowDivider()
-                    MuseRow(
-                        title = stringResource(R.string.nm_cloud_delete_account),
-                        icon = Icons.Outlined.DeleteOutline,
-                        chevron = false,
-                        titleColor = MaterialTheme.colorScheme.error,
-                        onClick = { confirm = Confirm.DELETE },
+                item {
+                    MuseGap()
+                    MuseCard {
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_sign_out_here),
+                            icon = Icons.AutoMirrored.Outlined.Logout,
+                            chevron = false,
+                            onClick = { confirm = Confirm.SIGN_OUT },
+                        )
+                        MuseRowDivider()
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_sign_out_everywhere),
+                            icon = Icons.AutoMirrored.Outlined.Logout,
+                            chevron = false,
+                            onClick = { confirm = Confirm.SIGN_OUT_ALL },
+                        )
+                        MuseRowDivider()
+                        MuseRow(
+                            title = stringResource(R.string.nm_cloud_delete_account),
+                            icon = Icons.Outlined.DeleteOutline,
+                            chevron = false,
+                            titleColor = MaterialTheme.colorScheme.error,
+                            onClick = { confirm = Confirm.DELETE },
+                        )
+                    }
+                    Text(
+                        text = stringResource(R.string.nm_cloud_sign_out_sub),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
                     )
                 }
-                Text(
-                    text = stringResource(R.string.nm_cloud_sign_out_sub),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 8.dp),
-                )
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 

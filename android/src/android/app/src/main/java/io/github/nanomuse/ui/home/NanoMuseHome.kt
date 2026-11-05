@@ -323,6 +323,13 @@ fun NanoMuseHome(
         scope.launch { drawerState.open() }
     }
     fun closeDrawer() = scope.launch { drawerState.close() }
+    fun navigateFromDrawer(route: String) {
+        navController.safeNavigate(route)
+        scope.launch {
+            kotlinx.coroutines.delay(350L)
+            drawerState.snapTo(DrawerValue.Closed)
+        }
+    }
 
     // Back: close the drawer → leave a non-chat tab → leave a side chat → double press to leave the app.
     val homeShown = phase == HomePhase.HOME
@@ -363,12 +370,12 @@ fun NanoMuseHome(
                     onOpenMain = { closeDrawer(); showMain() },
                     onOpenSession = { id -> closeDrawer(); showSession(id) },
                     onNewChat = { closeDrawer(); showSession("__new__${UUID.randomUUID()}") },
-                    onAllChats = { closeDrawer(); navController.safeNavigate(ROUTE_ALL_CHATS) },
-                    onSettings = { closeDrawer(); navController.safeNavigate(Routes.SETTINGS) },
+                    onAllChats = { navigateFromDrawer(ROUTE_ALL_CHATS) },
+                    onSettings = { navigateFromDrawer(Routes.SETTINGS) },
                     onSetMain = { id -> MainChat.set(context, id); closeDrawer(); showSession(id) },
-                    onSystemFiles = { closeDrawer(); navController.safeNavigate(io.github.nanomuse.ui.sysfiles.ROUTE_SYSTEM_FILES) },
-                    onDevices = { closeDrawer(); navController.safeNavigate(io.github.nanomuse.ui.cloud.ROUTE_CLOUD_ACCOUNT) },
-                    onCoding = { closeDrawer(); navController.safeNavigate(io.github.nanomuse.ui.coding.ROUTE_CODING) },
+                    onSystemFiles = { navigateFromDrawer(io.github.nanomuse.ui.sysfiles.ROUTE_SYSTEM_FILES) },
+                    onDevices = { navigateFromDrawer(io.github.nanomuse.ui.cloud.ROUTE_CLOUD_ACCOUNT) },
+                    onCoding = { navigateFromDrawer(io.github.nanomuse.ui.coding.ROUTE_CODING) },
                 )
             }
         },
