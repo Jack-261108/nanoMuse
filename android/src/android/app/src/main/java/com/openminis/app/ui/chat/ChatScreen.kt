@@ -490,6 +490,8 @@ fun ChatScreen(
     val nmHeaderModelShown by io.github.nanomuse.ui.chat.rememberHeaderModelShown()
     val nmHideModelRows = nmHome != null && nmHome.isMainChat && !nmHeaderModelShown
     val nmAvatarSize by io.github.nanomuse.ui.avatar.rememberAvatarSize() // nanoMuse: Settings → Appearance → Avatar size
+    // nanoMuse: only the chat canvas and its fades follow the local background choice.
+    val nmChatBackground = io.github.nanomuse.ui.chat.rememberChatBackgroundColor()
     // nanoMuse: the agent's steps (tool pills, reasoning, the bar over the
     // composer) are a Setting (Appearance → Conversation), off by default;
     // the status line under the face carries what it is doing instead.
@@ -2526,7 +2528,7 @@ fun ChatScreen(
         LocalMarkdownSessionId provides sessionId,
     ) {
     Scaffold(
-        containerColor = ChatColors.background,
+        containerColor = nmChatBackground, // nanoMuse: chat-only canvas
         contentWindowInsets = WindowInsets(0),
         topBar = {
             // nanoMuse: the header is an overlay. The list slides underneath and
@@ -2537,8 +2539,8 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .background(
                         Brush.verticalGradient(
-                            0f to ChatColors.background.copy(alpha = 0.8f),
-                            0.55f to ChatColors.background.copy(alpha = 0.35f),
+                            0f to nmChatBackground.copy(alpha = 0.8f),
+                            0.55f to nmChatBackground.copy(alpha = 0.35f),
                             1f to Color.Transparent,
                         )
                     ),
@@ -4707,7 +4709,7 @@ fun ChatScreen(
                 // nanoMuse: fade into the canvas above the composer while reading
                 // older messages. Live browser controls hide it immediately, even
                 // if a scroll animation or the alpha tween is still in progress.
-                val nmEdgeFade = ChatColors.background
+                val nmEdgeFade = nmChatBackground
                 val nmScrolledUp = listState.firstVisibleItemIndex > 0 ||
                     listState.firstVisibleItemScrollOffset > 0
                 val nmBottomFadeAlpha by animateFloatAsState(
@@ -7120,7 +7122,7 @@ fun ChatScreen(
             }
             },
         )
-        // Top gradient fade: messages fade into the Scaffold background.
+        // nanoMuse: the top fade follows the selected chat canvas.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -7129,8 +7131,8 @@ fun ChatScreen(
                 .background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
                         colors = listOf(
-                            ChatColors.background,
-                            ChatColors.background.copy(alpha = 0f),
+                            nmChatBackground,
+                            nmChatBackground.copy(alpha = 0f),
                         ),
                     )
                 )
