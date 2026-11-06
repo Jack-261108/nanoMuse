@@ -28,7 +28,11 @@ object HelperProcess {
         }
         val packageName = args[0]
         val appUid = args[1].toIntOrNull() ?: exitProcess(2)
-        val nonce = if (args.size > 2) args[2] else ""
+        val nonce = if (args.size > 2 && args[2] != "-") {
+            args[2]
+        } else {
+            runCatching { readLine() }.getOrNull().orEmpty()
+        }
 
         Looper.prepareMainLooper()
         val service = ShellService(allowedUid = appUid)

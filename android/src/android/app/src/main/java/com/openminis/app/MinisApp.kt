@@ -565,6 +565,8 @@ class MinisApp : Application(), ImageLoaderFactory {
         NativeOffloadServer.register("nanomuse-backup", io.github.nanomuse.backup.BackupOffloadHandler(this))
         // nanoMuse: join the hub, so the user's other devices can reach this phone and it can reach them.
         io.github.nanomuse.hub.Hub.autoStart(this)
+        // nanoMuse: start builtin wireless debugging manager & watchdog recovery
+        io.github.nanomuse.shell.setup.BuiltinShellManager.instance(this).start()
         // T-config: minis-config — agent-facing settings management
         // (read/write registered ConfigFields with audit + revert).
         // Mirrors iOS `config_offload_register()` in ISHKernel.m.

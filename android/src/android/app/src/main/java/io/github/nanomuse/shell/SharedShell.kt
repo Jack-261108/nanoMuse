@@ -46,8 +46,9 @@ object SharedShell {
 
     /**
      * 尝试启动特权助手：
-     * 1. 优先检测并使用 Shizuku
-     * 2. 其次尝试使用 su (root)
+     * 1. 优先检测并使用 Shizuku (免去配对与端口扫描，秒级拉起)
+     * 2. 其次使用内置无线调试已配对客户端 (零电脑、零 Shizuku、零 root)
+     * 3. 最后尝试使用 su (root)
      */
     fun startHelper(context: Context): Boolean {
         if (isReady()) return true
@@ -55,13 +56,23 @@ object SharedShell {
         val apkPath = context.applicationInfo.sourceDir
         val pkg = context.packageName
         val uid = Process.myUid()
-        val shellCmd = "CLASSPATH=$apkPath app_process /system/bin io.github.nanomuse.shell.HelperProcess $pkg $uid >/dev/null 2>&1 &"
+        val nonce = java.util.UUID.randomUUID().toString()
+        val shellCmd = "killall -q $pkg:helper 2>/dev/null; " +
+            "CLASSPATH='$apkPath' nohup app_process /system/bin --nice-name='$pkg:helper' " +
+            "io.github.nanomuse.shell.HelperProcess '$pkg' $uid '$nonce' </dev/null >/dev/null 2>&1 &"
 
         if (ShizukuManager.isReady()) {
             AppLogger.info(TAG, "starting shell helper via Shizuku...")
             Thread {
                 ShizukuManager.runProcess(arrayOf("sh", "-c", shellCmd))
             }.start()
+            return true
+        }
+
+        val builtin = io.github.nanomuse.shell.setup.BuiltinShellManager.instance(context)
+        if (builtin.paired) {
+            AppLogger.info(TAG, "starting shell helper via builtin wireless debugging...")
+            builtin.need()
             return true
         }
 
@@ -83,7 +94,8 @@ object SharedShell {
         val apkPath = context.applicationInfo.sourceDir
         val pkg = context.packageName
         val uid = Process.myUid()
-        return "CLASSPATH=$apkPath nohup app_process /system/bin io.github.nanomuse.shell.HelperProcess $pkg $uid >/dev/null 2>&1 &"
+        val nonce = java.util.UUID.randomUUID().toString()
+        return "CLASSPATH='$apkPath' nohup app_process /system/bin --nice-name='$pkg:helper' io.github.nanomuse.shell.HelperProcess '$pkg' $uid '$nonce' </dev/null >/dev/null 2>&1 &"
     }
 
     private fun hasSu(): Boolean {

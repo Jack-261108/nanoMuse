@@ -35,6 +35,8 @@ class MinisAccessibilityService : AccessibilityService() {
 
         @Volatile
         private var _instance: MinisAccessibilityService? = null
+        // nanoMuse: reactive instance flow for AccessibilityRepair monitoring
+        val instance = kotlinx.coroutines.flow.MutableStateFlow<MinisAccessibilityService?>(null)
 
         fun getInstance(): MinisAccessibilityService? = _instance
     }
@@ -55,12 +57,14 @@ class MinisAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         _instance = this
+        instance.value = this // nanoMuse: update reactive flow
         AppLogger.info(TAG, "service created")
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         _instance = this
+        instance.value = this // nanoMuse: update reactive flow
         // [T-android-a11y-miui-service-failure] Breadcrumb on (re)bind. On OEM
         // ROMs (MIUI etc.) the system kills + rebinds this service repeatedly,
         // surfacing "此服务出现故障"; a connect log lets us correlate a degraded
@@ -102,7 +106,10 @@ class MinisAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (_instance === this) _instance = null
+        if (_instance === this) {
+            _instance = null
+            instance.value = null // nanoMuse: update reactive flow
+        }
         eventRing.clear()
         nodeRegistry.clear()
         eventListeners.clear()

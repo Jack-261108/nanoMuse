@@ -17,10 +17,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -34,6 +39,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.openminis.app.MinisApp
 import com.openminis.app.R
+import com.openminis.app.offload.ShizukuManager
 import com.openminis.app.ui.settings.SettingsRow
 import com.openminis.app.ui.settings.SettingsScaffold
 import com.openminis.app.ui.settings.SettingsSection
@@ -41,7 +47,13 @@ import com.openminis.app.ui.settings.SettingsSwitchRow
 import io.github.nanomuse.hands.AdbKeyboardHelper
 import io.github.nanomuse.hands.Hands
 import io.github.nanomuse.shell.SharedShell
+import io.github.nanomuse.shell.setup.BuiltinShellFailure
+import io.github.nanomuse.shell.setup.BuiltinShellFix
+import io.github.nanomuse.shell.setup.BuiltinShellManager
+import io.github.nanomuse.shell.setup.BuiltinShellStatus
+import io.github.nanomuse.shell.setup.DeveloperSettings
 import io.github.nanomuse.ui.home.MuseTones
+import kotlinx.coroutines.launch
 
 const val ROUTE_HANDS = "nanomuse/hands"
 
@@ -173,37 +185,211 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
         // ── virtual screen ──
         val virtualScreenEnabled by remember(context) { Hands.virtualScreenEnabledFlow(context) }.collectAsState(initial = Hands.virtualScreenEnabled(context))
         val shellInstance by SharedShell.shell.collectAsState()
+        val builtin = remember(context) { BuiltinShellManager.instance(context) }
+        val builtinStatus by builtin.status.collectAsState()
+        val scanningPorts by builtin.scanningPorts.collectAsState()
+        val scope = rememberCoroutineScope()
+
+        val isRepairNeeded = builtinStatus is BuiltinShellStatus.Failed && (builtinStatus as BuiltinShellStatus.Failed).fix == BuiltinShellFix.RePair
+        var confirmUnpair by remember { mutableStateOf(false) }
+        var showPairingGuide by remember { mutableStateOf(false) }
+
+        if (confirmUnpair) {
+            AlertDialog(
+                onDismissRequest = { confirmUnpair = false },
+                title = { Text(stringResource(R.string.nm_hands_virtual_screen_unpair_dialog_title)) },
+                text = { Text(stringResource(R.string.nm_hands_virtual_screen_unpair_dialog_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        confirmUnpair = false
+                        scope.launch { builtin.unpair() }
+                    }) {
+                        Text(stringResource(R.string.nm_hands_virtual_screen_unpair_confirm), color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { confirmUnpair = false }) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                },
+            )
+        }
+
+        val guideToastText = stringResource(R.string.nm_hands_virtual_screen_pair_guide_toast)
+        if (showPairingGuide) {
+            AlertDialog(
+                onDismissRequest = { showPairingGuide = false },
+                title = { Text(stringResource(R.string.nm_hands_virtual_screen_pair_guide_title)) },
+                text = { Text(stringResource(R.string.nm_hands_virtual_screen_pair_guide_body)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showPairingGuide = false
+                        if (isRepairNeeded) {
+                            builtin.coordinator.startRepair()
+                        }
+                        builtin.coordinator.begin()
+                        android.widget.Toast.makeText(context, guideToastText, android.widget.Toast.LENGTH_LONG).show()
+                        val intents = DeveloperSettings.wirelessDebuggingPage()
+                        for (intent in intents) {
+                            if (runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
+                                break
+                            }
+                        }
+                    }) {
+                        Text(stringResource(R.string.nm_hands_virtual_screen_pair_guide_action))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPairingGuide = false }) {
+                        Text(stringResource(android.R.string.cancel))
+                    }
+                },
+            )
+        }
+
         SettingsSection(
             header = stringResource(R.string.nm_hands_section_virtual_screen),
             footer = stringResource(R.string.nm_hands_virtual_screen_footer),
         ) {
+            val status = builtinStatus
+            val failedReason = (status as? BuiltinShellStatus.Failed)?.reason
+            val isNoWifi = failedReason == BuiltinShellFailure.NoWifi
+            val isOff = status is BuiltinShellStatus.WirelessDebuggingOff || failedReason == BuiltinShellFailure.WifiNotAllowed
+            val isRetry = status is BuiltinShellStatus.Failed && status.fix == BuiltinShellFix.Retry
+
             SettingsSwitchRow(
                 title = stringResource(R.string.nm_hands_virtual_screen_title),
                 subtitle = when {
                     shellInstance != null -> stringResource(R.string.nm_hands_virtual_screen_ready)
+                    status is BuiltinShellStatus.Connecting -> stringResource(if (scanningPorts) R.string.nm_hands_virtual_screen_scanning_port else R.string.nm_hands_virtual_screen_connecting)
+                    isOff -> stringResource(R.string.nm_hands_virtual_screen_wireless_off)
+                    isRepairNeeded -> stringResource(R.string.nm_hands_virtual_screen_repair)
+                    isNoWifi -> stringResource(R.string.nm_hands_virtual_screen_no_wifi)
+                    isRetry -> stringResource(R.string.nm_hands_virtual_screen_retry_helper)
                     else -> stringResource(R.string.nm_hands_virtual_screen_not_started)
                 },
                 checked = virtualScreenEnabled,
                 onCheckedChange = { Hands.setVirtualScreenEnabled(context, it) },
                 icon = Icons.Outlined.Layers,
                 iconColor = if (virtualScreenEnabled && shellInstance != null) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
-                showDivider = shellInstance == null,
+                showDivider = true,
             )
+
             if (shellInstance == null) {
+                val shizukuSnapshot by ShizukuManager.snapshot.collectAsState()
+                if (shizukuSnapshot.state == ShizukuManager.State.READY) {
+                    SettingsRow(
+                        title = stringResource(R.string.nm_hands_virtual_screen_start_helper),
+                        subtitle = stringResource(R.string.nm_hands_virtual_screen_start_sub),
+                        onClick = {
+                            SharedShell.startHelper(context)
+                        },
+                        showDivider = true,
+                    )
+                }
+
+                if (!builtin.paired || isRepairNeeded) {
+                    SettingsRow(
+                        title = stringResource(if (isRepairNeeded) R.string.nm_hands_virtual_screen_repair else R.string.nm_hands_virtual_screen_pair_wireless),
+                        subtitle = stringResource(if (isRepairNeeded) R.string.nm_hands_virtual_screen_repair_sub else R.string.nm_hands_virtual_screen_pair_wireless_sub),
+                        onClick = {
+                            showPairingGuide = true
+                        },
+                        showDivider = true,
+                    )
+                } else {
+                    SettingsRow(
+                        title = when {
+                            isNoWifi -> stringResource(R.string.nm_hands_virtual_screen_no_wifi)
+                            isOff -> stringResource(R.string.nm_hands_virtual_screen_wireless_off)
+                            isRetry -> stringResource(R.string.nm_hands_virtual_screen_retry_helper)
+                            status is BuiltinShellStatus.Connecting -> stringResource(if (scanningPorts) R.string.nm_hands_virtual_screen_scanning_port else R.string.nm_hands_virtual_screen_connecting)
+                            else -> stringResource(R.string.nm_hands_virtual_screen_start_helper)
+                        },
+                        subtitle = when {
+                            isNoWifi -> stringResource(R.string.nm_hands_virtual_screen_no_wifi_sub)
+                            isOff -> stringResource(R.string.nm_hands_virtual_screen_wireless_off_sub)
+                            isRetry -> builtin.lastError ?: stringResource(R.string.nm_hands_virtual_screen_start_wireless_sub)
+                            else -> stringResource(R.string.nm_hands_virtual_screen_start_wireless_sub)
+                        },
+                        onClick = {
+                            when {
+                                isNoWifi -> {
+                                    val intents = DeveloperSettings.wifiPage()
+                                    for (intent in intents) {
+                                        if (runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
+                                            break
+                                        }
+                                    }
+                                }
+                                isOff -> {
+                                    val intents = DeveloperSettings.wirelessDebuggingPage()
+                                    for (intent in intents) {
+                                        if (runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) {
+                                            break
+                                        }
+                                    }
+                                    builtin.need()
+                                }
+                                else -> {
+                                    builtin.need()
+                                }
+                            }
+                        },
+                        showDivider = true,
+                    )
+                }
+
                 SettingsRow(
-                    title = stringResource(R.string.nm_hands_virtual_screen_start_helper),
-                    subtitle = stringResource(R.string.nm_hands_virtual_screen_start_sub),
+                    title = stringResource(R.string.nm_hands_virtual_screen_copy_cmd),
+                    subtitle = stringResource(R.string.nm_hands_virtual_screen_copy_cmd_sub),
                     onClick = {
-                        val started = SharedShell.startHelper(context)
-                        if (!started) {
-                            val cmd = SharedShell.getAdbCommand(context)
-                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                            cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb_cmd", cmd))
-                            android.widget.Toast.makeText(context, "Command copied: run via adb shell", android.widget.Toast.LENGTH_LONG).show()
-                        }
+                        val cmd = SharedShell.getAdbCommand(context)
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                        cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb_cmd", cmd))
+                        android.widget.Toast.makeText(context, "Command copied: run via adb shell", android.widget.Toast.LENGTH_LONG).show()
                     },
-                    showDivider = false,
+                    showDivider = builtin.paired,
                 )
+
+                if (builtin.paired) {
+                    SettingsRow(
+                        title = stringResource(R.string.nm_hands_virtual_screen_unpair),
+                        subtitle = stringResource(R.string.nm_hands_virtual_screen_auto_recovery_sub),
+                        onClick = {
+                            confirmUnpair = true
+                        },
+                        showDivider = false,
+                    )
+                }
+            } else {
+                if (builtin.paired) {
+                    SettingsRow(
+                        title = stringResource(R.string.nm_hands_virtual_screen_unpair),
+                        subtitle = stringResource(R.string.nm_hands_virtual_screen_auto_recovery_sub),
+                        onClick = {
+                            confirmUnpair = true
+                        },
+                        showDivider = false,
+                    )
+                } else {
+                    SettingsRow(
+                        title = stringResource(R.string.nm_hands_virtual_screen_stop_helper),
+                        subtitle = stringResource(R.string.nm_hands_virtual_screen_stop_sub),
+                        onClick = {
+                            SharedShell.release()
+                        },
+                        showDivider = true,
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.nm_hands_virtual_screen_pair_wireless),
+                        subtitle = stringResource(R.string.nm_hands_virtual_screen_pair_wireless_sub),
+                        onClick = {
+                            showPairingGuide = true
+                        },
+                        showDivider = false,
+                    )
+                }
             }
         }
 

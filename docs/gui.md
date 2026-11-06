@@ -93,7 +93,7 @@ The agent does not have to run on the phone. A *device* connects to the nanoMuse
 
 ### Background virtual screen on Android
 
-When paired with the privileged shell helper (started through Shizuku, root `su`, or USB `adb`), the Android hands can run entirely in the background on an isolated virtual display instead of driving the physical screen:
+When paired with the privileged shell helper (started through on-device wireless debugging, Shizuku, root `su`, or USB `adb`), the Android hands can run entirely in the background on an isolated virtual display instead of driving the physical screen:
 
 - **Non-disturbing background execution**: The target application launches into a private trusted virtual display with its own display group and local input method policy. The user's main screen remains untouched and interactive. If a requested app is already running on the physical screen, the operator avoids launching it to prevent collision.
 - **Audio muting**: Background tasks have their audio playback muted through `appops` so media or sound effects do not play over the user's audio.

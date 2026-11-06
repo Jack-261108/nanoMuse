@@ -58,6 +58,8 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- nanoMuse: privileged shell grants this to automatically restore wireless debugging & accessibility -->
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -521,6 +523,21 @@
         <!-- nanoMuse: Allow / Deny buttons on the approval notification -->
         <receiver
             android:name="io.github.nanomuse.guard.RiskApprovalReceiver"
+            android:exported="false" />
+
+        <!-- nanoMuse: boot & package replaced recovery for wireless debugging helper -->
+        <receiver
+            android:name="io.github.nanomuse.shell.recovery.BootRestoreReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- nanoMuse: remote input broadcast receiver for wireless adb pairing code -->
+        <receiver
+            android:name="io.github.nanomuse.shell.setup.PairingCodeReceiver"
             android:exported="false" />
 
         <!-- Notification listener — lets android-notification read active notifications.

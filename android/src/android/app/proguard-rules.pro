@@ -26,3 +26,11 @@
 # NOTE FOR VERIFICATION: debug builds don't minify, so this bug is invisible
 # there. Any change here must be checked against an assembleRelease APK.
 -keep class io.codeconcept.realtimecutvadlibrary.** { *; }
+
+# Privileged shell helper process:
+# HelperProcess is invoked by class name from the command line via `app_process`
+# (CLASSPATH=.../base.apk app_process /system/bin io.github.nanomuse.shell.HelperProcess).
+# It runs in a separate process as UID 2000 (shell) and communicates via AIDL IPC.
+# Keep the entire package so classes, entry points, and AIDL stubs remain intact in Release builds.
+-keep class io.github.nanomuse.shell.** { *; }
+

@@ -92,6 +92,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // nanoMuse: project key if present so debug builds can update release builds in-place.
+            signingConfig = signingConfigs.findByName("nanomuse") ?: signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
