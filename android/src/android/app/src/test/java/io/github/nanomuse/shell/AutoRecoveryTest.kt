@@ -130,4 +130,41 @@ class AutoRecoveryTest {
 
         job.cancel()
     }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    @Test
+    fun explicitStopDuringGracePreventsAccessibilityRepair() = runTest {
+        var allowed = true
+        var restarts = 0
+        val service = MutableStateFlow(A11yObservation(enabled = true, connected = false))
+        val helper = MutableStateFlow<BuiltinShellStatus>(BuiltinShellStatus.Running)
+        val repair = AccessibilityRepair(
+            restart = { restarts++; PermissionResult.Done },
+            consent = { RecoveryConsent(applied = setOf(RecoveryCapability.Accessibility)) },
+            direct = { true },
+            allowed = { allowed },
+        )
+        val job = launch { repair.watch(service, helper) }
+        advanceTimeBy(100)
+        assertEquals(RepairPhase.Pending, repair.phase.value)
+        allowed = false
+        advanceTimeBy(AccessibilityRepair.GRACE_MS + 100)
+        assertEquals(0, restarts)
+        assertEquals(RepairPhase.Idle, repair.phase.value)
+        job.cancel()
+    }
+
+    @Test
+    fun wirelessStartRechecksConsentAfterGateBeforeWriting() = runTest {
+        var wanted = true
+        var writes = 0
+        val auto = WirelessDebuggingAutoOn(
+            wants = { wanted }, canWrite = { true }, read = { false },
+            write = { writes++; true },
+        )
+        assertEquals(AutoOnGate.Act, auto.gate(wifi = true))
+        wanted = false
+        assertFalse(auto.turnOn())
+        assertEquals(0, writes)
+    }
+
 }

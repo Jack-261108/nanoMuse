@@ -56,8 +56,8 @@ import kotlin.math.sin
 class HandsStage(private val context: Context) {
     enum class Mood { WORKING, WAITING }
 
-    private val main = Handler(Looper.getMainLooper())
-    private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val main by lazy { Handler(Looper.getMainLooper()) }
+    private val wm by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
     private var view: StageView? = null
 
     /** Adds the window (below anything added after it) and returns once it is there. */
@@ -115,7 +115,8 @@ class HandsStage(private val context: Context) {
     // ── window ─────────────────────────────────────────────────────────────
 
     private fun onMain(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) runCatching(block).onFailure { AppLogger.warning(TAG, "stage: ${it.message}") }
+        val looper = runCatching { Looper.getMainLooper() }.getOrNull()
+        if (looper == null || Looper.myLooper() == looper) runCatching(block).onFailure { AppLogger.warning(TAG, "stage: ${it.message}") }
         else main.post { runCatching(block).onFailure { AppLogger.warning(TAG, "stage: ${it.message}") } }
     }
 

@@ -6,6 +6,8 @@ object HelperHandoff {
     const val KEY_NONCE = "nonce"
     const val KEY_UID = "uid"
     const val KEY_PID = "pid"
+    const val KEY_CLIENT_TOKEN = "client_token"
+    const val KEY_ACCEPTED = "ok"
 
     fun authority(packageName: String): String = "$packageName.shell.helper"
 }

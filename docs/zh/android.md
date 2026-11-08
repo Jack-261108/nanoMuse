@@ -80,6 +80,38 @@ Shell 进度更新若把较长内容改为较短文字，会保留未被覆盖�
 设置 → 外观 中，「聊天输入」「消息文本」「应用基础」的字号名称按 App 当前语言显示。
 
 
+### 停止屏幕任务 {#stopping-a-screen-task}
+
+按悬浮胶囊上的**停止**可以结束屏幕任务，手指按下时就会响应。点击、长按和滑动期间，
+胶囊始终可以触摸。主屏手势会经过胶囊时，胶囊会先移出整条手势路径；如果没有安全位置，
+操作器会拒绝这次手势，保留停止按钮。
+
+停止会取消模型等待，阻止尚未开始的手势和双击的第二次点击。已经交给 Android 的手势仍可能
+完成。模型超时仍按失败重试，不会被记成用户停止。
+
+### 后台屏幕与助手 {#background-screen-and-helper}
+
+后台屏幕控制需要 Android 12 及以上版本和兼容的特权助手，Android 11 仍可使用主屏控制。
+在手的设置页中，可以通过 Shizuku、已配对的无线调试、root 或手动 ADB 命令启动助手。
+收到有效的助手连接后，页面才会显示就绪。助手会检查设备的显示、任务和输入能力；
+设备不支持或连接失败时，后台任务会说明原因并结束。要使用主屏，请自行关闭后台模式。
+
+没有指定应用的任务会先向智能体提供已安装应用列表，打开应用后才能点击或输入。
+输入框和按钮文字只从选定的屏幕读取。粘贴后，操作器会读取输入框确认文字；无法确认时，
+会报告未确认，不会重复粘贴。操作期间你新复制的内容不会被剪贴板恢复覆盖。
+
+遇到付款或其他需要你处理的步骤时，操作器把任务移到主屏等待。你点继续后，它会把任务
+移回后台并重新观察画面，再决定下一步。继续不会重放原点击，也不代表付款成功。
+移到主屏或移回后台失败时，屏幕操作会停止。
+
+任务结束后，助手恢复自己修改过的音频设置；再次打开保留的任务时会重新静音。App 意外
+退出时，助手先关闭正在后台操作的屏幕任务，再恢复音频和剪贴板。其他应用间接打开的
+应用，在被检测到并静音前仍可能短暂出声。
+
+助手意外退出后会进行有限次数的重连。点**停止助手进程**后，自动重启和无障碍自愈会停止，
+直到你再次启动。**忘记配对**会先撤销恢复功能的权限；有权限无法撤销时，页面会提示重试
+清理，密钥仅保留用于清理，自动恢复保持关闭。清理成功后才会删除密钥。
+
 ## 自己的 key {#your-own-key}
 
 服务商信息保存在 `assets/nanomuse/providers.json`，它由 `node scripts/providers-json.mjs` 从运行时的 `nanomuse/llm/providers.json` 生成，各客户端共用同一目录，见 [own-key.md](own-key.md)。每项包括端点、key 创建页、登录方式、可注册地区 `cn` / `global`，以及模型能力 `chat`、`vision`（看屏幕）、`image`（图片）、`video`（短视频）。
@@ -230,6 +262,47 @@ Gradle 会在 Ubuntu 的 `$HOME/.android/debug.keystore` 创建 debug 签名密�
 
 示例数值是可选的堆内存上限，不是最低需求。应按 WSL 实际可用内存调整，并为其他进程预留空间。
 
+
+### 后台屏幕真机回归 {#background-screen-device-regression}
+
+使用 Android 12 及以上版本的 arm64 真机，通过 ADB 连接，保持手机解锁，并确保没有手的任务
+正在运行。完成上面的原生依赖构建后，在 `android/src/android` 目录运行以下命令，构建并安装
+主 APK 和测试 APK：
+
+```bash
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --console=plain --no-daemon
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+```
+
+打开 nanoMuse，并在 Android 设置中启用它的无障碍服务。测试前先停止 Android CLI 的交互
+服务，释放它可能占用的 UiAutomation 连接，否则测试运行器无法获取连接。只运行指定测试类：
+
+```bash
+adb shell am force-stop com.android.cli.interact.instrumentation
+adb shell am instrument -w \
+  -e class io.github.nanomuse.hands.BackgroundScreenDeviceTest \
+  io.github.nanomuse.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+测试只操作测试 APK 内的本地页面，检查助手连接、后台屏幕与输入、剪贴板内容读回、模拟付款
+接管、保留任务的复用、音频恢复和助手停止。测试不调用模型，也不进行真实付款。输出会逐项
+报告结果；剪贴板项显示 `SKIP` 表示该项未验证。测试会清理自己的屏幕任务，并停止助手。
+之后需要继续使用后台屏幕控制时，在手的设置页重新启动助手。
+
+设备无法应用静音设置时，可以在相同前置条件下单独运行下面的拒绝操作测试。它检查后台启动
+和重启都返回失败、不创建任务、保留主屏任务与原音频模式，并释放虚拟屏和助手：
+
+```bash
+adb shell am force-stop com.android.cli.interact.instrumentation
+adb shell am instrument -w \
+  -e class io.github.nanomuse.hands.BackgroundScreenAudioCompatibilityDeviceTest \
+  io.github.nanomuse.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+如果静音生效，测试会恢复原音频模式并报告跳过。测试通过表示不兼容设备上的拒绝操作行为
+符合预期，不代表完整后台屏幕回归通过。这个用例也只使用本地测试页面，不调用模型或付款，
+结束后助手保持停止。
 
 ## 发布 {#releases}
 

@@ -555,9 +555,11 @@
     <string name="nm_hands_why_any">the only enabled model that can see</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Supports wireless debugging pairing without a PC, Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">Run apps on a background screen with Android 12 or later and a compatible privileged helper. Start it through wireless debugging, Shizuku, root or USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Privileged helper ready</string>
-    <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to pair or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to pair or start helper</string>
+    <string name="nm_hands_virtual_screen_unavailable">The privileged helper is not ready for background mode. Please start or retry the helper in settings, or turn off background virtual screen to use the main screen.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Failed to initialize background virtual screen (%1$s). Please retry or turn off background screen to use the main screen.</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Connect via wireless debugging and launch helper process</string>
@@ -575,7 +577,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Retry connecting helper</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Forget pairing?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse will delete saved pairing keys and stop operating on the background virtual screen. You can pair again anytime.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Permissions are removed before the helper stops and pairing keys are deleted. If removal fails, the key is kept only for cleanup and automatic recovery stays off.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Forget</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1296,4 +1298,12 @@
     <string name="nm_chat_background_purple">Purple</string>
     <string name="nm_chat_in_progress">Task in progress</string>
     <string name="nm_mcp_oauth_token_failed">Connector sign-in failed (%1$s). Check the connection and OAuth settings, then try again.</string>
+    <string name="nm_hands_takeover_move_failed">Could not move the app to the main screen for you to take over. End the task and retry.</string>
+    <string name="nm_hands_takeover_restore_failed">Could not return the app to the background screen after takeover. Screen operation stopped.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Background screen control requires Android 12 or later. Main-screen control is still available.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Some permissions could not be removed. Retry cleanup; the saved key is kept only for this step and automatic recovery is stopped.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">No available helper connection. Start Shizuku, pair wireless debugging, or allow root access.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Root access was denied or timed out. Allow it before retrying.</string>
+    <string name="nm_hands_spill_restore_failed">Could not return an app that opened on the main screen to the background screen. Screen operation stopped.</string>
+    <string name="nm_hands_payment_takeover">Handle this payment step in the app, then tap Continue. The agent will check the screen before acting again.</string>
 </resources>

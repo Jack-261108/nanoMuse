@@ -24,6 +24,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
+import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The capsule that sits over the operated app while the hands work: the face in a slowly
@@ -59,17 +61,15 @@ import java.util.concurrent.TimeUnit
  *
  * The capsule hides itself for the instant a screenshot is taken ([hideForCapture]), so the
  * screen model never sees it and cannot tap its own Stop button. The model still cannot see
- * what is under it, so a gesture it asks for may land where the capsule is: for the length of
- * every injected gesture the window lets touches through ([passThrough]), and when the target
- * is under the capsule it first moves to the other end of the screen ([dodge]) so the ring
- * drawn there ([stage]) can be seen.
+ * what is under it, so [withGesture] moves the capsule clear of the whole gesture path first.
+ * The window stays touchable throughout the gesture so the person can always press Stop.
  *
  * The [stage] — the glow along the edges and the ring at the point about to be tapped — is a
  * second, full-screen window that never takes a touch, added first so the capsule stays on top.
  */
 class HandsCapsule(private val context: Context) {
-    private val main = Handler(Looper.getMainLooper())
-    private val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    private val main by lazy { Handler(Looper.getMainLooper()) }
+    private val wm by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
     private var root: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
     private var titleView: TextView? = null
@@ -78,8 +78,13 @@ class HandsCapsule(private val context: Context) {
     private var openBtn: TextView? = null
     private var allowBtn: TextView? = null
     private var denyBtn: TextView? = null
+    private var stopBtn: TextView? = null
     private var ring: RingView? = null
     private var bars: BarsView? = null
+    private val stopRequested = AtomicBoolean(false)
+    private var gestureInProgress = false // main thread only; prevents dragging into the stroke
+    private var preparedScreen: HandsGesturePlacement.Box? = null
+    private var preparedBounds: HandsGesturePlacement.Box? = null
 
     // ── Virtual screen preview (Mika-style PiP Window) ──
     private var previewToggleBtn: TextView? = null
@@ -101,8 +106,29 @@ class HandsCapsule(private val context: Context) {
 
     private fun dp(v: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), context.resources.displayMetrics).toInt()
 
+    /** Immediate visual feedback when Stop is tapped or requested. */
+    fun stopping() {
+        stopRequested.set(true)
+        onMain {
+            stage.clear()
+            ring?.turning(false)
+            bars?.stop()
+            bars?.visibility = View.GONE
+            titleView?.text = context.getString(R.string.nm_hands_stop)
+            detailView?.text = ""
+            continueBtn?.visibility = View.GONE
+            openBtn?.visibility = View.GONE
+            allowBtn?.visibility = View.GONE
+            denyBtn?.visibility = View.GONE
+            previewToggleBtn?.visibility = View.GONE
+            stopBtn?.isEnabled = false
+            stopBtn?.alpha = 0.5f
+        }
+    }
+
     /** Shows (or updates) the working state. */
     fun working(step: Int, detail: String) = onMain {
+        if (stopRequested.get()) return@onMain
         ensure()
         stage.mood(HandsStage.Mood.WORKING)
         ring?.turning(true)
@@ -119,6 +145,7 @@ class HandsCapsule(private val context: Context) {
 
     /** The hands wait for the user to do something on the phone. */
     fun takeOver(reason: String) = onMain {
+        if (stopRequested.get()) return@onMain
         ensure()
         stage.mood(HandsStage.Mood.WAITING)
         stage.clear()
@@ -141,6 +168,7 @@ class HandsCapsule(private val context: Context) {
      * which only the card in the chat can do: then the capsule offers Open instead.
      */
     fun approval(what: String, decidable: Boolean = false) = onMain {
+        if (stopRequested.get()) return@onMain
         ensure()
         stage.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
@@ -157,6 +185,7 @@ class HandsCapsule(private val context: Context) {
 
     /** 订阅后台虚拟屏的实时画面流（限速 <= 5 fps，有变化才推）。 */
     fun setPreviewFlow(flow: StateFlow<Bitmap?>?) = onMain {
+        if (flow != null && stopRequested.get()) return@onMain
         previewJob?.cancel()
         previewJob = null
         if (flow == null) {
@@ -200,7 +229,7 @@ class HandsCapsule(private val context: Context) {
         pipWindow?.hide()
         pipWindow = null
         val v = root
-        root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null
+        root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null; stopBtn = null
         previewToggleBtn = null
         ring?.turning(false); ring = null
         bars?.stop(); bars = null
@@ -235,80 +264,119 @@ class HandsCapsule(private val context: Context) {
         stage.setVisible(true)
     }
 
-    /**
-     * Runs [gesture] with the capsule letting touches through, so an injected tap or swipe that
-     * crosses it reaches the app underneath instead of Stop. Waits for the window manager to
-     * apply the flag before the gesture and puts it back after.
-     */
-    fun <T> passThrough(gesture: () -> T): T {
-        setPassThrough(true)
-        try {
-            return gesture()
-        } finally {
-            setPassThrough(false)
-        }
-    }
-
-    private fun setPassThrough(on: Boolean) {
-        val latch = CountDownLatch(1)
-        main.post {
+    /** Runs on the worker thread. An unsafe or unconfirmed placement rejects the gesture. */
+    fun withGesture(x1: Int, y1: Int, x2: Int, y2: Int, gesture: () -> Boolean): Boolean {
+        if (stopRequested.get() || Thread.currentThread().isInterrupted) return false
+        check(Looper.myLooper() != Looper.getMainLooper()) { "gestures must run off the main thread" }
+        val ready = CountDownLatch(1)
+        val abandoned = AtomicBoolean(false)
+        var safe = false
+        val prepare = Runnable {
+            if (abandoned.get() || stopRequested.get()) {
+                ready.countDown()
+                return@Runnable
+            }
             try {
-                val v = root ?: return@post
-                val p = params ?: return@post
-                val flags = if (on) p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                else p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                if (flags != p.flags) {
-                    p.flags = flags
+                val v = root
+                val p = params
+                if (v == null || p == null || !v.isAttachedToWindow) {
+                    ready.countDown()
+                    return@Runnable
+                }
+                gestureInProgress = true
+                // Measurements must describe the final touch region, not an entrance animation.
+                v.animate().cancel()
+                v.translationY = 0f
+                v.scaleX = 1f
+                v.scaleY = 1f
+                v.alpha = 1f
+                val screen = availableScreen()
+                val margin = dp(8)
+                val current = boundsOnScreen(v)
+                val next = HandsGesturePlacement.choose(current, screen, x1, y1, x2, y2, margin)
+                if (next == null) {
+                    ready.countDown()
+                    return@Runnable
+                }
+                if (next != current) {
+                    p.gravity = Gravity.TOP or Gravity.LEFT
+                    p.x = next.left
+                    p.y = next.top
                     wm.updateViewLayout(v, p)
                 }
+                // Let relayout and the input region catch up, then check the actual position.
+                v.postOnAnimation {
+                    v.postOnAnimation {
+                        try {
+                            val actual = boundsOnScreen(v)
+                            safe = !abandoned.get() && !stopRequested.get() && root === v &&
+                                v.isAttachedToWindow && v.visibility == View.VISIBLE &&
+                                actual.width > 0 && actual.height > 0 && screen.contains(actual) &&
+                                !HandsGesturePlacement.intersects(actual, x1, y1, x2, y2, margin)
+                            if (safe) {
+                                preparedScreen = screen
+                                preparedBounds = actual
+                            }
+                        } finally {
+                            ready.countDown()
+                        }
+                    }
+                }
             } catch (t: Throwable) {
-                AppLogger.warning(TAG, "pass-through: ${t.message}")
-            } finally {
-                latch.countDown()
+                AppLogger.warning(TAG, "gesture placement: ${t.message}")
+                ready.countDown()
             }
         }
-        latch.await(300, TimeUnit.MILLISECONDS)
-        // The touchable region follows the next relayout.
-        if (on) Thread.sleep(60)
+        try {
+            if (!main.post(prepare) || !ready.await(600, TimeUnit.MILLISECONDS)) return false
+            return safe && !stopRequested.get() && !Thread.currentThread().isInterrupted && gesture()
+        } finally {
+            abandoned.set(true)
+            main.removeCallbacks(prepare)
+            onMain {
+                gestureInProgress = false
+                preparedScreen = null
+                preparedBounds = null
+            }
+        }
     }
 
-    /**
-     * When ([x], [y]) is under the capsule, moves it to the other end of the screen and waits
-     * for the move, so the ring drawn at the target is not hidden behind it. The touch itself
-     * would pass through anyway ([passThrough]).
-     */
-    fun dodge(x: Int, y: Int) {
-        val latch = CountDownLatch(1)
-        var moved = false
-        main.post {
-            try {
-                val v = root ?: return@post
-                val p = params ?: return@post
-                val loc = IntArray(2)
-                v.getLocationOnScreen(loc)
-                val margin = dp(8)
-                val inside = x >= loc[0] - margin && x <= loc[0] + v.width + margin &&
-                    y >= loc[1] - margin && y <= loc[1] + v.height + margin
-                if (!inside) return@post
-                val atTop = p.gravity and Gravity.BOTTOM != Gravity.BOTTOM
-                p.gravity = (if (atTop) Gravity.BOTTOM else Gravity.TOP) or Gravity.CENTER_HORIZONTAL
-                p.y = (if (atTop) navigationBarHeight() else statusBarHeight()) + dp(6)
-                wm.updateViewLayout(v, p)
-                moved = true
-            } catch (t: Throwable) {
-                AppLogger.warning(TAG, "dodge: ${t.message}")
-            } finally {
-                latch.countDown()
-            }
+    /** Rechecked on the main thread just before injection, after the aim animation's wait. */
+    internal fun canDispatchGesture(): Boolean {
+        val v = root ?: return false
+        return gestureInProgress && !stopRequested.get() && v.isAttachedToWindow &&
+            v.visibility == View.VISIBLE && !v.isLayoutRequested &&
+            preparedScreen == availableScreen() && preparedBounds == boundsOnScreen(v)
+    }
+
+    private fun boundsOnScreen(v: View): HandsGesturePlacement.Box {
+        val location = IntArray(2)
+        v.getLocationOnScreen(location)
+        return HandsGesturePlacement.Box(location[0], location[1], location[0] + v.width, location[1] + v.height)
+    }
+
+    private fun availableScreen(): HandsGesturePlacement.Box {
+        val pad = dp(6)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = wm.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+            return HandsGesturePlacement.Box(
+                insets.left, insets.top + pad,
+                metrics.bounds.width() - insets.right,
+                metrics.bounds.height() - insets.bottom - pad,
+            )
         }
-        latch.await(300, TimeUnit.MILLISECONDS)
-        if (moved) Thread.sleep(120)
+        val dm = context.resources.displayMetrics
+        return HandsGesturePlacement.Box(0, statusBarHeight() + pad, dm.widthPixels, dm.heightPixels - navigationBarHeight() - pad)
     }
 
     // ── building ───────────────────────────────────────────────────────────
 
     private fun onMain(block: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) runCatching(block).onFailure { AppLogger.warning(TAG, "capsule: ${it.message}") }
+        val looper = runCatching { Looper.getMainLooper() }.getOrNull()
+        if (looper == null || Looper.myLooper() == looper) runCatching(block).onFailure { AppLogger.warning(TAG, "capsule: ${it.message}") }
         else main.post { runCatching(block).onFailure { AppLogger.warning(TAG, "capsule: ${it.message}") } }
     }
 
@@ -409,7 +477,19 @@ class HandsCapsule(private val context: Context) {
         val open = button(context.getString(R.string.nm_hands_open), ACCENT) { onOpenApp?.invoke() }.apply { visibility = View.GONE }
         val allow = button(context.getString(R.string.nm_hands_allow_once), ACCENT) { onAllow?.invoke() }.apply { visibility = View.GONE }
         val deny = button(context.getString(R.string.nm_hands_deny), STOP_RED) { onDeny?.invoke() }.apply { visibility = View.GONE }
-        val stop = button(context.getString(R.string.nm_hands_stop), STOP_RED) { onStop?.invoke() }
+        val stop = button(context.getString(R.string.nm_hands_stop), STOP_RED) {
+            stopping()
+            onStop?.invoke()
+        }.apply {
+            minWidth = dp(48)
+            minHeight = dp(48)
+            // Stop on down: another injected stroke must not cancel the user's pending up.
+            setOnTouchListener { v, event ->
+                if (event.actionMasked == MotionEvent.ACTION_DOWN && v.isEnabled) v.performClick()
+                true
+            }
+        }
+        stopBtn = stop
         pill.addView(faceBox); pill.addView(barsView); pill.addView(texts); pill.addView(previewBtn); pill.addView(cont); pill.addView(open); pill.addView(allow); pill.addView(deny); pill.addView(stop)
 
         rootLayout.addView(pill)
@@ -454,6 +534,10 @@ class HandsCapsule(private val context: Context) {
         var isDragging = false
 
         target.setOnTouchListener { _, event ->
+            if (gestureInProgress || stopRequested.get()) {
+                isDragging = false
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downRawX = event.rawX
@@ -495,8 +579,11 @@ class HandsCapsule(private val context: Context) {
         setTextColor(Color.WHITE)
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        setPadding(dp(12), dp(7), dp(12), dp(7))
-        background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(color) }
+        gravity = Gravity.CENTER
+        minHeight = dp(34)
+        minWidth = dp(46)
+        setPadding(dp(12), dp(6), dp(12), dp(6))
+        background = GradientDrawable().apply { cornerRadius = dp(17).toFloat(); setColor(color) }
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(6) }
         setOnClickListener { onClick() }
     }

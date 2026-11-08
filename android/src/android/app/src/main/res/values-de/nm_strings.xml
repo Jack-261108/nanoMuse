@@ -564,9 +564,11 @@
     <string name="nm_hands_why_any">das einzige aktivierte Modell, das sehen kann</string>
     <string name="nm_hands_section_virtual_screen">Virtueller Hintergrundbildschirm</string>
     <string name="nm_hands_virtual_screen_title">Auf virtuellem Bildschirm ausführen</string>
-    <string name="nm_hands_virtual_screen_footer">Wenn aktiviert und der Helfer bereit ist, laufen Apps auf einem virtuellen Bildschirm, ohne Ihre normale Nutzung zu stören. Erfordert Shizuku, Root oder PC-Start.</string>
+    <string name="nm_hands_virtual_screen_footer">Führe Apps mit Android 12 oder neuer und einem kompatiblen privilegierten Helfer auf einem Hintergrundbildschirm aus. Starte ihn über drahtloses Debugging, Shizuku, Root oder USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Helfer verbunden</string>
     <string name="nm_hands_virtual_screen_not_started">Helfer nicht gestartet (tippen zum Starten oder Hauptbildschirm nutzen)</string>
+    <string name="nm_hands_virtual_screen_unavailable">Der privilegierte Helfer ist für den Hintergrundmodus nicht bereit. Bitte starten oder wiederholen Sie den Helfer in den Einstellungen oder deaktivieren Sie den virtuellen Hintergrundbildschirm, um den Hauptbildschirm zu verwenden.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Fehler beim Initialisieren des virtuellen Hintergrundbildschirms (%1$s). Bitte wiederholen Sie den Vorgang oder deaktivieren Sie den virtuellen Hintergrundbildschirm, um den Hauptbildschirm zu verwenden.</string>
     <string name="nm_hands_virtual_screen_start_helper">Helferprozess starten</string>
     <string name="nm_hands_virtual_screen_start_sub">Versucht Helfer über Shizuku oder Root zu starten</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Über kabelloses Debugging verbinden und Helfer starten</string>
@@ -584,7 +586,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Verbindung zum Helfer wiederholen</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Kopplung aufheben?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse löscht die gespeicherten Schlüssel und beendet die Steuerung auf dem virtuellen Bildschirm.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Zuerst werden Berechtigungen entfernt, dann der Helfer gestoppt und Kopplungsschlüssel gelöscht. Bei einem Fehler bleibt der Schlüssel nur zur Bereinigung erhalten. Die automatische Wiederherstellung bleibt aus.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Entkoppeln</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1316,4 +1318,12 @@
     <string name="nm_chat_background_purple">Lila</string>
     <string name="nm_chat_in_progress">Aufgabe läuft</string>
     <string name="nm_mcp_oauth_token_failed">Anmeldung beim Konnektor fehlgeschlagen (%1$s). Prüfe die Verbindung und die OAuth-Einstellungen und versuche es erneut.</string>
+    <string name="nm_hands_takeover_move_failed">Die App konnte nicht zur Übernahme auf den Hauptbildschirm verschoben werden. Beende die Aufgabe und versuche es erneut.</string>
+    <string name="nm_hands_takeover_restore_failed">Die App konnte nach der Übernahme nicht auf den Hintergrundbildschirm zurückkehren. Die Bildschirmsteuerung wurde gestoppt.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Die Hintergrundsteuerung erfordert Android 12 oder neuer. Die Steuerung des Hauptbildschirms bleibt verfügbar.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Einige Berechtigungen konnten nicht entfernt werden. Wiederhole die Bereinigung. Der Schlüssel bleibt nur dafür gespeichert und die automatische Wiederherstellung ist gestoppt.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Keine Verbindung zum Helfer verfügbar. Starte Shizuku, kopple das drahtlose Debugging oder erlaube Root-Zugriff.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Der Root-Zugriff wurde abgelehnt oder ist abgelaufen. Erlaube ihn vor dem nächsten Versuch.</string>
+    <string name="nm_hands_spill_restore_failed">Die auf dem Hauptbildschirm geöffnete App konnte nicht auf den Hintergrundbildschirm zurückkehren. Die Bildschirmsteuerung wurde gestoppt.</string>
+    <string name="nm_hands_payment_takeover">Erledige diesen Zahlungsschritt in der App und tippe dann auf Weiter. Der Agent prüft den Bildschirm vor der nächsten Aktion.</string>
 </resources>

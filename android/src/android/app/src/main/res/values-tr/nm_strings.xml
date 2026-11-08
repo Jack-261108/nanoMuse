@@ -564,9 +564,11 @@
     <string name="nm_hands_why_any">görebilen tek etkin model</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">Android 12 veya üstü ve uyumlu ayrıcalıklı bir yardımcı ile uygulamaları arka plan ekranında çalıştırın. Kablosuz hata ayıklama, Shizuku, root veya USB ADB ile başlatın.</string>
     <string name="nm_hands_virtual_screen_ready">Helper connected</string>
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_unavailable">Ayrıcalıklı yardımcı arka plan modu için hazır değil. Lütfen ayarlardan yardımcıyı başlatın veya yeniden deneyin ya da ana ekranı kullanmak için arka plan sanal ekranını kapatın.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Arka plan sanal ekranı başlatılamadı (%1$s). Lütfen tekrar deneyin veya ana ekranı kullanmak için arka plan ekranını kapatın.</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Kablosuz hata ayıklama ile bağlanıp yardımcı süreci başlatın</string>
@@ -584,7 +586,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Yardımcı bağlantısını yeniden dene</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Eşleme kaldırılsın mı?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse kayıtlı anahtarları silecek ve sanal ekrandaki işlemi durduracaktır.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Yardımcı durdurulmadan ve eşleştirme anahtarları silinmeden önce izinler kaldırılır. Kaldırma başarısız olursa anahtar yalnızca temizlik için saklanır ve otomatik kurtarma kapalı kalır.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Kaldır</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1316,4 +1318,12 @@
     <string name="nm_chat_background_purple">Mor</string>
     <string name="nm_chat_in_progress">Görev devam ediyor</string>
     <string name="nm_mcp_oauth_token_failed">Bağlayıcı oturumu açılamadı (%1$s). Bağlantıyı ve OAuth ayarlarını kontrol edip tekrar deneyin.</string>
+    <string name="nm_hands_takeover_move_failed">Kontrolü devralmanız için uygulama ana ekrana taşınamadı. Görevi bitirip yeniden deneyin.</string>
+    <string name="nm_hands_takeover_restore_failed">Devralma sonrasında uygulama arka plan ekranına geri taşınamadı. Ekran kontrolü durduruldu.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Arka plan ekran kontrolü Android 12 veya üstünü gerektirir. Ana ekran kontrolü kullanılabilir.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Bazı izinler kaldırılamadı. Temizliği yeniden deneyin; anahtar yalnızca bu adım için saklanır ve otomatik kurtarma durdurulmuştur.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Kullanılabilir yardımcı bağlantısı yok. Shizuku’yu başlatın, kablosuz hata ayıklamayı eşleştirin veya root erişimine izin verin.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Root erişimi reddedildi veya zaman aşımına uğradı. Yeniden denemeden önce izin verin.</string>
+    <string name="nm_hands_spill_restore_failed">Ana ekranda açılan uygulama arka plan ekranına geri taşınamadı. Ekran kontrolü durduruldu.</string>
+    <string name="nm_hands_payment_takeover">Bu ödeme adımını uygulamada tamamlayıp Devam’a dokunun. Ajan yeniden işlem yapmadan önce ekranı kontrol eder.</string>
 </resources>

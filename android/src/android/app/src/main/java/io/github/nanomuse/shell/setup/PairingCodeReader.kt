@@ -18,7 +18,7 @@ internal object PairingCodeReader {
     private const val SETTLE_MS = 300L
     private const val MAX_NODES = 400
 
-    suspend fun run(context: Context, control: BuiltinShellControl, coordinator: PairingCoordinator) {
+    suspend fun run(context: Context, control: BuiltinShellControl, coordinator: PairingCoordinator, sessionId: Long) {
         val settingsPkg = resolveSettingsPackage(context)
         val tried = mutableSetOf<String>()
 
@@ -36,7 +36,7 @@ internal object PairingCodeReader {
                 }
                 if (attempt != null) {
                     tried += attempt.code
-                    coordinator.pair(attempt.code, attempt.port)
+                    coordinator.pair(attempt.code, attempt.port, sessionId)
                 }
             }
             delay(SETTLE_MS)

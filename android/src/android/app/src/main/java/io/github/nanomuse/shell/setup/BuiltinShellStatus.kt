@@ -42,6 +42,10 @@ enum class BuiltinShellFailure(val defaultFix: BuiltinShellFix, val duringPairin
     HelperStartFailed(BuiltinShellFix.Retry, duringPairing = false),
     /** 经 USB 启动命令起的助手停了(多半是手机重启过), 又没配对过无线调试, 自己起不来: 再运行一次启动命令。 */
     UsbHelperStopped(BuiltinShellFix.RunUsbCommand, duringPairing = false),
+    UnsupportedAndroid(BuiltinShellFix.Retry, duringPairing = false),
+    BackendUnavailable(BuiltinShellFix.Retry, duringPairing = false),
+    RootDenied(BuiltinShellFix.Retry, duringPairing = false),
+    CleanupPending(BuiltinShellFix.Retry, duringPairing = false),
     Unknown(BuiltinShellFix.Retry, duringPairing = false),
 }
 

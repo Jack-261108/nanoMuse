@@ -564,9 +564,11 @@
     <string name="nm_hands_why_any">el único modelo activado que puede ver</string>
     <string name="nm_hands_section_virtual_screen">Pantalla virtual en segundo plano</string>
     <string name="nm_hands_virtual_screen_title">Operar en pantalla virtual</string>
-    <string name="nm_hands_virtual_screen_footer">Cuando está activado y el asistente listo, las apps se ejecutan en una pantalla virtual sin interrumpir su uso habitual. Requiere Shizuku, root o inicio por PC.</string>
+    <string name="nm_hands_virtual_screen_footer">Ejecuta apps en una pantalla en segundo plano con Android 12 o posterior y un asistente privilegiado compatible. Inícialo mediante depuración inalámbrica, Shizuku, root o USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Asistente conectado</string>
     <string name="nm_hands_virtual_screen_not_started">Asistente no iniciado (toque para iniciar o usar pantalla principal)</string>
+    <string name="nm_hands_virtual_screen_unavailable">El asistente con privilegios no está listo para el modo en segundo plano. Inicie o reintente el asistente en configuración, o desactive la pantalla virtual en segundo plano para usar la pantalla principal.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Error al inicializar la pantalla virtual en segundo plano (%1$s). Reintente o desactive la pantalla virtual para usar la pantalla principal.</string>
     <string name="nm_hands_virtual_screen_start_helper">Iniciar asistente</string>
     <string name="nm_hands_virtual_screen_start_sub">Intentar iniciar asistente vía Shizuku o root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Conectar vía depuración inalámbrica e iniciar asistente</string>
@@ -584,7 +586,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Reintentar conexión del asistente</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">¿Desvincular?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse eliminará las claves guardadas y detendrá el funcionamiento en la pantalla virtual.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Primero se revocan los permisos, luego se detiene el asistente y se borran las claves de emparejamiento. Si falla la revocación, la clave se conserva solo para la limpieza y la recuperación automática sigue desactivada.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Desvincular</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1316,4 +1318,12 @@
     <string name="nm_chat_background_purple">Morado</string>
     <string name="nm_chat_in_progress">Tarea en curso</string>
     <string name="nm_mcp_oauth_token_failed">No se pudo iniciar sesión en el conector (%1$s). Revisa la conexión y la configuración de OAuth e inténtalo de nuevo.</string>
+    <string name="nm_hands_takeover_move_failed">No se pudo mover la app a la pantalla principal para que tomes el control. Finaliza la tarea y vuelve a intentarlo.</string>
+    <string name="nm_hands_takeover_restore_failed">No se pudo devolver la app a la pantalla en segundo plano. Se detuvo el control de pantalla.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">El control en segundo plano requiere Android 12 o posterior. El control de la pantalla principal sigue disponible.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">No se pudieron revocar algunos permisos. Reintenta la limpieza; la clave se conserva solo para este paso y la recuperación automática está detenida.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">No hay conexión disponible con el asistente. Inicia Shizuku, empareja la depuración inalámbrica o permite el acceso root.</string>
+    <string name="nm_hands_virtual_screen_root_denied">El acceso root se denegó o agotó el tiempo de espera. Permítelo antes de reintentar.</string>
+    <string name="nm_hands_spill_restore_failed">No se pudo devolver a la pantalla en segundo plano una app que se abrió en la pantalla principal. Se detuvo el control de pantalla.</string>
+    <string name="nm_hands_payment_takeover">Completa este paso del pago en la app y luego toca Continuar. El agente revisará la pantalla antes de volver a actuar.</string>
 </resources>

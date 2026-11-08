@@ -50,6 +50,7 @@ sealed interface PairingNotice {
 object PairingNotifier {
     const val KEY_CODE = "pairing_code"
     const val EXTRA_PORT = "pairing_port"
+    const val EXTRA_SESSION = "pairing_session"
     private const val ID = 4402
     private const val CHANNEL_ID = "nanomuse_adb_pairing"
     private const val CHANNEL_NAME = "Wireless Debugging Pairing"
@@ -67,7 +68,7 @@ object PairingNotifier {
         return CHANNEL_ID
     }
 
-    fun show(context: Context, notice: PairingNotice) {
+    fun show(context: Context, notice: PairingNotice, sessionId: Long) {
         val nm = context.getSystemService(NotificationManager::class.java)
         val channel = ensureChannel(context)
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
@@ -91,7 +92,11 @@ object PairingNotifier {
                     .build()
                 val reply = PendingIntent.getBroadcast(
                     context, 1,
-                    Intent(context, PairingCodeReceiver::class.java).apply { notice.port?.let { putExtra(EXTRA_PORT, it) } },
+                    Intent(context, PairingCodeReceiver::class.java).apply {
+                        notice.port?.let { putExtra(EXTRA_PORT, it) }
+                        putExtra(EXTRA_SESSION, sessionId)
+                        data = android.net.Uri.parse("nanomuse-pairing://session/$sessionId")
+                    },
                     PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 )
                 val action = Notification.Action.Builder(null, "Pair", reply)

@@ -18,13 +18,18 @@ class AudioMuteLedger(private val file: File?) {
     operator fun get(packageName: String): String? = modes[packageName]
     fun packages(): List<String> = modes.keys.toList()
 
-    fun put(packageName: String, mode: String) {
-        modes[packageName] = mode
-        save()
+    fun put(packageName: String, mode: String): Boolean {
+        val before = modes.put(packageName, mode)
+        if (save()) return true
+        if (before == null) modes.remove(packageName) else modes[packageName] = before
+        return false
     }
 
-    fun remove(packageName: String) {
-        if (modes.remove(packageName) != null) save()
+    fun remove(packageName: String): Boolean {
+        val before = modes.remove(packageName) ?: return true
+        if (save()) return true
+        modes[packageName] = before
+        return false
     }
 
     fun restoreAll(write: (packageName: String, mode: String) -> Boolean): Boolean {
@@ -35,27 +40,47 @@ class AudioMuteLedger(private val file: File?) {
         return modes.isEmpty()
     }
 
-    private fun save() {
-        val f = file ?: return
-        runCatching {
+    private fun save(): Boolean {
+        val f = file ?: return true
+        return runCatching {
             if (modes.isEmpty()) {
-                f.delete()
+                check(!f.exists() || f.delete()) { "delete failed" }
             } else {
-                val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(format(modes))
-                if (!tmp.renameTo(f)) error("rename failed")
+                val tmp = File.createTempFile(f.name, ".tmp", f.parentFile)
+                try {
+                    tmp.writeText(format(modes))
+                    // The next helper may use the shell backend after this one ran as root.
+                    check(tmp.setReadable(true, false)) { "chmod failed" }
+                    if (!tmp.renameTo(f)) error("rename failed")
+                } finally {
+                    tmp.delete()
+                }
             }
-        }
+        }.isSuccess
     }
 
     companion object {
         private val LINE = Regex("""([A-Za-z0-9_.]+(?:@[0-9]+)?) ([a-z_]+)""")
+        private const val MODES = "allow|ignore|deny|default|foreground"
+        private val EXPLICIT_MODE = Regex(
+            """(?m)^\s*(?:PLAY_AUDIO|android:play_audio):\s*($MODES)(?=;|\s|$)""",
+        )
+        private val DEFAULT_MODE = Regex("""(?m)^\s*Default mode:\s*($MODES)\s*$""")
+        private val NO_OPERATIONS = Regex("""(?m)^\s*No operations\.\s*$""")
 
+        // Preserve an explicitly observed MODE_DEFAULT. An unset PLAY_AUDIO is recorded as
+        // its reported mode (normally allow), so these two cases must not be normalized together.
         fun restoreMode(prior: String?): String =
-            if (prior.isNullOrEmpty() || prior == "default") "allow" else prior
+            prior?.takeIf { it.isNotEmpty() } ?: "default"
 
         fun parseSetMode(output: String): String? =
-            Regex("""PLAY_AUDIO:\s*([a-z_]+)""").find(output)?.groupValues?.get(1)
+            EXPLICIT_MODE.find(output)?.groupValues?.get(1)
+
+        /** An unset operation has a reported default mode; it is not MODE_DEFAULT. */
+        fun parseMode(output: String): String? = parseSetMode(output)
+            ?: DEFAULT_MODE.find(output)?.groupValues?.get(1)?.takeIf {
+                NO_OPERATIONS.containsMatchIn(output)
+            }
 
         internal fun format(modes: Map<String, String>): String =
             modes.entries.joinToString("") { "${it.key} ${it.value}\n" }

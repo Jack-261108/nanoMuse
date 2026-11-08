@@ -570,9 +570,11 @@
     <string name="nm_hands_why_any">единственная включённая модель, которая видит</string>
     <string name="nm_hands_section_virtual_screen">Виртуальный экран в фоне</string>
     <string name="nm_hands_virtual_screen_title">Работать на виртуальном экране</string>
-    <string name="nm_hands_virtual_screen_footer">При включении и готовности помощника приложения работают на виртуальном экране, не мешая обычному использованию. Требуется Shizuku, root или запуск с ПК.</string>
+    <string name="nm_hands_virtual_screen_footer">Запускайте приложения на фоновом экране с Android 12 или новее и совместимым привилегированным помощником. Его можно запустить через беспроводную отладку, Shizuku, root или USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Помощник подключен</string>
     <string name="nm_hands_virtual_screen_not_started">Помощник не запущен (нажмите для запуска или используйте основной экран)</string>
+    <string name="nm_hands_virtual_screen_unavailable">Привилегированный помощник не готов к работе в фоновом режиме. Запустите или повторите попытку в настройках или отключите фоновый виртуальный экран для работы на основном экране.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Не удалось инициализировать фоновый виртуальный экран (%1$s). Повторите попытку или отключите фоновый экран для работы на основном экране.</string>
     <string name="nm_hands_virtual_screen_start_helper">Запустить помощника</string>
     <string name="nm_hands_virtual_screen_start_sub">Попытка запуска через Shizuku или root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Подключиться через беспроводную отладку и запустить помощника</string>
@@ -590,7 +592,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Повторить подключение помощника</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Удалить сопряжение?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse удалит сохраненные ключи и прекратит работу на виртуальном экране.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Сначала отзываются разрешения, затем останавливается помощник и удаляются ключи сопряжения. При ошибке ключ сохраняется только для очистки, а автоматическое восстановление остаётся выключенным.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Удалить</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1324,4 +1326,12 @@
     <string name="nm_chat_background_purple">Фиолетовый</string>
     <string name="nm_chat_in_progress">Задача выполняется</string>
     <string name="nm_mcp_oauth_token_failed">Не удалось войти в коннектор (%1$s). Проверьте подключение и настройки OAuth и повторите попытку.</string>
+    <string name="nm_hands_takeover_move_failed">Не удалось перенести приложение на основной экран для ручного управления. Завершите задачу и повторите попытку.</string>
+    <string name="nm_hands_takeover_restore_failed">Не удалось вернуть приложение на фоновый экран после ручного управления. Управление экраном остановлено.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Для управления фоновым экраном нужен Android 12 или новее. Управление основным экраном остаётся доступным.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Не удалось отозвать некоторые разрешения. Повторите очистку; ключ сохранён только для этого шага, а автоматическое восстановление остановлено.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Нет доступного подключения к помощнику. Запустите Shizuku, выполните сопряжение беспроводной отладки или разрешите root-доступ.</string>
+    <string name="nm_hands_virtual_screen_root_denied">В root-доступе отказано или время ожидания истекло. Разрешите его перед повторной попыткой.</string>
+    <string name="nm_hands_spill_restore_failed">Не удалось вернуть приложение, открывшееся на основном экране, на фоновый экран. Управление экраном остановлено.</string>
+    <string name="nm_hands_payment_takeover">Выполните этот шаг оплаты в приложении, затем нажмите «Продолжить». Агент проверит экран перед следующим действием.</string>
 </resources>

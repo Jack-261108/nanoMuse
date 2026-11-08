@@ -37,9 +37,27 @@ class AudioMuteLedgerTest {
     }
 
     @Test
+    fun unsetAudioUsesItsReportedAllowMode() {
+        assertEquals("allow", AudioMuteLedger.parseMode("No operations.\nDefault mode: allow"))
+        assertEquals("default", AudioMuteLedger.parseMode("PLAY_AUDIO: default"))
+        assertEquals("ignore", AudioMuteLedger.parseMode("  PLAY_AUDIO: ignore; time=+2s"))
+        assertEquals("deny", AudioMuteLedger.parseMode("android:play_audio: deny"))
+    }
+
+    @Test
+    fun unknownOutputMustNotBecomeAUsableMode() {
+        assertNull(AudioMuteLedger.parseMode(""))
+        assertNull(AudioMuteLedger.parseMode("No operations."))
+        assertNull(AudioMuteLedger.parseMode("Default mode: allow"))
+        assertNull(AudioMuteLedger.parseMode("PLAY_AUDIO: vendor_value"))
+        assertNull(AudioMuteLedger.parseMode("RECORD_AUDIO: allow"))
+        assertNull(AudioMuteLedger.parseMode("Error: package not found"))
+    }
+
+    @Test
     fun testRestoreMode() {
-        assertEquals("allow", AudioMuteLedger.restoreMode(null))
-        assertEquals("allow", AudioMuteLedger.restoreMode("default"))
+        assertEquals("default", AudioMuteLedger.restoreMode(null))
+        assertEquals("default", AudioMuteLedger.restoreMode("default"))
         assertEquals("ignore", AudioMuteLedger.restoreMode("ignore"))
         assertEquals("allow", AudioMuteLedger.restoreMode("allow"))
     }
@@ -67,7 +85,27 @@ class AudioMuteLedgerTest {
         assertTrue(ok)
         assertEquals(2, restored.size)
         assertTrue(restored.contains("com.pkg.a" to "allow"))
-        assertTrue(restored.contains("com.pkg.b@10" to "allow"))
+        assertTrue(restored.contains("com.pkg.b@10" to "default"))
         assertFalse(ledger2.contains("com.pkg.a"))
+    }
+
+    @Test
+    fun failedRestoreIsRetainedAndOtherEntriesAreAttempted() {
+        val file = tempFolder.newFile("pending_audio")
+        val ledger = AudioMuteLedger(file)
+        ledger.put("com.pkg.a", "default")
+        ledger.put("com.pkg.b", "allow")
+        val attempted = mutableListOf<String>()
+        assertFalse(ledger.restoreAll { key, _ -> attempted += key; key == "com.pkg.b" })
+        assertEquals(listOf("com.pkg.a", "com.pkg.b"), attempted)
+        assertEquals(mapOf("com.pkg.a" to "default"), AudioMuteLedger.parse(file.readText()))
+    }
+
+    @Test
+    fun failedPersistenceDoesNotAcceptAChange() {
+        val notDirectory = tempFolder.newFile("not_a_directory")
+        val ledger = AudioMuteLedger(java.io.File(notDirectory, "ledger"))
+        assertFalse(ledger.put("com.pkg.a", "default"))
+        assertFalse(ledger.contains("com.pkg.a"))
     }
 }

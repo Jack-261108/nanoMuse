@@ -1,113 +1,101 @@
 package io.github.nanomuse.shell
 
 import android.content.Context
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import com.openminis.app.logging.AppLogger
-import com.openminis.app.offload.ShizukuManager
+import io.github.nanomuse.shell.setup.BuiltinShellManager
+import io.github.nanomuse.shell.recovery.PermissionCommands
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import java.io.File
 
-/**
- * 特权 Shell 助手的应用级单例连接管理器。
- */
+/** One live helper, with handoffs scoped to the start that requested them. */
 object SharedShell {
     private const val TAG = "SharedShell"
-
     private val _shell = MutableStateFlow<INanoMuseShell?>(null)
     val shell: StateFlow<INanoMuseShell?> = _shell.asStateFlow()
+    private var deathRecipient: IBinder.DeathRecipient? = null
+    private val handoff = HelperHandoffState()
 
-    @Volatile private var helperPid: Int = -1
-    @Volatile private var helperUid: Int = -1
+    fun isReady(): Boolean = _shell.value?.asBinder()?.isBinderAlive == true
 
-    private val deathRecipient = IBinder.DeathRecipient {
-        AppLogger.warning(TAG, "shell helper died")
-        _shell.value = null
-        helperPid = -1
-        helperUid = -1
-    }
+    @Synchronized
+    fun prepareStart(nonce: String) { handoff.expect(nonce) }
 
-    fun isReady(): Boolean = _shell.value != null
+    @Synchronized
+    fun cancelStart(nonce: String? = null) { handoff.cancel(nonce) }
 
-    fun setShell(instance: INanoMuseShell?, pid: Int = -1, uid: Int = -1) {
-        val old = _shell.value
-        if (old != null) {
-            runCatching { old.asBinder().unlinkToDeath(deathRecipient, 0) }
-        }
-        _shell.value = instance
-        helperPid = pid
-        helperUid = uid
-        if (instance != null) {
-            runCatching { instance.asBinder().linkToDeath(deathRecipient, 0) }
-        }
-    }
-
-    /**
-     * 尝试启动特权助手：
-     * 1. 优先检测并使用 Shizuku (免去配对与端口扫描，秒级拉起)
-     * 2. 其次使用内置无线调试已配对客户端 (零电脑、零 Shizuku、零 root)
-     * 3. 最后尝试使用 su (root)
-     */
-    fun startHelper(context: Context): Boolean {
-        if (isReady()) return true
-
-        val apkPath = context.applicationInfo.sourceDir
-        val pkg = context.packageName
-        val uid = Process.myUid()
-        val nonce = java.util.UUID.randomUUID().toString()
-        val shellCmd = "killall -q $pkg:helper 2>/dev/null; " +
-            "CLASSPATH='$apkPath' nohup app_process /system/bin --nice-name='$pkg:helper' " +
-            "io.github.nanomuse.shell.HelperProcess '$pkg' $uid '$nonce' </dev/null >/dev/null 2>&1 &"
-
-        if (ShizukuManager.isReady()) {
-            AppLogger.info(TAG, "starting shell helper via Shizuku...")
-            Thread {
-                ShizukuManager.runProcess(arrayOf("sh", "-c", shellCmd))
-            }.start()
+    @Synchronized
+    fun setShell(instance: INanoMuseShell?, pid: Int = -1, uid: Int = -1, nonce: String? = null): Boolean {
+        if (instance == null) {
+            detach()
             return true
         }
-
-        val builtin = io.github.nanomuse.shell.setup.BuiltinShellManager.instance(context)
-        if (builtin.paired) {
-            AppLogger.info(TAG, "starting shell helper via builtin wireless debugging...")
-            builtin.need()
-            return true
-        }
-
-        if (hasSu()) {
-            AppLogger.info(TAG, "starting shell helper via su...")
-            Thread {
-                runCatching {
-                    val p = Runtime.getRuntime().exec(arrayOf("su", "-c", shellCmd))
-                    p.waitFor()
+        if (!handoff.accepts(nonce) || isReady()) return false
+        val binder = instance.asBinder()
+        if (!binder.isBinderAlive || !binder.pingBinder()) return false
+        val recipient = IBinder.DeathRecipient {
+            synchronized(this) {
+                if (_shell.value?.asBinder() === binder) {
+                    AppLogger.warning(TAG, "shell helper died")
+                    detach()
                 }
-            }.start()
-            return true
+            }
         }
+        try {
+            binder.linkToDeath(recipient, 0)
+        } catch (_: Exception) {
+            return false
+        }
+        if (!binder.isBinderAlive) {
+            runCatching { binder.unlinkToDeath(recipient, 0) }
+            return false
+        }
+        detach()
+        deathRecipient = recipient
+        handoff.cancel()
+        _shell.value = instance
+        AppLogger.info(TAG, "accepted shell helper (pid=$pid, uid=$uid)")
+        return true
+    }
 
-        return false
+    private fun detach() {
+        val old = _shell.value
+        val recipient = deathRecipient
+        if (old != null && recipient != null) runCatching { old.asBinder().unlinkToDeath(recipient, 0) }
+        deathRecipient = null
+        _shell.value = null
+    }
+
+    /** All backends share the manager's start, stop and retry state. */
+    fun startHelper(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        BuiltinShellManager.instance(context).need()
+        return isReady()
     }
 
     fun getAdbCommand(context: Context): String {
-        val apkPath = context.applicationInfo.sourceDir
-        val pkg = context.packageName
-        val uid = Process.myUid()
         val nonce = java.util.UUID.randomUUID().toString()
-        return "CLASSPATH='$apkPath' nohup app_process /system/bin --nice-name='$pkg:helper' io.github.nanomuse.shell.HelperProcess '$pkg' $uid '$nonce' </dev/null >/dev/null 2>&1 &"
+        check(BuiltinShellManager.instance(context).prepareManualStart(nonce)) { "helper startup is unavailable" }
+        return command(context, nonce)
     }
 
-    private fun hasSu(): Boolean {
-        val paths = arrayOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/sd/xbin/su")
-        return paths.any { File(it).canExecute() }
+    internal fun command(context: Context, nonce: String): String {
+        val apk = PermissionCommands.quote(context.applicationInfo.sourceDir)
+        val pkg = PermissionCommands.quote(context.packageName)
+        val process = PermissionCommands.quote("${context.packageName}:helper")
+        return "CLASSPATH=$apk nohup app_process /system/bin --nice-name=$process " +
+            "io.github.nanomuse.shell.HelperProcess $pkg ${Process.myUid()} '$nonce' </dev/null >/dev/null 2>&1 &"
     }
 
     fun release() {
-        val instance = _shell.value
-        if (instance != null) {
-            runCatching { instance.releaseAll() }
+        val instance = synchronized(this) {
+            handoff.cancel()
+            _shell.value.also { detach() }
         }
-        setShell(null)
+        // destroy performs cleanup and exits the privileged process.
+        if (instance != null) runCatching { instance.destroy() }
     }
 }

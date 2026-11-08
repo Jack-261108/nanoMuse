@@ -34,6 +34,7 @@ class AccessibilityRepair(
     private val restart: suspend (gapMs: Long) -> PermissionResult,
     private val consent: () -> RecoveryConsent,
     private val direct: () -> Boolean = { false },
+    private val allowed: () -> Boolean = { true },
     private val now: () -> Long = System::currentTimeMillis,
 ) {
     private val tag = "AccessibilityRepair"
@@ -73,7 +74,7 @@ class AccessibilityRepair(
     }
 
     private fun eligible(s: A11yObservation, h: BuiltinShellStatus, unlocked: Boolean) =
-        s.stuck && unlocked && (direct() || h == BuiltinShellStatus.Running) && consent().wants(RecoveryCapability.Accessibility)
+        allowed() && s.stuck && unlocked && (direct() || h == BuiltinShellStatus.Running) && consent().wants(RecoveryCapability.Accessibility)
 
     private suspend fun repair(
         service: StateFlow<A11yObservation>,

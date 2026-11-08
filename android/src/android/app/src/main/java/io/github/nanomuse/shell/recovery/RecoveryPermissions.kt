@@ -110,13 +110,17 @@ class RecoveryPermissions(
     private val runner: () -> ShellCommandRunner?,
     private val store: RecoveryConsentStore,
     private val packageName: String,
+    private val allowApply: () -> Boolean = { true },
 ) {
     private val lock = Mutex()
     private val _autoFailed = MutableStateFlow<Set<RecoveryCapability>>(emptySet())
     val autoFailed: StateFlow<Set<RecoveryCapability>> = _autoFailed.asStateFlow()
 
     suspend fun set(capability: RecoveryCapability, on: Boolean): PermissionResult = lock.withLock {
+        if (on && !allowApply()) return@withLock PermissionResult.NoRunner
         val now = store.consent.value
+        // Persist the user's choice even if the connection needed for revocation is gone.
+        store.save(now.chose(capability, on))
         val shell = runner()
         if (shell == null) {
             return@withLock when {
@@ -134,9 +138,11 @@ class RecoveryPermissions(
     }
 
     suspend fun applyPending(): PermissionResult = lock.withLock {
+        if (!allowApply()) return@withLock PermissionResult.NoRunner
         val shell = runner() ?: return@withLock PermissionResult.NoRunner
         var failure: PermissionResult? = null
         for (c in store.consent.value.pending) {
+            if (!allowApply()) return@withLock PermissionResult.NoRunner
             val r = run(shell, listOf(c), on = true)
             if (r == PermissionResult.Done) store.save(store.consent.value.withApplied(c, true))
             else if (failure == null) failure = r
@@ -147,29 +153,61 @@ class RecoveryPermissions(
 
     suspend fun revokeAll(): PermissionResult = lock.withLock {
         val now = store.consent.value
-        val granted = now.applied.filterNot { it.writesSecureSettings }.toSet() + RecoveryCapability.RestoreAfterReboot
-        store.save(now.copy(applied = emptySet()))
-        _autoFailed.value = emptySet()
+        // The manager closes allowApply before cleanup. Preserve the person's choices for
+        // a later explicit pairing, and retain every applied bit until revocation succeeds.
+        if (now.applied.isEmpty()) return@withLock PermissionResult.Done
         val shell = runner() ?: return@withLock PermissionResult.NoRunner
-        run(shell, granted.toList(), on = false)
+        var failure: PermissionResult? = null
+        for (capability in now.applied.filterNot { it.writesSecureSettings }) {
+            val result = run(shell, listOf(capability), on = false)
+            if (result == PermissionResult.Done) {
+                store.save(store.consent.value.withApplied(capability, false))
+                _autoFailed.update { it - capability }
+            } else if (failure == null) failure = result
+        }
+        val secure = now.applied.filter { it.writesSecureSettings }.toSet()
+        if (secure.isNotEmpty()) {
+            // Both switches share one OS permission. Revoke it once, without the per-switch
+            // "another feature still uses it" shortcut, then clear both records together.
+            val result = try {
+                runAll(shell, listOf(PermissionCommands.revokeWriteSecureSettings(packageName)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                PermissionResult.Failed(e.message ?: e.javaClass.simpleName)
+            }
+            if (result == PermissionResult.Done) {
+                store.save(store.consent.value.copy(applied = store.consent.value.applied - secure))
+                _autoFailed.update { it - secure }
+            } else if (failure == null) failure = result
+        }
+        failure ?: PermissionResult.Done
     }
 
     suspend fun restartAccessibility(gapMs: Long = 400L): PermissionResult = lock.withLock {
+        if (!allowApply()) return@withLock PermissionResult.NoRunner
         val shell = runner() ?: return@withLock PermissionResult.NoRunner
         val me = PermissionCommands.accessibilityService(packageName)
+        suspend fun enable(raw: String?): PermissionResult {
+            if (!allowApply()) return PermissionResult.NoRunner
+            // A command may complete after a transport cancellation. Keep a cleanup record
+            // before dispatching any write that could enable our service.
+            store.save(store.consent.value.withApplied(RecoveryCapability.Accessibility, true))
+            return runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(raw, me)), allowApply)
+        }
         try {
             val current = shell.exec(PermissionCommands.READ_ACCESSIBILITY)
-            if (!AccessibilityList.contains(current, me)) {
-                return@withLock runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(current, me)))
-            }
+            if (!allowApply()) return@withLock PermissionResult.NoRunner
+            if (!AccessibilityList.contains(current, me)) return@withLock enable(current)
             val removed = runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.without(current, me)))
             if (removed != PermissionResult.Done) return@withLock removed
             withContext(NonCancellable) {
                 delay(gapMs)
+                if (!allowApply()) return@withContext PermissionResult.NoRunner
                 val now = shell.exec(PermissionCommands.READ_ACCESSIBILITY)
-                val back = runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(now, me)))
-                if (back != PermissionResult.Done) {
-                    runCatching { runAll(shell, PermissionCommands.writeAccessibility(AccessibilityList.with(current, me))) }
+                val back = enable(now)
+                if (back != PermissionResult.Done && allowApply()) {
+                    runCatching { enable(current) }
                 }
                 back
             }
@@ -184,7 +222,7 @@ class RecoveryPermissions(
         var failure: PermissionResult? = null
         for (c in capabilities) {
             val r = try {
-                runAll(shell, commands(shell, c, on))
+                runAll(shell, commands(shell, c, on), if (on) allowApply else { { true } })
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -210,8 +248,13 @@ class RecoveryPermissions(
         }
     }
 
-    private suspend fun runAll(shell: ShellCommandRunner, commands: List<String>): PermissionResult {
+    private suspend fun runAll(
+        shell: ShellCommandRunner,
+        commands: List<String>,
+        allowed: () -> Boolean = { true },
+    ): PermissionResult {
         for (cmd in commands) {
+            if (!allowed()) return PermissionResult.NoRunner
             val out = shell.exec(PermissionCommands.checked(cmd))
             if (PermissionCommands.exitCode(out) != 0) return PermissionResult.Failed("$cmd: ${out.trim()}")
         }

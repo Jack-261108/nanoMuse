@@ -1,6 +1,8 @@
 package io.github.nanomuse.shell.recovery
 
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -57,12 +59,16 @@ class WirelessDebuggingAutoOn(
     }
 
     suspend fun turnOn(): Boolean {
+        currentCoroutineContext().ensureActive()
+        if (!wants() || !canWrite()) return false
         synchronized(this) {
             writing = true
             writes++
             lastWriteAt = now()
         }
         try {
+            currentCoroutineContext().ensureActive()
+            if (!wants() || !canWrite()) return false
             val accepted = runCatching(write).getOrDefault(false)
             if (!accepted || read() == false) {
                 return false.also { block(if (accepted) AutoOnBlock.NotAllowedHere else AutoOnBlock.Refused) }

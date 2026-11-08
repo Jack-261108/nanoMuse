@@ -34,23 +34,21 @@ internal class ShellClipboard(private val context: Context) {
     private val getDescription by lazy { method("getPrimaryClipDescription") }
     private val hasClip by lazy { method("hasPrimaryClip") }
 
-    val primaryClip: ClipData?
-        get() = getClip.let {
-            if (it == null) runCatching { manager.primaryClip }.getOrNull()
-            else runCatching { call(it) as ClipData? }.getOrNull()
+    fun read(): ClipboardLease.Read<ClipData> = try {
+        val clip = getClip?.let { call(it) as ClipData? } ?: manager.primaryClip
+        if (clip != null) {
+            ClipboardLease.Read(true, clip)
+        } else {
+            val present = hasClip?.let { call(it) as Boolean } ?: manager.hasPrimaryClip()
+            val description = if (getDescription != null) {
+                call(getDescription!!) as ClipDescription?
+            } else manager.primaryClipDescription
+            ClipboardLease.Read(!present && description == null)
         }
-
-    val primaryClipDescription: ClipDescription?
-        get() = getDescription.let {
-            if (it == null) runCatching { manager.primaryClipDescription }.getOrNull()
-            else runCatching { call(it) as ClipDescription? }.getOrNull()
-        }
-
-    fun hasPrimaryClip(): Boolean =
-        hasClip.let {
-            if (it == null) runCatching { manager.hasPrimaryClip() }.getOrDefault(false)
-            else runCatching { call(it) as Boolean }.getOrDefault(false)
-        }
+    } catch (_: Throwable) {
+        // A rejected read must never be treated as an empty clipboard.
+        ClipboardLease.Read(false)
+    }
 
     fun setPrimaryClip(clip: ClipData) {
         manager.setPrimaryClip(clip)

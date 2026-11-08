@@ -561,9 +561,11 @@
     <string name="nm_hands_why_any">โมเดลเดียวที่เปิดใช้และมองเห็นได้</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">เรียกใช้แอปบนหน้าจอเบื้องหลังด้วย Android 12 ขึ้นไปและผู้ช่วยที่มีสิทธิ์พิเศษที่รองรับ เริ่มได้ผ่านการแก้ไขข้อบกพร่องแบบไร้สาย Shizuku, root หรือ USB ADB</string>
     <string name="nm_hands_virtual_screen_ready">Helper connected</string>
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_unavailable">ตัวช่วยพิเศษยังไม่พร้อมสำหรับโหมดพื้นหลัง โปรดเริ่มหรือลองใช้ตัวช่วยใหม่อีกครั้งในการตั้งค่า หรือปิดหน้าจอเสมือนพื้นหลังเพื่อใช้หน้าจอหลัก</string>
+    <string name="nm_hands_virtual_screen_init_failed">ไม่สามารถเริ่มต้นหน้าจอเสมือนพื้นหลังได้ (%1$s) โปรดลองอีกครั้งหรือปิดหน้าจอพื้นหลังเพื่อใช้หน้าจอหลัก</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">เชื่อมต่อผ่านการแก้จุดบกพร่องไร้สายและเริ่มกระบวนการตัวช่วย</string>
@@ -581,7 +583,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">ลองเชื่อมต่อตัวช่วยอีกครั้ง</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">ยกเลิกการจับคู่หรือไม่?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse จะลบคีย์ที่บันทึกไว้และหยุดการทำงานบนหน้าจอเสมือน</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">จะเพิกถอนสิทธิ์ก่อนหยุดผู้ช่วยและลบคีย์การจับคู่ หากเพิกถอนไม่สำเร็จ จะเก็บคีย์ไว้เพื่อการล้างข้อมูลเท่านั้นและปิดการกู้คืนอัตโนมัติต่อไป</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">ยกเลิกการจับคู่</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1312,4 +1314,12 @@
     <string name="nm_chat_background_purple">สีม่วง</string>
     <string name="nm_chat_in_progress">กำลังดำเนินงาน</string>
     <string name="nm_mcp_oauth_token_failed">ลงชื่อเข้าใช้ตัวเชื่อมต่อไม่สำเร็จ (%1$s) โปรดตรวจสอบการเชื่อมต่อและการตั้งค่า OAuth แล้วลองอีกครั้ง</string>
+    <string name="nm_hands_takeover_move_failed">ย้ายแอปไปยังหน้าจอหลักเพื่อให้คุณควบคุมเองไม่ได้ โปรดจบงานแล้วลองอีกครั้ง</string>
+    <string name="nm_hands_takeover_restore_failed">ย้ายแอปกลับไปยังหน้าจอเบื้องหลังหลังจากควบคุมเองไม่ได้ หยุดการควบคุมหน้าจอแล้ว</string>
+    <string name="nm_hands_virtual_screen_requires_android12">การควบคุมหน้าจอเบื้องหลังต้องใช้ Android 12 ขึ้นไป ยังใช้การควบคุมหน้าจอหลักได้</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">เพิกถอนสิทธิ์บางรายการไม่ได้ โปรดลองล้างข้อมูลอีกครั้ง โดยจะเก็บคีย์ไว้สำหรับขั้นตอนนี้เท่านั้น และหยุดการกู้คืนอัตโนมัติแล้ว</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">ไม่มีการเชื่อมต่อผู้ช่วยที่พร้อมใช้ โปรดเริ่ม Shizuku จับคู่การแก้ไขข้อบกพร่องแบบไร้สาย หรืออนุญาตสิทธิ์ root</string>
+    <string name="nm_hands_virtual_screen_root_denied">สิทธิ์ root ถูกปฏิเสธหรือหมดเวลารอ โปรดอนุญาตก่อนลองอีกครั้ง</string>
+    <string name="nm_hands_spill_restore_failed">ย้ายแอปที่เปิดบนหน้าจอหลักกลับไปยังหน้าจอเบื้องหลังไม่ได้ หยุดการควบคุมหน้าจอแล้ว</string>
+    <string name="nm_hands_payment_takeover">จัดการขั้นตอนการชำระเงินนี้ในแอป แล้วแตะดำเนินการต่อ เอเจนต์จะตรวจสอบหน้าจอก่อนทำงานต่อ</string>
 </resources>

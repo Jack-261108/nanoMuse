@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.view.Display
 import android.view.KeyEvent
+import com.openminis.app.R
 import com.openminis.app.accessibility.MinisAccessibilityService
 import com.openminis.app.logging.AppLogger
 import io.github.nanomuse.display.AgentDisplay
@@ -38,6 +39,8 @@ interface HandsDisplayTarget {
     fun pressBack(): Boolean
     fun pressHome(): Boolean
     fun injectKey(keyCode: Int): Boolean
+    fun foregroundPackage(svc: MinisAccessibilityService): String?
+    fun hasTask(): Boolean = true
     val previewFrames: StateFlow<Bitmap?>?
 
     fun injectText(text: String): Boolean = false
@@ -125,6 +128,10 @@ class MainDisplayTarget(
         svc.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
 
     override fun injectKey(keyCode: Int): Boolean = false
+
+    override fun foregroundPackage(svc: MinisAccessibilityService): String? =
+        svc.foregroundPackage().first
+            ?: ScreenWords.rootsOn(svc, Display.DEFAULT_DISPLAY).firstNotNullOfOrNull { it.packageName?.toString() }
 }
 
 /**
@@ -143,7 +150,9 @@ class VirtualDisplayTarget(
     override val height: Int get() = display.height
     override val previewFrames: StateFlow<Bitmap?> get() = display.frames
 
-    private var activeTaskId: Int = -1
+    private var takeoverTaskId: Int = -1
+
+    override fun hasTask(): Boolean = shell.topTaskId(displayId) >= 0
 
     override fun captureScreenshot(): Bitmap? {
         // 等待一小会儿确保首帧到达
@@ -185,33 +194,10 @@ class VirtualDisplayTarget(
         return shell.injectStroke(displayId, xs, ys, times)
     }
 
-    override fun openApp(packageName: String): Int {
-        val watch = armSpillWatch()
-        val res = shell.startApp(displayId, packageName)
-        if (res == 0) {
-            activeTaskId = shell.topTaskId(displayId)
-        }
-        val excluded = context?.let { SystemPickers.resolve(it) } ?: emptySet()
-        val spill = checkSpill(watch, excluded = excluded)
-        if (spill is MainScreenSpill.PullBack) {
-            activeTaskId = spill.arrival.taskId
-        }
-        return res
-    }
+    // The operator checks for spills after settling, with the user's main-screen tap history.
+    override fun openApp(packageName: String): Int = shell.startApp(displayId, packageName)
 
-    override fun restartApp(packageName: String): Int {
-        val watch = armSpillWatch()
-        val res = shell.restartApp(displayId, packageName)
-        if (res == 0) {
-            activeTaskId = shell.topTaskId(displayId)
-        }
-        val excluded = context?.let { SystemPickers.resolve(it) } ?: emptySet()
-        val spill = checkSpill(watch, excluded = excluded)
-        if (spill is MainScreenSpill.PullBack) {
-            activeTaskId = spill.arrival.taskId
-        }
-        return res
-    }
+    override fun restartApp(packageName: String): Int = shell.restartApp(displayId, packageName)
 
     override fun armSpillWatch(windowMs: Int): HandsDisplayTarget.SpillWatch? {
         val since = SystemClock.uptimeMillis()
@@ -234,8 +220,9 @@ class VirtualDisplayTarget(
             val taskId = verdict.arrival.taskId
             AppLogger.info(tag, "pulling back spilled task $taskId (${verdict.arrival.packageName}) to virtual display $displayId")
             val moved = runCatching { shell.moveTask(taskId, displayId) }.getOrDefault(false)
-            if (moved) {
-                activeTaskId = taskId
+            check(moved) {
+                context?.getString(R.string.nm_hands_spill_restore_failed)
+                    ?: "could not return the app from the main screen to the virtual screen; screen operation stopped"
             }
         }
         return verdict
@@ -263,23 +250,27 @@ class VirtualDisplayTarget(
     override fun injectCtrlKey(keyCode: Int): Boolean =
         shell.injectCtrlKey(displayId, keyCode)
 
+    override fun foregroundPackage(svc: MinisAccessibilityService): String? =
+        ScreenWords.rootsOn(svc, displayId).firstNotNullOfOrNull { it.packageName?.toString() }
+            ?: runCatching { shell.packageOfTask(shell.topTaskId(displayId)) }.getOrNull()
+
     override fun onTakeoverStart(): Boolean {
+        if (takeoverTaskId >= 0) return false
         val top = shell.topTaskId(displayId)
-        if (top > 0) {
-            activeTaskId = top
-            AppLogger.info(tag, "moving task $top to main screen for user takeover")
-            return shell.moveTask(top, Display.DEFAULT_DISPLAY)
-        }
+        if (top < 0) return false
+        AppLogger.info(tag, "moving task $top to main screen for user takeover")
+        if (!shell.moveTask(top, Display.DEFAULT_DISPLAY)) return false
+        takeoverTaskId = top
         return true
     }
 
     override fun onTakeoverEnd(): Boolean {
-        if (activeTaskId > 0) {
-            AppLogger.info(tag, "moving task $activeTaskId back to virtual display $displayId")
-            val ok = shell.moveTask(activeTaskId, displayId)
-            Thread.sleep(500)
-            return ok
-        }
+        val taskId = takeoverTaskId
+        if (taskId < 0) return false
+        AppLogger.info(tag, "moving task $taskId back to virtual display $displayId")
+        if (!shell.moveTask(taskId, displayId)) return false
+        takeoverTaskId = -1
+        Thread.sleep(500)
         return true
     }
 
@@ -296,10 +287,5 @@ class VirtualDisplayTarget(
             AppLogger.warning(tag, "finishDisplay failed: ${t.message}")
         }
         display.release()
-        try {
-            shell.recoverMuted()
-        } catch (t: Throwable) {
-            AppLogger.warning(tag, "recoverMuted failed: ${t.message}")
-        }
     }
 }

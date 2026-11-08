@@ -565,9 +565,11 @@
     <string name="nm_hands_why_any">le seul modèle activé qui voit</string>
     <string name="nm_hands_section_virtual_screen">Écran virtuel d\'arrière-plan</string>
     <string name="nm_hands_virtual_screen_title">Opérer sur l\'écran virtuel</string>
-    <string name="nm_hands_virtual_screen_footer">Activé avec l\'assistant prêt, les apps tournent sur un écran virtuel sans perturber votre usage. Nécessite Shizuku, root ou démarrage PC.</string>
+    <string name="nm_hands_virtual_screen_footer">Exécutez des applications sur un écran en arrière-plan avec Android 12 ou une version ultérieure et un assistant privilégié compatible. Démarrez-le via le débogage sans fil, Shizuku, root ou USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Assistant connecté</string>
     <string name="nm_hands_virtual_screen_not_started">Assistant non démarré (appuyez pour démarrer ou utiliser l\'écran principal)</string>
+    <string name="nm_hands_virtual_screen_unavailable">L\'assistant privilégié n\'est pas prêt pour le mode arrière-plan. Veuillez démarrer ou réessayer l\'assistant dans les paramètres, ou désactiver l\'écran virtuel en arrière-plan pour utiliser l\'écran principal.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Échec de l\'initialisation de l\'écran virtuel en arrière-plan (%1$s). Veuillez réessayer ou désactiver l\'écran en arrière-plan pour utiliser l\'écran principal.</string>
     <string name="nm_hands_virtual_screen_start_helper">Démarrer l\'assistant</string>
     <string name="nm_hands_virtual_screen_start_sub">Tenter de lancer l\'assistant via Shizuku ou root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Se connecter via le débogage sans fil et lancer l\'assistant</string>
@@ -585,7 +587,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Réessayer la connexion de l\'assistant</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Dissocier ?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse supprimera les clés enregistrées et arrêtera l\'opération sur l\'écran virtuel.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Les autorisations sont retirées avant l’arrêt de l’assistant et la suppression des clés d’association. En cas d’échec, la clé est conservée uniquement pour le nettoyage et la récupération automatique reste désactivée.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Dissocier</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1317,4 +1319,12 @@
     <string name="nm_chat_background_purple">Violet</string>
     <string name="nm_chat_in_progress">Tâche en cours</string>
     <string name="nm_mcp_oauth_token_failed">La connexion au connecteur a échoué (%1$s). Vérifiez la connexion et les paramètres OAuth, puis réessayez.</string>
+    <string name="nm_hands_takeover_move_failed">Impossible de déplacer l’application sur l’écran principal pour vous laisser la main. Terminez la tâche et réessayez.</string>
+    <string name="nm_hands_takeover_restore_failed">Impossible de renvoyer l’application sur l’écran en arrière-plan après votre intervention. Le contrôle de l’écran est arrêté.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Le contrôle en arrière-plan nécessite Android 12 ou une version ultérieure. Le contrôle de l’écran principal reste disponible.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Certaines autorisations n’ont pas pu être retirées. Relancez le nettoyage ; la clé est conservée uniquement pour cette étape et la récupération automatique est arrêtée.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Aucune connexion à l’assistant disponible. Démarrez Shizuku, associez le débogage sans fil ou autorisez l’accès root.</string>
+    <string name="nm_hands_virtual_screen_root_denied">L’accès root a été refusé ou a expiré. Autorisez-le avant de réessayer.</string>
+    <string name="nm_hands_spill_restore_failed">Impossible de renvoyer sur l’écran en arrière-plan une application ouverte sur l’écran principal. Le contrôle de l’écran est arrêté.</string>
+    <string name="nm_hands_payment_takeover">Effectuez cette étape du paiement dans l’application, puis appuyez sur Continuer. L’agent vérifiera l’écran avant d’agir à nouveau.</string>
 </resources>

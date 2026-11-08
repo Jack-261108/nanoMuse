@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -47,6 +48,9 @@ class MinisAccessibilityService : AccessibilityService() {
         val className: String?,
         val text: String?,
         val timestamp: Long,
+        // nanoMuse: retain displayId and eventTime (in SystemClock.uptimeMillis() timebase)
+        val displayId: Int = Display.INVALID_DISPLAY,
+        val eventTime: Long = SystemClock.uptimeMillis(),
     )
 
     private val eventRing = ConcurrentLinkedQueue<RecordedEvent>()
@@ -84,14 +88,43 @@ class MinisAccessibilityService : AccessibilityService() {
         }
     }
 
+    // nanoMuse: resolve which display the accessibility event came from
+    private fun displayOf(event: AccessibilityEvent): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val d = event.displayId
+            if (d != Display.INVALID_DISPLAY) return d
+        }
+        val windowId = event.windowId
+        if (windowId == -1) return Display.INVALID_DISPLAY
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val all = runCatching { windowsOnAllDisplays }.getOrNull()
+            if (all != null) {
+                for (i in 0 until all.size()) {
+                    if (all.valueAt(i).any { it.id == windowId }) return all.keyAt(i)
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val w = runCatching { windows?.firstOrNull { it.id == windowId } }.getOrNull()
+            if (w != null) return w.displayId
+        }
+        // nanoMuse: an unknown source must not count as a user's main-screen interaction.
+        return Display.INVALID_DISPLAY
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
+        // nanoMuse: extract displayId and eventTime in uptimeMillis
+        val dId = displayOf(event)
+        val eTime = if (event.eventTime > 0) event.eventTime else SystemClock.uptimeMillis()
         val rec = RecordedEvent(
             type = AccessibilityEvent.eventTypeToString(event.eventType),
             packageName = event.packageName?.toString(),
             className = event.className?.toString(),
             text = event.text?.joinToString(" ") { it?.toString() ?: "" }?.takeIf { it.isNotBlank() },
             timestamp = System.currentTimeMillis(),
+            displayId = dId,
+            eventTime = eTime,
         )
         eventRing.offer(rec)
         while (eventRing.size > EVENT_RING_CAP) eventRing.poll()

@@ -28,7 +28,7 @@ class BootRestoreReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val manager = BuiltinShellManager.instance(context)
-                manager.need()
+                manager.restoreAfterBoot()
             } catch (t: Throwable) {
                 AppLogger.warning(TAG, "boot recovery failed: ${t.message}")
             } finally {

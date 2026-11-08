@@ -93,13 +93,17 @@ The agent does not have to run on the phone. A *device* connects to the nanoMuse
 
 ### Background virtual screen on Android
 
-When paired with the privileged shell helper (started through on-device wireless debugging, Shizuku, root `su`, or USB `adb`), the Android hands can run entirely in the background on an isolated virtual display instead of driving the physical screen:
+Background control needs **Android 12 or later** and a compatible privileged helper, started through on-device wireless debugging, Shizuku, root `su`, or USB `adb`. Main-screen control still works on Android 11. A failed helper or display capability check ends the task with an explanation; choosing the main screen requires turning off background mode.
 
-- **Non-disturbing background execution**: The target application launches into a private trusted virtual display with its own display group and local input method policy. The user's main screen remains untouched and interactive. If a requested app is already running on the physical screen, the operator avoids launching it to prevent collision.
-- **Audio muting**: Background tasks have their audio playback muted through `appops` so media or sound effects do not play over the user's audio.
-- **Text input and keys**: When ADB keyboard is not enabled, text is entered via accessibility `ACTION_SET_TEXT` or injected through the privileged shell clipboard with SystemUI overlay suppression and sensitive marking, followed by paste or Ctrl+V key events on the virtual display. Key events like Enter route directly to the virtual display without displaying an on-screen keyboard on the main screen.
-- **User takeover**: When an interaction requires manual intervention (such as entering credentials or solving a CAPTCHA), the task root activity moves seamlessly to the main display. Once the user finishes and taps Continue, the task moves back to the virtual display.
-- **Live preview capsule**: The floating capsule on the main screen provides a live preview of the background virtual display, throttled up to 5 fps and updated only when the frame changes. The mini-screen can be collapsed to a minimal pill or tapped to zoom in for inspection without switching away from the user's foreground app.
+- **Display isolation**: Apps open on a separate virtual display. The helper checks task and input access and the local input method policy before use. Display flags differ by Android version and device; an Android version alone does not establish compatibility. An app visible on the main screen, including split screen, is left for the user. Accessibility nodes, button text and focused fields are read only from the target display.
+- **Starting without an app**: An empty display first gives the model the installed app list without an image. It can open an app, ask the user or end the task; it cannot tap or type until a screen is available. The operator waits briefly for the first app frame before treating a black screen as a manual step.
+- **Audio**: Each display keeps the audio settings it changed and applies muting again when reopening a retained task. Cleanup ends the display tasks before restoring audio. An indirectly opened app may play briefly before it is detected and muted; cleanup failures retain the recovery record.
+- **Text and keys**: Virtual-screen input uses the focused field on that display. Paste waits for text readback. An unconfirmed write is reported without automatically repeating it. Clipboard replacement requires a readable original value, and restoration checks ownership so a new user copy is preserved. Enter uses the same approval gate as taps.
+- **User takeover**: Payments and other manual steps move the task to the main display. Continue moves it back and requests a fresh observation, without replaying the pending click or claiming that a payment succeeded. A failed move stops the operation.
+- **Helper lifetime**: The helper watches the app's Binder connection and cleans up active display tasks if the app exits. Unexpected helper death has bounded retries. Stop disables automatic restarting; unpair revokes recovery permissions before deleting keys. Failed revocations retain the key only for cleanup and keep automatic recovery disabled.
+- **Preview**: The floating capsule shows the virtual display at up to 5 fps when its frame changes. Collapse it to a pill or tap to zoom in.
+
+The [Android guide](android.md#background-screen-and-helper) describes startup, cleanup and retry controls.
 
 *Connections → Phone* shows which device is connected and how many apps it lists. `GET /api/phone` returns the same plus the last screen read.
 

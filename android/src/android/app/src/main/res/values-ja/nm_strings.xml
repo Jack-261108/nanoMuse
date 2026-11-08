@@ -561,9 +561,11 @@
     <string name="nm_hands_why_any">有効なモデルのうち画面を見られる唯一のもの</string>
     <string name="nm_hands_section_virtual_screen">バックグラウンド仮想画面</string>
     <string name="nm_hands_virtual_screen_title">仮想画面で操作</string>
-    <string name="nm_hands_virtual_screen_footer">有効で特権ヘルパーが準備できている場合、アプリはバックグラウンドの仮想画面で動作し、通常の使用を妨げません。Shizuku、root、またはPCからの起動が必要です。</string>
+    <string name="nm_hands_virtual_screen_footer">Android 12 以降と対応する特権ヘルパーで、バックグラウンド画面上のアプリを操作できます。ワイヤレスデバッグ、Shizuku、root、USB ADB から起動できます。</string>
     <string name="nm_hands_virtual_screen_ready">特権ヘルパー接続済み</string>
     <string name="nm_hands_virtual_screen_not_started">ヘルパー未起動（タップして起動、未起動時はメイン画面を使用）</string>
+    <string name="nm_hands_virtual_screen_unavailable">特権ヘルパーがバックグラウンドモードに対応していません。設定でヘルパーを起動または再試行するか、バックグラウンド仮想画面をオフにしてメイン画面を使用してください。</string>
+    <string name="nm_hands_virtual_screen_init_failed">バックグラウンド仮想画面の初期化に失敗しました (%1$s)。再試行するか、バックグラウンド仮想画面をオフにしてメイン画面を使用してください。</string>
     <string name="nm_hands_virtual_screen_start_helper">特権ヘルパーを起動</string>
     <string name="nm_hands_virtual_screen_start_sub">Shizukuまたはrootでヘルパープロセスを起動します</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">ワイヤレスデバッグ経由で接続し特権ヘルパーを起動</string>
@@ -581,7 +583,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">特権ヘルパーへの接続を再試行</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">ペア設定を解除しますか？</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuseは保存されたペア設定キーを削除し、仮想画面での操作を停止します。</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">権限を取り消してからヘルパーを停止し、ペア設定の鍵を削除します。取り消しに失敗した場合、鍵は後処理のためだけに保持され、自動復旧は停止したままになります。</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">解除</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1312,4 +1314,12 @@
     <string name="nm_chat_background_purple">紫</string>
     <string name="nm_chat_in_progress">タスク進行中</string>
     <string name="nm_mcp_oauth_token_failed">コネクターへのログインに失敗しました（%1$s）。接続と OAuth 設定を確認して、もう一度お試しください。</string>
+    <string name="nm_hands_takeover_move_failed">引き継ぎ用にアプリをメイン画面へ移動できませんでした。タスクを終了して再試行してください。</string>
+    <string name="nm_hands_takeover_restore_failed">引き継ぎ後にアプリをバックグラウンド画面へ戻せませんでした。画面操作を停止しました。</string>
+    <string name="nm_hands_virtual_screen_requires_android12">バックグラウンド画面の操作には Android 12 以降が必要です。メイン画面の操作は引き続き利用できます。</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">一部の権限を取り消せませんでした。後処理を再試行してください。保存した鍵は後処理のためだけに保持され、自動復旧は停止しています。</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">利用可能なヘルパー接続がありません。Shizuku を起動するか、ワイヤレスデバッグをペア設定するか、root 権限を許可してください。</string>
+    <string name="nm_hands_virtual_screen_root_denied">root 権限が拒否されたか、タイムアウトしました。許可してから再試行してください。</string>
+    <string name="nm_hands_spill_restore_failed">メイン画面で開いたアプリをバックグラウンド画面へ戻せませんでした。画面操作を停止しました。</string>
+    <string name="nm_hands_payment_takeover">アプリでこの支払い手順を操作してから「続ける」をタップしてください。エージェントは画面を確認してから次の操作を行います。</string>
 </resources>

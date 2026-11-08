@@ -561,9 +561,11 @@
     <string name="nm_hands_why_any">satu-satunya model aktif yang bisa melihat</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">Jalankan aplikasi di layar latar belakang dengan Android 12 atau lebih baru dan helper berhak istimewa yang kompatibel. Mulai melalui debugging nirkabel, Shizuku, root, atau USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Helper connected</string>
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_unavailable">Helper berhak istimewa belum siap untuk mode latar belakang. Silakan mulai atau coba lagi helper di pengaturan, atau matikan layar virtual latar belakang untuk menggunakan layar utama.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Gagal menginisialisasi layar virtual latar belakang (%1$s). Silakan coba lagi atau matikan layar latar belakang untuk menggunakan layar utama.</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Hubungkan via debugging nirkabel dan jalankan helper</string>
@@ -581,7 +583,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Coba lagi koneksi helper</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Putuskan pemasangan?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse akan menghapus kunci tersimpan dan menghentikan pengoperasian pada layar virtual.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Izin dicabut sebelum helper dihentikan dan kunci pemasangan dihapus. Jika pencabutan gagal, kunci disimpan hanya untuk pembersihan dan pemulihan otomatis tetap nonaktif.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Putuskan</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1312,4 +1314,12 @@
     <string name="nm_chat_background_purple">Ungu</string>
     <string name="nm_chat_in_progress">Tugas sedang berlangsung</string>
     <string name="nm_mcp_oauth_token_failed">Gagal masuk ke konektor (%1$s). Periksa koneksi dan pengaturan OAuth, lalu coba lagi.</string>
+    <string name="nm_hands_takeover_move_failed">Aplikasi tidak dapat dipindahkan ke layar utama agar Anda mengambil alih. Akhiri tugas lalu coba lagi.</string>
+    <string name="nm_hands_takeover_restore_failed">Aplikasi tidak dapat dikembalikan ke layar latar belakang setelah pengambilalihan. Kontrol layar dihentikan.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Kontrol layar latar belakang memerlukan Android 12 atau lebih baru. Kontrol layar utama tetap tersedia.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Beberapa izin tidak dapat dicabut. Coba lagi pembersihan; kunci disimpan hanya untuk langkah ini dan pemulihan otomatis dihentikan.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Tidak ada koneksi helper yang tersedia. Jalankan Shizuku, pasangkan debugging nirkabel, atau izinkan akses root.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Akses root ditolak atau kehabisan waktu. Izinkan sebelum mencoba lagi.</string>
+    <string name="nm_hands_spill_restore_failed">Aplikasi yang terbuka di layar utama tidak dapat dikembalikan ke layar latar belakang. Kontrol layar dihentikan.</string>
+    <string name="nm_hands_payment_takeover">Tangani langkah pembayaran ini di aplikasi, lalu ketuk Lanjutkan. Agen akan memeriksa layar sebelum bertindak lagi.</string>
 </resources>

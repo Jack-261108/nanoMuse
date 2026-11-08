@@ -5,7 +5,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.net.Uri
 import android.os.Bundle
-import android.os.Process
+import android.os.Binder
 import com.openminis.app.logging.AppLogger
 
 /**
@@ -20,12 +20,17 @@ class HelperHandoffProvider : ContentProvider() {
             val binder = extras.getBinder(HelperHandoff.KEY_BINDER)
             val pid = extras.getInt(HelperHandoff.KEY_PID, -1)
             val uid = extras.getInt(HelperHandoff.KEY_UID, -1)
-            if (binder != null) {
+            val caller = Binder.getCallingUid()
+            if (binder != null && caller in setOf(0, 2000) && uid == caller && pid == Binder.getCallingPid()) {
                 val shell = INanoMuseShell.Stub.asInterface(binder)
-                SharedShell.setShell(shell, pid, uid)
-                AppLogger.info(TAG, "shell helper attached successfully (pid=$pid, uid=$uid)")
-                return Bundle().apply { putBoolean("ok", true) }
+                val accepted = SharedShell.setShell(shell, pid, uid, extras.getString(HelperHandoff.KEY_NONCE))
+                if (accepted) AppLogger.info(TAG, "shell helper attached successfully (pid=$pid, uid=$uid)")
+                return Bundle().apply {
+                    putBoolean(HelperHandoff.KEY_ACCEPTED, accepted)
+                    if (accepted) putBinder(HelperHandoff.KEY_CLIENT_TOKEN, clientToken)
+                }
             }
+            return Bundle().apply { putBoolean(HelperHandoff.KEY_ACCEPTED, false) }
         }
         return super.call(method, arg, extras)
     }
@@ -38,5 +43,6 @@ class HelperHandoffProvider : ContentProvider() {
 
     companion object {
         private const val TAG = "HelperHandoffProvider"
+        private val clientToken = Binder()
     }
 }

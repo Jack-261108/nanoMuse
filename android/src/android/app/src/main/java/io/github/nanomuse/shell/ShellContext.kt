@@ -26,6 +26,7 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
 
         @SuppressLint("PrivateApi", "DiscouragedPrivateApi")
         fun create(): Context {
+            check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { "background helper requires Android 12" }
             val at = Class.forName("android.app.ActivityThread")
             val thread = at.getMethod("currentActivityThread").invoke(null) ?: newActivityThread(at)
             val system = at.getDeclaredMethod("getSystemContext").invoke(thread) as Context

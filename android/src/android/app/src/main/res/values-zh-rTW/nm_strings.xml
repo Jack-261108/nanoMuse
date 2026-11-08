@@ -546,9 +546,11 @@
     <string name="nm_hands_why_any">唯一一個啟用了、又能看圖的模型</string>
     <string name="nm_hands_section_virtual_screen">後台虛擬螢幕</string>
     <string name="nm_hands_virtual_screen_title">在後台虛擬螢幕上操作</string>
-    <string name="nm_hands_virtual_screen_footer">開啟且特權助手就緒時，App 在獨立的後台虛擬螢幕上運行，不打擾您正常使用主螢幕。支援純手機無線調試免電腦配對，無需 Shizuku、root 或傳輸線。</string>
+    <string name="nm_hands_virtual_screen_footer">Android 12 及更新版本搭配相容的特權助手，可在背景畫面執行應用程式。支援透過無線偵錯、Shizuku、root 或 USB ADB 啟動助手。</string>
     <string name="nm_hands_virtual_screen_ready">特權助手已就緒</string>
-    <string name="nm_hands_virtual_screen_not_started">特權助手未啟動（點擊配對，未啟動时自動使用主螢幕）</string>
+    <string name="nm_hands_virtual_screen_not_started">特權助手未啟動（點擊配對或啟動）</string>
+    <string name="nm_hands_virtual_screen_unavailable">後台模式特權助手未就緒。請在設定中啟動或重試助手，或關閉後台虛擬螢幕切換至主螢幕操作。</string>
+    <string name="nm_hands_virtual_screen_init_failed">後台虛擬螢幕初始化失敗（%1$s）。請重試或關閉後台虛擬螢幕切换至主螢幕操作。</string>
     <string name="nm_hands_virtual_screen_start_helper">啟動特權助手</string>
     <string name="nm_hands_virtual_screen_start_sub">嘗試通過 Shizuku 或 root 拉起特權助手進程</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">透過無線調試連線並拉起特權助手進程</string>
@@ -566,7 +568,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">重試連線特權助手</string>
     <string name="nm_hands_virtual_screen_unpair">解除無線配對</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">解除無線配對？</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse 將刪除儲存的配對密鑰並停止在後台虛擬螢幕上操作。需要重新配對後才能再次使用。</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">先撤銷權限，再停止助手並刪除配對金鑰。撤權失敗時，金鑰僅保留用於清理，自動恢復保持關閉。</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">解除配對</string>
     <string name="nm_hands_virtual_screen_connecting">正在連接特權助手...</string>
     <string name="nm_hands_virtual_screen_scanning_port">正在掃描本地無線調試連接埠...</string>
@@ -1282,4 +1284,12 @@
     <string name="nm_chat_background_purple">紫色</string>
     <string name="nm_chat_in_progress">工作進行中</string>
     <string name="nm_mcp_oauth_token_failed">連接器登入失敗（%1$s）。請檢查網路連線及 OAuth 設定後重試。</string>
+    <string name="nm_hands_takeover_move_failed">無法將應用程式移到主畫面，請結束任務後重試。</string>
+    <string name="nm_hands_takeover_restore_failed">接管後無法將應用程式移回背景畫面，畫面操作已停止。</string>
+    <string name="nm_hands_virtual_screen_requires_android12">背景畫面控制需要 Android 12 或更新版本，仍可使用主畫面控制。</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">部分權限尚未撤銷，請重試清理。配對金鑰僅保留用於撤權，自動恢復已停止。</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">沒有可用的助手連線。請啟動 Shizuku、配對無線偵錯，或允許 root 授權。</string>
+    <string name="nm_hands_virtual_screen_root_denied">root 授權遭拒或已逾時，請允許授權後重試。</string>
+    <string name="nm_hands_spill_restore_failed">無法將跳到主畫面的應用程式移回背景畫面，畫面操作已停止。</string>
+    <string name="nm_hands_payment_takeover">請在應用程式中親自處理這一步付款，然後點「繼續」。智慧體會先查看畫面結果，再繼續操作。</string>
 </resources>

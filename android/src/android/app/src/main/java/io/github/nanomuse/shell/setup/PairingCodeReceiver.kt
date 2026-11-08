@@ -13,6 +13,7 @@ class PairingCodeReceiver : BroadcastReceiver() {
         val code = RemoteInput.getResultsFromIntent(intent)
             ?.getCharSequence(PairingNotifier.KEY_CODE)?.toString() ?: return
         val port = intent.getIntExtra(PairingNotifier.EXTRA_PORT, -1).takeIf { it > 0 }
-        BuiltinShellManager.instance(context).coordinator.submit(code, port)
+        val sessionId = intent.getLongExtra(PairingNotifier.EXTRA_SESSION, -1L)
+        BuiltinShellManager.instance(context).coordinator.submit(code, port, sessionId)
     }
 }

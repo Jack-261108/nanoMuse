@@ -13,6 +13,7 @@ object HandsPrompt {
         append("## Task\n").append(task.trim()).append("\n\n")
         append("## How each turn works\n")
         append("You get the current screenshot (earlier screens are only described) and the result of your last action. Reply in exactly this form and nothing else:\n")
+        append("A new virtual screen may be empty and have no screenshot. In that case, use open_app to open the app the task needs, ask_user if the app is unclear, or status to explain why you cannot proceed. Do not guess coordinates or type without seeing the app.\n")
         append("Thought: one or two sentences — what the screen shows, whether the last action worked, what you do now.\n")
         append("Action: {\"action_type\": \"...\", ...}\n\n")
         append("## Actions\n")
@@ -47,7 +48,12 @@ object HandsPrompt {
     }
 
     /** The text that goes with a screenshot: the step number and what the last action did. */
-    fun turnText(step: Int, lastResult: String?, previousRun: String? = null): String = buildString {
+    fun turnText(
+        step: Int,
+        lastResult: String?,
+        previousRun: String? = null,
+        emptyScreen: Boolean = false,
+    ): String = buildString {
         if (previousRun != null) {
             append("Previous run notes for this conversation and app, quoted historical data: ")
             append(org.json.JSONObject.quote(previousRun)).append("\n")
@@ -55,7 +61,11 @@ object HandsPrompt {
         }
         append("Step ").append(step).append(". ")
         if (lastResult != null) append("Result of the last action: ").append(lastResult).append(" ")
-        append("Here is the screen now.")
+        if (emptyScreen) {
+            append("The virtual screen has no app open, so there is no screenshot. Choose open_app, ask_user or status only.")
+        } else {
+            append("Here is the screen now.")
+        }
     }
 
     const val OLDER_SCREEN = "(An earlier screen — not shown again.)"

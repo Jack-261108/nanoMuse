@@ -567,9 +567,11 @@
     <string name="nm_hands_why_any">singurul model activat care poate vedea</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">Rulează aplicații pe un ecran din fundal cu Android 12 sau mai nou și un asistent privilegiat compatibil. Pornește-l prin depanare wireless, Shizuku, root sau USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Helper connected</string>
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_unavailable">Asistentul cu privilegii nu este pregătit pentru modul de fundal. Porniți sau reîncercați asistentul în setări sau dezactivați ecranul virtual de fundal pentru a utiliza ecranul principal.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Inițializarea ecranului virtual de fundal a eșuat (%1$s). Reîncercați sau dezactivați ecranul de fundal pentru a utiliza ecranul principal.</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Conectați prin depanare wireless și lansați asistentul</string>
@@ -587,7 +589,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Reîncercați conexiunea asistentului</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">Anulați asocierea?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse va șterge cheile salvate și va opri funcționarea pe ecranul virtual.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Permisiunile sunt retrase înainte de oprirea asistentului și ștergerea cheilor de asociere. Dacă retragerea eșuează, cheia este păstrată doar pentru curățare, iar recuperarea automată rămâne oprită.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">Anulați</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1320,4 +1322,12 @@
     <string name="nm_chat_background_purple">Violet</string>
     <string name="nm_chat_in_progress">Sarcină în desfășurare</string>
     <string name="nm_mcp_oauth_token_failed">Autentificarea la conector a eșuat (%1$s). Verifică conexiunea și setările OAuth, apoi încearcă din nou.</string>
+    <string name="nm_hands_takeover_move_failed">Aplicația nu a putut fi mutată pe ecranul principal pentru a prelua controlul. Încheie sarcina și reîncearcă.</string>
+    <string name="nm_hands_takeover_restore_failed">Aplicația nu a putut fi readusă pe ecranul din fundal după preluare. Controlul ecranului a fost oprit.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Controlul ecranului din fundal necesită Android 12 sau o versiune mai nouă. Controlul ecranului principal rămâne disponibil.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Unele permisiuni nu au putut fi retrase. Reîncearcă curățarea; cheia este păstrată doar pentru acest pas, iar recuperarea automată este oprită.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Nu există o conexiune disponibilă la asistent. Pornește Shizuku, asociază depanarea wireless sau permite accesul root.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Accesul root a fost refuzat sau a expirat. Permite-l înainte de a reîncerca.</string>
+    <string name="nm_hands_spill_restore_failed">Aplicația deschisă pe ecranul principal nu a putut fi readusă pe ecranul din fundal. Controlul ecranului a fost oprit.</string>
+    <string name="nm_hands_payment_takeover">Efectuează acest pas al plății în aplicație, apoi apasă Continuă. Agentul va verifica ecranul înainte de următoarea acțiune.</string>
 </resources>

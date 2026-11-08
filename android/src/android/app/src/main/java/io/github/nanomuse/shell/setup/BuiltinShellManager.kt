@@ -13,7 +13,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import com.openminis.app.logging.AppLogger
+import com.openminis.app.offload.ShizukuManager
 import io.github.nanomuse.shell.SharedShell
+import io.github.nanomuse.hands.Hands
 import io.github.nanomuse.shell.adb.AdbConnectPort
 import io.github.nanomuse.shell.adb.AdbConnection
 import io.github.nanomuse.shell.adb.AdbConnectionException
@@ -55,6 +57,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -96,7 +103,14 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     private val finder = NsdAdbServiceFinder(app)
     private var discoveryJob: Job? = null
     private var connectJob: Job? = null
+    private var repairJob: Job? = null
     private var started = false
+    private val runState = HelperRunState(prefs.getBoolean(KEY_DESIRED, paired))
+    private val recoveryBudget = HelperRecoveryBudget()
+    @Volatile private var cleanupPending = prefs.getBoolean(KEY_CLEANUP_PENDING, false)
+    @Volatile private var permanentFailure = false
+    @Volatile private var rootAuthorized = false
+    @Volatile private var stopping = false
 
     private val portCache = object : PortCache {
         override fun load(): Int? = prefs.getInt("port", 0).takeIf { it > 0 }
@@ -128,7 +142,13 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     val recoveryPermissions: RecoveryPermissions by lazy {
         RecoveryPermissions(
             runner = {
-                if (paired && DeveloperSettings.wirelessDebugging(app.contentResolver)) {
+                if (ShizukuManager.isReady()) {
+                    ShellCommandRunner { cmd ->
+                        withContext(io) {
+                            ShizukuManager.runProcess(arrayOf("sh", "-c", cmd)).combined
+                        }
+                    }
+                } else if (paired && DeveloperSettings.wirelessDebugging(app.contentResolver)) {
                     ShellCommandRunner { cmd ->
                         withContext(io) {
                             connectAdb().use { conn ->
@@ -140,6 +160,7 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
             },
             store = consentStore,
             packageName = app.packageName,
+            allowApply = { runState.desiredRunning && !cleanupPending && !stopping },
         )
     }
 
@@ -149,28 +170,38 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     private suspend fun restartAccessibilityDirectly(gapMs: Long): PermissionResult = withContext(io) {
         val cr = app.contentResolver
         val me = PermissionCommands.accessibilityService(app.packageName)
+        fun allowed() = runState.desiredRunning && !cleanupPending && !stopping
         fun read() = Settings.Secure.getString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-        fun write(list: String) {
-            Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list.ifEmpty { null })
-            Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, if (list.isEmpty()) 0 else 1)
+        fun writeIfAllowed(list: String, enabling: Boolean = false): Boolean = synchronized(this@BuiltinShellManager) {
+            if (!allowed()) return@synchronized false
+            if (enabling) {
+                consentStore.save(consentStore.consent.value.withApplied(RecoveryCapability.Accessibility, true))
+            }
+            check(Settings.Secure.putString(cr, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES, list.ifEmpty { null }))
+            check(Settings.Secure.putInt(cr, Settings.Secure.ACCESSIBILITY_ENABLED, if (list.isEmpty()) 0 else 1))
+            true
         }
         try {
+            if (!allowed()) return@withContext PermissionResult.NoRunner
             val current = read()
             if (AccessibilityList.contains(current, me)) {
-                write(AccessibilityList.without(current, me))
-                withContext(NonCancellable) {
+                if (!writeIfAllowed(AccessibilityList.without(current, me))) return@withContext PermissionResult.NoRunner
+                withContext(NonCancellable) restore@{
                     delay(gapMs)
                     try {
-                        write(AccessibilityList.with(read(), me))
+                        if (!writeIfAllowed(AccessibilityList.with(read(), me), enabling = true)) {
+                            return@restore PermissionResult.NoRunner
+                        }
+                        PermissionResult.Done
                     } catch (e: Exception) {
-                        runCatching { write(current.orEmpty()) }
+                        runCatching { writeIfAllowed(current.orEmpty(), enabling = true) }
                         throw e
                     }
                 }
             } else {
-                write(AccessibilityList.with(current, me))
+                if (writeIfAllowed(AccessibilityList.with(current, me), enabling = true)) PermissionResult.Done
+                else PermissionResult.NoRunner
             }
-            PermissionResult.Done
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -183,6 +214,7 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
             restart = { gap -> if (canWriteSecure()) restartAccessibilityDirectly(gap) else recoveryPermissions.restartAccessibility(gap) },
             consent = { consentStore.consent.value },
             direct = ::canWriteSecure,
+            allowed = { runState.desiredRunning && !cleanupPending },
         )
     }
 
@@ -222,27 +254,44 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
 
     val wirelessAutoOn: WirelessDebuggingAutoOn by lazy {
         WirelessDebuggingAutoOn(
-            wants = { consentStore.consent.value.wants(RecoveryCapability.AutoWirelessDebugging) },
+            wants = { runState.desiredRunning && !cleanupPending && consentStore.consent.value.wants(RecoveryCapability.AutoWirelessDebugging) },
             canWrite = { app.checkSelfPermission(PermissionCommands.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED },
             read = { DeveloperSettings.wirelessDebugging(app.contentResolver) },
-            write = { DeveloperSettings.turnOnWirelessDebugging(app.contentResolver) },
+            write = {
+                synchronized(this) {
+                    runState.desiredRunning && !cleanupPending && !stopping &&
+                        DeveloperSettings.turnOnWirelessDebugging(app.contentResolver)
+                }
+            },
         )
     }
 
     init {
         scope.launch {
+            var wasReady = false
             SharedShell.shell.collect { shell ->
                 if (shell != null) {
+                    if (!runState.desiredRunning || cleanupPending) {
+                        SharedShell.release()
+                        return@collect
+                    }
+                    wasReady = true
+                    recoveryBudget.connected(android.os.SystemClock.elapsedRealtime())
                     _status.value = BuiltinShellStatus.Running
                     wirelessAutoOn.reset()
-                    runCatching { recoveryPermissions.applyPending() }
-                } else if (_status.value is BuiltinShellStatus.Failed) {
-                    // 保留失败状态与一键修复路径，不覆盖为 NotPaired
-                } else if (paired) {
-                    val wd = DeveloperSettings.wirelessDebugging(app.contentResolver)
-                    _status.value = if (!wd) BuiltinShellStatus.WirelessDebuggingOff else BuiltinShellStatus.Connecting
-                } else {
-                    _status.value = BuiltinShellStatus.NotPaired
+                    if (paired) runCatching { recoveryPermissions.applyPending() }
+                } else if (wasReady) {
+                    wasReady = false
+                    if (runState.desiredRunning && !cleanupPending) {
+                        _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.HelperStartFailed)
+                        if (recoveryBudget.retryAfterDeath(android.os.SystemClock.elapsedRealtime())) {
+                            // A fast crash can arrive while the successful start is still unwinding.
+                            scope.launch {
+                                connectJob?.join()
+                                resumeIfWanted()
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -261,8 +310,8 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
                     val on = DeveloperSettings.wirelessDebugging(app.contentResolver)
                     AppLogger.info(TAG, "wireless debugging state changed: on=$on")
                     if (on && paired && !SharedShell.isReady()) {
-                        need()
-                    } else if (!on && paired && !SharedShell.isReady()) {
+                        resumeIfWanted()
+                    } else if (!on && paired && runState.desiredRunning && !cleanupPending && !SharedShell.isReady()) {
                         _status.value = BuiltinShellStatus.WirelessDebuggingOff
                     }
                 }
@@ -278,16 +327,12 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
             cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     AppLogger.info(TAG, "wifi connected, checking if helper needed...")
-                    if (paired && !SharedShell.isReady()) {
-                        need()
-                    }
+                    if (paired && !SharedShell.isReady()) resumeIfWanted()
                 }
             })
         }
 
-        scope.launch {
-            accessibilityRepair.watch(accessibility, status, userUnlocked)
-        }
+        startRepairWatch()
     }
 
     override val paired: Boolean
@@ -298,23 +343,101 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     }
 
     private fun initialStatus(): BuiltinShellStatus = when {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S -> BuiltinShellStatus.Failed(BuiltinShellFailure.UnsupportedAndroid)
+        prefs.getBoolean(KEY_CLEANUP_PENDING, false) -> BuiltinShellStatus.Failed(BuiltinShellFailure.CleanupPending)
         SharedShell.isReady() -> BuiltinShellStatus.Running
-        !paired -> BuiltinShellStatus.NotPaired
+        !prefs.getBoolean(KEY_DESIRED, paired) || !paired -> BuiltinShellStatus.NotPaired
         !DeveloperSettings.wirelessDebugging(app.contentResolver) -> BuiltinShellStatus.WirelessDebuggingOff
         else -> BuiltinShellStatus.Connecting
     }
 
-    fun need() {
-        if (SharedShell.isReady()) return
-        start()
-        scope.launch {
-            lock.withLock {
-                launchHelperInternal()
-            }
+    private fun startRepairWatch() {
+        if (repairJob?.isActive == true || !runState.desiredRunning || cleanupPending) return
+        repairJob = scope.launch { accessibilityRepair.watch(accessibility, status, userUnlocked) }
+    }
+
+    private fun persistDesired(wanted: Boolean) {
+        prefs.edit().putBoolean(KEY_DESIRED, wanted).apply()
+    }
+
+    /** Explicit user request; automatic callbacks use resumeIfWanted instead. */
+    fun need() { scheduleStart(userInitiated = true) }
+
+    fun restoreAfterBoot() {
+        if (consentStore.consent.value.wants(RecoveryCapability.RestoreAfterReboot)) resumeIfWanted()
+    }
+
+    private fun resumeIfWanted() {
+        if (runState.desiredRunning && !cleanupPending && !permanentFailure) scheduleStart(userInitiated = false)
+    }
+
+    @Synchronized
+    private fun scheduleStart(userInitiated: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.UnsupportedAndroid)
+            return
         }
+        if (stopping) return
+        if (cleanupPending) {
+            _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.CleanupPending)
+            return
+        }
+        if (!userInitiated && (!runState.desiredRunning || permanentFailure)) return
+        if (connectJob?.isActive == true) return
+        if (userInitiated) {
+            permanentFailure = false
+            recoveryBudget.reset()
+        }
+        val generation = runState.request()
+        persistDesired(true)
+        start()
+        startRepairWatch()
+        if (SharedShell.isReady()) return
+        connectJob = scope.launch(start = CoroutineStart.LAZY) {
+            for (attempt in 0..HelperRunState.RETRY_DELAYS_MS.size) {
+                if (!runState.current(generation)) break
+                if (attempt > 0) delay(HelperRunState.RETRY_DELAYS_MS[attempt - 1])
+                if (!runState.current(generation)) break
+                lock.withLock {
+                    if (runState.current(generation)) launchHelperInternal(allowRoot = userInitiated || rootAuthorized, generation = generation)
+                }
+                if (!runState.current(generation) || SharedShell.isReady()) break
+                val failure = (_status.value as? BuiltinShellStatus.Failed)?.reason
+                if (!HelperRunState.retryable(failure)) {
+                    permanentFailure = failure in setOf(
+                        BuiltinShellFailure.AuthorizationRevoked, BuiltinShellFailure.KeyUnreadable,
+                        BuiltinShellFailure.RootDenied, BuiltinShellFailure.UnsupportedAndroid,
+                        BuiltinShellFailure.BackendUnavailable,
+                    )
+                    break
+                }
+            }
+        }.also { it.start() }
+    }
+
+    @Synchronized
+    fun prepareManualStart(nonce: String): Boolean {
+        if (stopping || cleanupPending || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        connectJob?.cancel()
+        runState.request()
+        permanentFailure = false
+        persistDesired(true)
+        start()
+        startRepairWatch()
+        _status.value = BuiltinShellStatus.Connecting
+        SharedShell.prepareStart(nonce)
+        return true
+    }
+
+    @Synchronized
+    private fun prepareHandoff(nonce: String, generation: Long): Boolean {
+        if (!runState.current(generation) || stopping || cleanupPending) return false
+        SharedShell.prepareStart(nonce)
+        return true
     }
 
     override fun startDiscovery() {
+        if (stopping || cleanupPending || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         discoveryJob?.cancel()
         _pairingDiscovery.value = PairingDiscovery.Searching
         discoveryJob = scope.launch {
@@ -337,7 +460,20 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     }
 
     override suspend fun startPairing(code: String, port: Int?) {
+        connectJob?.cancelAndJoin()
+        val pairingContext = currentCoroutineContext()
+        val generation = synchronized(this) {
+            pairingContext.ensureActive()
+            if (stopping || cleanupPending || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+            permanentFailure = false
+            recoveryBudget.reset()
+            persistDesired(true)
+            runState.request()
+        }
+        start()
+        startRepairWatch()
         lock.withLock {
+            if (!runState.current(generation) || cleanupPending) return@withLock
             _status.value = BuiltinShellStatus.Connecting
             val targetPort = port ?: (pairingDiscovery.value as? PairingDiscovery.Found)?.port
                 ?: finder.findPorts(AdbServiceTypes.PAIRING, 5_000L).firstOrNull()
@@ -356,7 +492,9 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
                 lastError = null
                 setPaired(true)
                 stopDiscovery()
-                launchHelperInternal()
+                if (runState.desiredRunning && !cleanupPending) launchHelperInternal(allowRoot = false, generation = generation)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: AdbPairingException) {
                 AppLogger.warning(TAG, "pairing failed: ${e.reason} - ${e.message}")
                 lastError = "AdbPairingException(${e.reason}): ${e.message}"
@@ -375,30 +513,84 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
     }
 
     override suspend fun retry() {
-        lock.withLock {
-            launchHelperInternal()
+        if (cleanupPending) unpair() else {
+            need()
+            connectJob?.join()
         }
     }
 
-    override suspend fun unpair() {
-        lock.withLock {
-            setPaired(false)
-            lastError = null
-            AndroidAdb.forget(app)
-            runCatching { recoveryPermissions.revokeAll() }
-            SharedShell.release()
-            _status.value = BuiltinShellStatus.NotPaired
+    private suspend fun stopWork() {
+        // Invalidate callbacks before awaiting cancelled work or acquiring the launch lock.
+        synchronized(this) {
+            stopping = true
+            runState.stop()
+            persistDesired(false)
+            SharedShell.cancelStart()
+        }
+        Hands.stopCurrent()
+        coordinator.end()
+        connectJob?.cancelAndJoin()
+        connectJob = null
+        repairJob?.cancelAndJoin()
+        repairJob = null
+    }
+
+    suspend fun stop(): Unit = withContext(NonCancellable + io) {
+        try {
+            stopWork()
+            lock.withLock {
+                SharedShell.release()
+                _status.value = BuiltinShellStatus.NotPaired
+            }
+        } finally {
+            stopping = false
         }
     }
 
-    private suspend fun launchHelperInternal() {
+    override suspend fun unpair(): Unit = withContext(NonCancellable + io) {
+        cleanupPending = true
+        prefs.edit().putBoolean(KEY_CLEANUP_PENDING, true).apply()
+        try {
+            stopWork()
+            lock.withLock {
+                val result = recoveryPermissions.revokeAll()
+                // Disconnect only after using the still-valid identity to undo our grants.
+                SharedShell.release()
+                if (result != PermissionResult.Done) {
+                    runCatching { MinisAccessibilityService.getInstance()?.disableSelf() }
+                    lastError = (result as? PermissionResult.Failed)?.detail
+                    _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.CleanupPending)
+                    return@withLock
+                }
+                setPaired(false)
+                AndroidAdb.forget(app)
+                cleanupPending = false
+                prefs.edit().putBoolean(KEY_CLEANUP_PENDING, false).apply()
+                lastError = null
+                _status.value = BuiltinShellStatus.NotPaired
+            }
+        } finally {
+            stopping = false
+        }
+    }
+
+    private suspend fun launchHelperInternal(allowRoot: Boolean, generation: Long) {
         if (SharedShell.isReady()) {
             _status.value = BuiltinShellStatus.Running
             return
         }
-
+        if (!runState.current(generation) || cleanupPending) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.UnsupportedAndroid)
+            return
+        }
+        if (ShizukuManager.isReady()) {
+            launchLocalBackend(root = false, generation = generation)
+            return
+        }
         if (!paired) {
-            _status.value = BuiltinShellStatus.NotPaired
+            if (allowRoot && hasSu()) launchLocalBackend(root = true, generation = generation)
+            else _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.BackendUnavailable)
             return
         }
 
@@ -433,34 +625,46 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
 
         try {
             val connection = withContext(io) { connectAdb() }
+            if (!runState.desiredRunning || cleanupPending) {
+                connection.close()
+                return
+            }
 
             val apkPath = app.applicationInfo.sourceDir
             val pkg = app.packageName
             val uid = Process.myUid()
             val nonce = UUID.randomUUID().toString()
+            if (!prepareHandoff(nonce, generation)) {
+                connection.close()
+                return
+            }
 
             val cmd = "read n; (echo \"\$n\" | CLASSPATH='$apkPath' setsid app_process /system/bin --nice-name='$pkg:helper' io.github.nanomuse.shell.HelperProcess $pkg $uid - >/dev/null 2>&1 &); read _"
 
-            withContext(io) {
-                connection.use { conn ->
-                    val stream = conn.exec(cmd)
-                    stream.write((nonce + "\n").toByteArray(Charsets.UTF_8))
-                    withTimeoutOrNull(15_000L) {
-                        SharedShell.shell.first { it != null }
+            try {
+                withContext(io) {
+                    connection.use { conn ->
+                        val stream = conn.exec(cmd)
+                        stream.write((nonce + "\n").toByteArray(Charsets.UTF_8))
+                        withTimeoutOrNull(15_000L) { SharedShell.shell.first { it != null } }
                     }
                 }
+            } finally {
+                SharedShell.cancelStart(nonce)
             }
 
             if (SharedShell.isReady()) {
                 AppLogger.info(TAG, "helper process attached and running!")
                 lastError = null
                 _status.value = BuiltinShellStatus.Running
-                recoveryPermissions.applyPending()
+                if (runState.desiredRunning && !cleanupPending) recoveryPermissions.applyPending()
             } else {
                 AppLogger.warning(TAG, "helper process did not attach in time")
                 lastError = "helper handoff timed out"
                 _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.HelperStartFailed)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: AdbKeyUnreadableException) {
             AppLogger.warning(TAG, "stored adb key is unreadable: ${e.message}")
             lastError = "AdbKeyUnreadableException: ${e.message}"
@@ -484,6 +688,57 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
             AppLogger.warning(TAG, "unexpected error during launchHelper: ${t.message}")
             lastError = "${t.javaClass.simpleName}: ${t.message}"
             _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.Unknown)
+        }
+    }
+
+    private fun hasSu(): Boolean = listOf(
+        "/system/bin/su", "/system/xbin/su", "/sbin/su", "/system/sd/xbin/su", "/debug_ramdisk/su",
+    ).any { File(it).canExecute() }
+
+    private suspend fun launchLocalBackend(root: Boolean, generation: Long) {
+        val nonce = UUID.randomUUID().toString()
+        if (!prepareHandoff(nonce, generation)) return
+        _status.value = BuiltinShellStatus.Connecting
+        try {
+            val command = SharedShell.command(app, nonce)
+            val exit = if (root) {
+                runInterruptible(io) {
+                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", command))
+                    try {
+                        if (!process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)) {
+                            process.destroy()
+                            -1
+                        } else process.exitValue()
+                    } finally {
+                        process.destroy()
+                    }
+                }
+            } else withContext(io) {
+                ShizukuManager.runProcess(arrayOf("sh", "-c", command), timeoutMs = 15_000L).exitCode
+            }
+            if (exit != 0) {
+                _status.value = BuiltinShellStatus.Failed(
+                    if (root) BuiltinShellFailure.RootDenied else BuiltinShellFailure.BackendUnavailable,
+                )
+                return
+            }
+            withTimeoutOrNull(15_000L) { SharedShell.shell.first { it != null } }
+            if (SharedShell.isReady()) {
+                rootAuthorized = root
+                lastError = null
+                _status.value = BuiltinShellStatus.Running
+            } else {
+                _status.value = BuiltinShellStatus.Failed(BuiltinShellFailure.HelperStartFailed)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            lastError = e.message
+            _status.value = BuiltinShellStatus.Failed(
+                if (root) BuiltinShellFailure.RootDenied else BuiltinShellFailure.BackendUnavailable,
+            )
+        } finally {
+            SharedShell.cancelStart(nonce)
         }
     }
 
@@ -534,6 +789,8 @@ class BuiltinShellManager private constructor(private val app: Context) : Builti
         private const val TAG = "BuiltinShellManager"
         private const val PREFS_NAME = "nanomuse_builtin_shell"
         private const val KEY_PAIRED = "paired"
+        private const val KEY_DESIRED = "desired_running"
+        private const val KEY_CLEANUP_PENDING = "cleanup_pending"
         private const val LOCALHOST = "127.0.0.1"
 
         @Volatile

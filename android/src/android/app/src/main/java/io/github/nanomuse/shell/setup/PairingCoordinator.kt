@@ -13,6 +13,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -50,6 +52,8 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
     private val app = context.applicationContext
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var watch: Job? = null
+    private var pairingJob: Job? = null
+    private val session = PairingSession()
     private val deadline = SlidingDeadline(WINDOW_MS) { SystemClock.elapsedRealtime() }
 
     @Volatile private var shown: PairingNotice? = null
@@ -60,10 +64,21 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
     fun startRepair() { _repairing.value = true }
     fun cancelRepair() { _repairing.value = false }
 
-    suspend fun pair(code: String, port: Int?) = coroutineScope {
-        val job = launch(start = CoroutineStart.UNDISPATCHED) { control.startPairing(code, port) }
-        _repairing.value = false
-        submitted = false
+    suspend fun pair(code: String, port: Int?, sessionId: Long) = coroutineScope {
+        currentCoroutineContext().ensureActive()
+        val job = synchronized(this@PairingCoordinator) {
+            if (!session.accepts(sessionId)) return@coroutineScope
+            pairingJob?.cancel()
+            launch(start = CoroutineStart.LAZY) {
+                currentCoroutineContext().ensureActive()
+                control.startPairing(code, port)
+            }.also {
+                pairingJob = it
+                _repairing.value = false
+                submitted = false
+                it.start()
+            }
+        }
         job.join()
     }
 
@@ -72,8 +87,9 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
         deadline.extend()
         control.startDiscovery()
         if (watch?.isActive == true) return
+        val token = session.begin()
         watch = scope.launch {
-            val reader = launch { PairingCodeReader.run(app, control, this@PairingCoordinator) }
+            val reader = launch { PairingCodeReader.run(app, control, this@PairingCoordinator, token) }
             val notices = launch {
                 combine(control.status, control.pairingDiscovery, _repairing) { _, _, _ ->
                     val d = control.pairingDiscovery.value
@@ -83,32 +99,41 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
                 }
                     .distinctUntilChanged()
                     .transformWhile { emit(it.first); !it.second }
-                    .collectLatest { notice -> notice?.let { post(it) } }
+                    .collectLatest { notice -> notice?.let { post(it, token) } }
             }
             if (!deadline.await(notices)) {
                 notices.cancel()
-                cancelNotice()
+                synchronized(this@PairingCoordinator) {
+                    if (session.accepts(token)) cancelNotice()
+                }
             }
             reader.cancel()
-            control.stopDiscovery()
+            synchronized(this@PairingCoordinator) {
+                if (session.accepts(token)) {
+                    session.end()
+                    control.stopDiscovery()
+                }
+            }
         }
     }
 
-    private suspend fun post(notice: PairingNotice) {
+    private suspend fun post(notice: PairingNotice, token: Long) {
         delay(PairingNotice.delayBefore(notice, autoRead = MinisAccessibilityService.getInstance() != null))
-        show(notice)
+        show(notice, token)
         var sent = 0
         while (true) {
             delay(PairingNotice.realertAfter(notice, sent) ?: return)
             if (shown != notice) return
-            show(notice)
+            show(notice, token)
             sent++
         }
     }
 
-    private fun show(notice: PairingNotice) {
+    @Synchronized
+    private fun show(notice: PairingNotice, token: Long) {
+        if (!session.accepts(token)) return
         shown = notice
-        PairingNotifier.show(app, notice)
+        PairingNotifier.show(app, notice, token)
         if (notice is PairingNotice.Done) {
             Handler(Looper.getMainLooper()).post {
                 runCatching {
@@ -125,23 +150,39 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
 
     @Synchronized
     fun end() {
+        session.end()
         watch?.cancel()
         watch = null
+        pairingJob?.cancel()
+        pairingJob = null
+        submitted = false
         _repairing.value = false
         control.stopDiscovery()
         cancelNotice()
     }
 
-    fun submit(raw: String, port: Int?): Boolean {
+    @Synchronized
+    fun submit(raw: String, port: Int?, token: Long): Boolean {
+        if (!session.accepts(token)) return false
         val code = PairingCode.normalize(raw)
         if (code == null) {
-            show(PairingNotice.EnterCode(port, "Please enter a valid 6-digit number."))
+            show(PairingNotice.EnterCode(port, "Please enter a valid 6-digit number."), token)
             return false
         }
         submitted = true
-        begin()
-        show(PairingNotice.Working)
-        scope.launch { pair(code, port) }
+        deadline.extend()
+        show(PairingNotice.Working, token)
+        pairingJob?.cancel()
+        pairingJob = scope.launch(start = CoroutineStart.LAZY) {
+            currentCoroutineContext().ensureActive()
+            if (synchronized(this@PairingCoordinator) {
+                if (!session.accepts(token)) false else {
+                    _repairing.value = false
+                    submitted = false
+                    true
+                }
+            }) control.startPairing(code, port)
+        }.also { it.start() }
         return true
     }
 

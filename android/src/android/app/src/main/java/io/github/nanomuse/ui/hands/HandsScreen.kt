@@ -3,6 +3,7 @@ package io.github.nanomuse.ui.hands
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -190,6 +191,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
         val scanningPorts by builtin.scanningPorts.collectAsState()
         val scope = rememberCoroutineScope()
 
+        val virtualScreenSupported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         val isRepairNeeded = builtinStatus is BuiltinShellStatus.Failed && (builtinStatus as BuiltinShellStatus.Failed).fix == BuiltinShellFix.RePair
         var confirmUnpair by remember { mutableStateOf(false) }
         var showPairingGuide by remember { mutableStateOf(false) }
@@ -256,10 +258,19 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
             val isNoWifi = failedReason == BuiltinShellFailure.NoWifi
             val isOff = status is BuiltinShellStatus.WirelessDebuggingOff || failedReason == BuiltinShellFailure.WifiNotAllowed
             val isRetry = status is BuiltinShellStatus.Failed && status.fix == BuiltinShellFix.Retry
+            val isCleanupPending = failedReason == BuiltinShellFailure.CleanupPending
+            val failureText = when (failedReason) {
+                BuiltinShellFailure.CleanupPending -> R.string.nm_hands_virtual_screen_cleanup_pending
+                BuiltinShellFailure.BackendUnavailable -> R.string.nm_hands_virtual_screen_backend_unavailable
+                BuiltinShellFailure.RootDenied -> R.string.nm_hands_virtual_screen_root_denied
+                else -> null
+            }
 
             SettingsSwitchRow(
                 title = stringResource(R.string.nm_hands_virtual_screen_title),
                 subtitle = when {
+                    !virtualScreenSupported -> stringResource(R.string.nm_hands_virtual_screen_requires_android12)
+                    failureText != null -> stringResource(failureText)
                     shellInstance != null -> stringResource(R.string.nm_hands_virtual_screen_ready)
                     status is BuiltinShellStatus.Connecting -> stringResource(if (scanningPorts) R.string.nm_hands_virtual_screen_scanning_port else R.string.nm_hands_virtual_screen_connecting)
                     isOff -> stringResource(R.string.nm_hands_virtual_screen_wireless_off)
@@ -269,20 +280,30 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                     else -> stringResource(R.string.nm_hands_virtual_screen_not_started)
                 },
                 checked = virtualScreenEnabled,
-                onCheckedChange = { Hands.setVirtualScreenEnabled(context, it) },
+                enabled = !isCleanupPending && (virtualScreenSupported || virtualScreenEnabled),
+                onCheckedChange = {
+                    if (!it || virtualScreenSupported) Hands.setVirtualScreenEnabled(context, it)
+                },
                 icon = Icons.Outlined.Layers,
                 iconColor = if (virtualScreenEnabled && shellInstance != null) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
                 showDivider = true,
             )
 
-            if (shellInstance == null) {
+            if (virtualScreenSupported && isCleanupPending) {
+                SettingsRow(
+                    title = stringResource(R.string.nm_hands_virtual_screen_retry_helper),
+                    subtitle = stringResource(R.string.nm_hands_virtual_screen_cleanup_pending),
+                    onClick = { scope.launch { builtin.retry() } },
+                    showDivider = false,
+                )
+            } else if (virtualScreenSupported && shellInstance == null) {
                 val shizukuSnapshot by ShizukuManager.snapshot.collectAsState()
-                if (shizukuSnapshot.state == ShizukuManager.State.READY) {
+                if (!builtin.paired || shizukuSnapshot.state == ShizukuManager.State.READY) {
                     SettingsRow(
                         title = stringResource(R.string.nm_hands_virtual_screen_start_helper),
                         subtitle = stringResource(R.string.nm_hands_virtual_screen_start_sub),
                         onClick = {
-                            SharedShell.startHelper(context)
+                            scope.launch { builtin.retry() }
                         },
                         showDivider = true,
                     )
@@ -309,7 +330,8 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                         subtitle = when {
                             isNoWifi -> stringResource(R.string.nm_hands_virtual_screen_no_wifi_sub)
                             isOff -> stringResource(R.string.nm_hands_virtual_screen_wireless_off_sub)
-                            isRetry -> builtin.lastError ?: stringResource(R.string.nm_hands_virtual_screen_start_wireless_sub)
+                            failureText != null -> stringResource(failureText)
+                            isRetry -> stringResource(R.string.nm_hands_virtual_screen_start_wireless_sub)
                             else -> stringResource(R.string.nm_hands_virtual_screen_start_wireless_sub)
                         },
                         onClick = {
@@ -329,10 +351,10 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                                             break
                                         }
                                     }
-                                    builtin.need()
+                                    scope.launch { builtin.retry() }
                                 }
                                 else -> {
-                                    builtin.need()
+                                    scope.launch { builtin.retry() }
                                 }
                             }
                         },
@@ -347,7 +369,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                         val cmd = SharedShell.getAdbCommand(context)
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
                         cm?.setPrimaryClip(android.content.ClipData.newPlainText("adb_cmd", cmd))
-                        android.widget.Toast.makeText(context, "Command copied: run via adb shell", android.widget.Toast.LENGTH_LONG).show()
+                        android.widget.Toast.makeText(context, R.string.nm_sysfile_copied, android.widget.Toast.LENGTH_LONG).show()
                     },
                     showDivider = builtin.paired,
                 )
@@ -362,7 +384,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                         showDivider = false,
                     )
                 }
-            } else {
+            } else if (virtualScreenSupported) {
                 if (builtin.paired) {
                     SettingsRow(
                         title = stringResource(R.string.nm_hands_virtual_screen_unpair),
@@ -377,7 +399,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                         title = stringResource(R.string.nm_hands_virtual_screen_stop_helper),
                         subtitle = stringResource(R.string.nm_hands_virtual_screen_stop_sub),
                         onClick = {
-                            SharedShell.release()
+                            scope.launch { builtin.stop() }
                         },
                         showDivider = true,
                     )

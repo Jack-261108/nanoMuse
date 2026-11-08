@@ -239,6 +239,49 @@ colors. Background images, gradients and theme imports are not included.
 
 Under **Settings → Appearance**, the font-size labels for **Chat Input**, **Message Text** and **App Base** follow the app's language.
 
+### Stopping a screen task
+
+Press **Stop** on the floating capsule to end a screen task. The button responds as soon as
+your finger touches it, and the capsule stays touchable during taps, long presses and swipes.
+Before a gesture on the main screen, the capsule moves clear of the full gesture path when
+needed. If it cannot fit safely elsewhere, the operator rejects that gesture instead of
+making Stop unavailable.
+
+Stopping cancels the model wait and prevents queued gestures and the second tap of a double
+tap from starting. A gesture already handed to Android can still finish. Model timeouts
+remain retryable errors and are not reported as a user stop.
+
+### Background screen and helper
+
+Background screen control requires Android 12 or later and a compatible privileged helper.
+Main-screen control remains available on Android 11. Start the helper from the Hands settings
+using Shizuku, paired wireless debugging, root, or the manual ADB command. The page reports it
+ready only after the app receives a live helper connection. The helper checks the device's
+display, task and input capabilities; an unsupported device or a failed connection ends a
+background task with an explanation. To use the main screen, turn background mode off yourself.
+
+A task without a chosen app starts with the installed app list. The agent must open an app
+before it can tap or type on that screen. Text fields and button labels are read from the
+selected display only. After pasting, the operator checks the field's text; if it cannot
+confirm the change, it reports that instead of repeating the paste. Clipboard restoration
+leaves anything you copied during the operation intact.
+
+For a payment or another step that needs you, the operator moves the task to the main screen
+and waits. After you continue, it moves the task back and looks at the new screen before
+choosing another action. Continuing does not repeat the old click or claim a payment succeeded.
+If either move fails, screen operation stops.
+
+The helper restores the audio settings it changed when the task ends. Reopening a retained
+task applies muting again. If the app exits unexpectedly, the helper closes its active screen
+tasks before restoring audio and the clipboard. An app opened indirectly by another app may
+play audio before it is detected and muted.
+
+An unexpected helper exit triggers a limited number of reconnect attempts. **Stop helper**
+disables automatic restarting and accessibility repair until you start it again. **Forget
+pairing** first revokes the recovery permissions. If a permission cannot be revoked, the page
+asks you to retry cleanup, keeps the key only for that cleanup, and leaves automatic recovery
+off. It deletes the key after cleanup succeeds.
+
 ## Your own key
 
 The vendors the app knows are one file, `assets/nanomuse/providers.json`, a copy of the
@@ -567,6 +610,51 @@ Gradle directory:
 These are optional heap ceilings, not minimum requirements. Choose limits that fit
 the memory available to WSL and leave room for the other processes.
 
+### Background screen device regression
+
+Use an unlocked arm64 phone running Android 12 or later, connected through ADB, with no
+Hands task running. After completing the native build above, run these commands from
+`android/src/android` to build and install both APKs:
+
+```bash
+./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --console=plain --no-daemon
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+```
+
+Open nanoMuse and enable its accessibility service in Android settings before running the
+test. Stop the Android CLI interaction service first, because its UiAutomation connection
+can prevent the test runner from acquiring one. Run only the named class:
+
+```bash
+adb shell am force-stop com.android.cli.interact.instrumentation
+adb shell am instrument -w \
+  -e class io.github.nanomuse.hands.BackgroundScreenDeviceTest \
+  io.github.nanomuse.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The test uses a local screen in the test APK. It checks the helper connection, background
+display and input, clipboard readback, simulated payment handoff, retained task reuse,
+audio restoration and helper shutdown. It does not call a model or make a real payment.
+The output reports each checkpoint; a clipboard `SKIP` means that part was not verified.
+The test cleans up its screen tasks and stops the helper. Start the helper again in Hands
+settings when you want to resume background screen control.
+
+On a device that cannot apply app muting, optionally run this separate refusal test with
+the same setup. It checks that background launch and restart both fail, create no task,
+preserve the main task and original audio mode, and release the display and helper:
+
+```bash
+adb shell am force-stop com.android.cli.interact.instrumentation
+adb shell am instrument -w \
+  -e class io.github.nanomuse.hands.BackgroundScreenAudioCompatibilityDeviceTest \
+  io.github.nanomuse.app.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+If muting works, this test restores the original audio mode and reports a skipped test.
+A pass verifies refusal on an incompatible device; it does not establish that the full
+background screen regression passed. This test also uses only the local fixture, makes
+no model call or payment, and leaves the helper stopped.
 
 ## Releases
 

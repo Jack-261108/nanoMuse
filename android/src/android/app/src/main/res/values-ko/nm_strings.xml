@@ -561,9 +561,11 @@
     <string name="nm_hands_why_any">볼 수 있는 유일하게 켜진 모델</string>
     <string name="nm_hands_section_virtual_screen">백그라운드 가상 화면</string>
     <string name="nm_hands_virtual_screen_title">가상 화면에서 작업</string>
-    <string name="nm_hands_virtual_screen_footer">활성화되고 권한 도우미가 준비되면 앱이 보이지 않는 가상 화면에서 실행되어 휴대폰 사용을 방해하지 않습니다. Shizuku, root 또는 PC 시작이 필요합니다.</string>
+    <string name="nm_hands_virtual_screen_footer">Android 12 이상과 호환되는 권한 도우미를 사용하여 백그라운드 화면에서 앱을 실행합니다. 무선 디버깅, Shizuku, root 또는 USB ADB로 시작할 수 있습니다.</string>
     <string name="nm_hands_virtual_screen_ready">도우미 연결됨</string>
     <string name="nm_hands_virtual_screen_not_started">도우미 시작되지 않음 (눌러서 시작하거나 메인 화면 사용)</string>
+    <string name="nm_hands_virtual_screen_unavailable">백그라운드 모드를 위한 권한 도우미가 준비되지 않았습니다. 설정에서 도우미를 시작하거나 재시도하거나, 백그라운드 가상 화면을 꺼서 메인 화면을 사용하세요.</string>
+    <string name="nm_hands_virtual_screen_init_failed">백그라운드 가상 화면을 초기화하지 못했습니다 (%1$s). 다시 시도하거나 백그라운드 가상 화면을 꺼서 메인 화면을 사용하세요.</string>
     <string name="nm_hands_virtual_screen_start_helper">도우미 프로세스 시작</string>
     <string name="nm_hands_virtual_screen_start_sub">Shizuku 또는 root를 통해 도우미 실행 시도</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">무선 디버깅을 통해 연결하고 도우미 프로세스 실행</string>
@@ -581,7 +583,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">도우미 연결 다시 시도</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">페어링을 해제할까요?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">nanoMuse는 저장된 키를 삭제하고 가상 화면 작업을 중지합니다.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">권한을 해제한 다음 도우미를 중지하고 페어링 키를 삭제합니다. 해제에 실패하면 키는 정리에만 사용하도록 보관되며 자동 복구는 꺼진 상태로 유지됩니다.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">해제</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1312,4 +1314,12 @@
     <string name="nm_chat_background_purple">보라색</string>
     <string name="nm_chat_in_progress">작업 진행 중</string>
     <string name="nm_mcp_oauth_token_failed">커넥터 로그인에 실패했습니다(%1$s). 연결 및 OAuth 설정을 확인한 후 다시 시도하세요.</string>
+    <string name="nm_hands_takeover_move_failed">직접 조작할 수 있도록 앱을 기본 화면으로 옮기지 못했습니다. 작업을 종료한 후 다시 시도하세요.</string>
+    <string name="nm_hands_takeover_restore_failed">직접 조작 후 앱을 백그라운드 화면으로 되돌리지 못했습니다. 화면 조작을 중지했습니다.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">백그라운드 화면 제어에는 Android 12 이상이 필요합니다. 기본 화면 제어는 계속 사용할 수 있습니다.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">일부 권한을 해제하지 못했습니다. 정리를 다시 시도하세요. 저장된 키는 정리에만 사용되며 자동 복구는 중지되었습니다.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">사용 가능한 도우미 연결이 없습니다. Shizuku를 시작하거나 무선 디버깅을 페어링하거나 root 접근을 허용하세요.</string>
+    <string name="nm_hands_virtual_screen_root_denied">root 접근이 거부되었거나 시간이 초과되었습니다. 허용한 후 다시 시도하세요.</string>
+    <string name="nm_hands_spill_restore_failed">기본 화면에 열린 앱을 백그라운드 화면으로 되돌리지 못했습니다. 화면 조작을 중지했습니다.</string>
+    <string name="nm_hands_payment_takeover">앱에서 이 결제 단계를 직접 처리한 뒤 계속을 누르세요. 에이전트는 화면을 확인한 후 다음 동작을 수행합니다.</string>
 </resources>

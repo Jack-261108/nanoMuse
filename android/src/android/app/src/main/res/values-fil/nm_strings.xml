@@ -564,9 +564,11 @@
     <string name="nm_hands_why_any">ang tanging naka-enable na modelong nakakakita</string>
     <string name="nm_hands_section_virtual_screen">Background virtual screen</string>
     <string name="nm_hands_virtual_screen_title">Operate on background screen</string>
-    <string name="nm_hands_virtual_screen_footer">When enabled with privileged helper, apps run on a hidden virtual screen without disturbing your phone use. Requires Shizuku, root, or USB start.</string>
+    <string name="nm_hands_virtual_screen_footer">Magpatakbo ng mga app sa screen sa background gamit ang Android 12 o mas bago at isang katugmang privileged helper. Simulan ito sa wireless debugging, Shizuku, root o USB ADB.</string>
     <string name="nm_hands_virtual_screen_ready">Helper connected</string>
     <string name="nm_hands_virtual_screen_not_started">Helper not started; tap to start or falls back to main screen</string>
+    <string name="nm_hands_virtual_screen_unavailable">Hindi handa ang privileged helper para sa background mode. Pakisimulan o subukan muli ang helper sa mga setting, o i-off ang background virtual screen para gamitin ang pangunahing screen.</string>
+    <string name="nm_hands_virtual_screen_init_failed">Nabigong simulan ang background virtual screen (%1$s). Pakisubukan muli o i-off ang background screen para gamitin ang pangunahing screen.</string>
     <string name="nm_hands_virtual_screen_start_helper">Start helper process</string>
     <string name="nm_hands_virtual_screen_start_sub">Attempt to launch shell helper via Shizuku or root</string>
     <string name="nm_hands_virtual_screen_start_wireless_sub">Kumonekta sa wireless debugging at ilunsad ang helper</string>
@@ -584,7 +586,7 @@
     <string name="nm_hands_virtual_screen_retry_helper">Subukang muli ang koneksyon ng helper</string>
     <string name="nm_hands_virtual_screen_unpair">Forget pairing</string>
     <string name="nm_hands_virtual_screen_unpair_dialog_title">I-unpair?</string>
-    <string name="nm_hands_virtual_screen_unpair_dialog_body">Buburahin ng nanoMuse ang mga nakaimbak na key at ihihinto ang operasyon sa virtual screen.</string>
+    <string name="nm_hands_virtual_screen_unpair_dialog_body">Aalisin muna ang mga pahintulot bago ihinto ang helper at burahin ang mga susi sa pagpapares. Kung mabigo, itatago ang susi para lamang sa paglilinis at mananatiling naka-off ang awtomatikong pagbawi.</string>
     <string name="nm_hands_virtual_screen_unpair_confirm">I-unpair</string>
     <string name="nm_hands_virtual_screen_connecting">Connecting helper...</string>
     <string name="nm_hands_virtual_screen_scanning_port">Scanning local ports for wireless debugging...</string>
@@ -1316,4 +1318,12 @@
     <string name="nm_chat_background_purple">Lila</string>
     <string name="nm_chat_in_progress">Kasalukuyang ginagawa ang gawain</string>
     <string name="nm_mcp_oauth_token_failed">Hindi makapag-sign in sa connector (%1$s). Suriin ang koneksyon at mga setting ng OAuth, at subukang muli.</string>
+    <string name="nm_hands_takeover_move_failed">Hindi nailipat ang app sa pangunahing screen para ikaw ang kumontrol. Tapusin ang gawain at subukang muli.</string>
+    <string name="nm_hands_takeover_restore_failed">Hindi naibalik ang app sa screen sa background matapos mong kumontrol. Itinigil ang kontrol sa screen.</string>
+    <string name="nm_hands_virtual_screen_requires_android12">Kailangan ng Android 12 o mas bago para sa kontrol sa background. Magagamit pa rin ang kontrol sa pangunahing screen.</string>
+    <string name="nm_hands_virtual_screen_cleanup_pending">Hindi naalis ang ilang pahintulot. Subukang muli ang paglilinis; ang naka-save na susi ay para lamang dito at nakahinto ang awtomatikong pagbawi.</string>
+    <string name="nm_hands_virtual_screen_backend_unavailable">Walang magagamit na koneksyon sa helper. Simulan ang Shizuku, ipares ang wireless debugging, o payagan ang root access.</string>
+    <string name="nm_hands_virtual_screen_root_denied">Tinanggihan o nag-timeout ang root access. Payagan ito bago subukang muli.</string>
+    <string name="nm_hands_spill_restore_failed">Hindi naibalik sa screen sa background ang app na bumukas sa pangunahing screen. Itinigil ang kontrol sa screen.</string>
+    <string name="nm_hands_payment_takeover">Gawin ang hakbang na ito ng pagbabayad sa app, pagkatapos ay i-tap ang Magpatuloy. Titingnan muna ng agent ang screen bago kumilos muli.</string>
 </resources>

@@ -1,7 +1,10 @@
 package io.github.nanomuse.hands
 
 import android.graphics.Rect
+import android.os.Build
+import android.view.Display
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import com.openminis.app.accessibility.MinisAccessibilityService
 
 /**
@@ -14,10 +17,32 @@ import com.openminis.app.accessibility.MinisAccessibilityService
 object ScreenWords {
     private const val MAX_UP = 3
 
-    fun at(svc: MinisAccessibilityService, x: Int, y: Int): String? {
+    fun windowsOn(svc: MinisAccessibilityService, displayId: Int): List<AccessibilityWindowInfo> {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return runCatching { svc.windowsOnAllDisplays?.get(displayId) }.getOrNull().orEmpty()
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return runCatching { svc.windows?.filter { it.displayId == displayId } }.getOrNull().orEmpty()
+        }
+        return if (displayId == Display.DEFAULT_DISPLAY) runCatching { svc.windows }.getOrNull().orEmpty() else emptyList()
+    }
+
+    fun rootsOn(svc: MinisAccessibilityService, displayId: Int): List<AccessibilityNodeInfo> {
+        val windows = windowsOn(svc, displayId)
+        val out = ArrayList<AccessibilityNodeInfo>()
+        for (w in windows) {
+            w.root?.let { out.add(it) }
+        }
+        if (out.isEmpty() && displayId == Display.DEFAULT_DISPLAY) {
+            runCatching { svc.rootInActiveWindow?.let { out.add(it) } }
+        }
+        return out
+    }
+
+    fun at(svc: MinisAccessibilityService, displayId: Int, x: Int, y: Int): String? {
         val words = LinkedHashSet<String>()
         try {
-            for (root in svc.rootNodes()) {
+            for (root in rootsOn(svc, displayId)) {
                 val leaf = deepestAt(root, x, y, 0) ?: continue
                 var node: AccessibilityNodeInfo? = leaf
                 var up = 0
@@ -34,6 +59,8 @@ object ScreenWords {
         }
         return words.joinToString(" ").trim().take(200).ifBlank { null }
     }
+
+    fun at(svc: MinisAccessibilityService, x: Int, y: Int): String? = at(svc, Display.DEFAULT_DISPLAY, x, y)
 
     private fun label(node: AccessibilityNodeInfo): String? {
         val text = node.text?.toString()?.trim().orEmpty()
