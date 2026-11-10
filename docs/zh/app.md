@@ -92,6 +92,8 @@ nanomuse serve --port 9000 --no-qr
 
 任务在设置触发器的原聊天中执行，将邮件、日程、设备信息或请求作为背景，结果在动态标为「新邮件：…」「即将开始：…」「Webhook：…」「设备上线：…」。邮件 UID、日程开始时间用于去重，同一事件不重复触发；webhook 间隔不到十秒会拒绝，错误 key 与错误 URL 都返回相同表现。邮件、日程和设备在线情况属于私密数据，触发后对话会标为已污染，向允许列表之外的主机发送数据需要审批。模型被要求将事件内容视为数据，不能当作指令。「现在运行」用样例事件测试，列表显示触发次数和最近读邮箱时间。终端可用 `nanomuse triggers list | add | cancel`。
 
+hub 自动重连时，设备触发器会保留上次观察到的在线状态。上次离线的设备若在重连后的首个设备列表中变为在线，仍会触发。退出登录、切换账号或关闭 hub 会清除这份记录，重新加入后的首个列表只记录状态，已有在线设备不会触发。
+
 **资源库**。列出工作区全部文件，最新在前，支持搜索和按页面、文档、图片、数据、代码筛选。页面可实时查看，Markdown 格式化显示，CSV 变为表格，图片和 PDF 内嵌展示。智能体生成的页面在沙箱 iframe（隔离的嵌入页面）中运行，采用 opaque origin，即不共享主页面身份，不能读取访问令牌或调用 API。每个 HTML 响应也附 `Content-Security-Policy: sandbox` 实施相同隔离。
 
 **形象**。聊天顶部的龙下方显示当前聊天状态：正在做什么，或等待你回答。各状态图位于 `web/public/avatars/dragon-*.webp`，待命时静候，工作时戴耳机在小电脑前输入，等待时看水晶球，完成时抱星星，工具失败或拒绝时出现汗滴。点击形象也会有回应。[形象工作室](avatar.md)绘制的面孔使用相同状态；设置中可换成整体呼吸、摇摆或跳动的 emoji。Android 还可用自己的短视频作形象，仅保留在该手机，见 [avatar.md](avatar.md#your-own-clip)。开启 `prefers-reduced-motion` 后全部动画停止。
@@ -125,7 +127,7 @@ App 支持英语和简体中文。设置 → 应用语言保存在本设备浏�
 
 技能是包含 `SKILL.md` 的文件夹，文件开头声明名称和简短说明，之后用 Markdown 编写步骤。它遵守 [Agent Skills](https://agentskills.io) 格式，可以与其他智能体共用。内置十二个技能：`skill-creator`、`weekly-review`、`trip-plan`、`inbox-triage`、`compare-options`、`meeting-prep`、`phone-messages`、`feishu`、`tencent-meeting`、`amap`、`kuaidi100`、`train-tickets`。用户技能位于 `<data_dir>/skills/<name>/`，同名时覆盖内置技能。
 
-系统提示词提供所有已启用技能的名称和说明。模型按请求选择，例如京都旅行会选 `trip-plan`，再通过 `skills` 工具读取完整步骤。你也可以输入 `/` 查看技能，按 `Tab` 补全首个匹配；`/trip-plan Kyoto, 5 days in November` 会将技能指令和你的任务一起发送。
+系统提示词提供所有已启用技能的名称和说明。模型按请求选择，例如京都旅行会选 `trip-plan`，再通过 `skills` 工具读取完整步骤。你也可以输入 `/` 查看技能，按 `Tab` 补全首个匹配；`/trip-plan Kyoto, 5 days in November` 会将技能指令和你的任务一起发送。 智能体工作期间也可以调用已启用的技能，指令会在下一次模型调用前加入。技能涉及的工具操作仍遵守原有哨兵审批规则。
 
 添加方式有三种：在技能 → 新建中编写，填好名称后有模板；粘贴原始 `SKILL.md`、GitHub 文件或目录链接并点击「获取」；任务成功后要求「把这个存成技能」。智能体写入前会请求审批，因为 `skills` 的 action=save 是敏感操作，即使 `auto` 也需要，删除同样如此。关闭技能会将其从模型索引移除。内置技能的「复制一份改成你的」会创建用户副本并打开编辑。技能脚本和参考文件在[沙箱](sentinel.md#the-sandbox)内只读可见。终端命令为 `nanomuse skills list | show | add | new | remove | enable | disable`。
 
