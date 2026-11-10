@@ -46,6 +46,12 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Runtime
 
+- Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
+
+- Preserved each conversation's tool permissions and reused them after concurrent approval waits, reducing repeated cards while keeping one-time approvals and warning checks separate. For #724.
+
+- Added UberLLM to the own-key catalogue: an OpenAI-compatible gateway at `https://api.uberllm.dev/v1`, a key from [uberllm.dev/signup](https://uberllm.dev/signup), prepaid and pay as you go; one key reaches models from several labs. Model ids carry the vendor's name as its `/v1/models` list names them; the default model is `openai/gpt-5.4-mini`, and any id from that list can be set instead. Chat only here, on the OpenAI shape; picture input, image generation and video are not claimed.
+
 - **A queued skill invocation runs the skill.** A `/name args` message typed while the agent was working was folded into the running turn as literal slash text, because only the message that started the turn went through the skill expansion, so the model never saw the skill's instructions. Folded messages now expand the same way.
 
 - Preserved device-trigger state across automatic hub reconnects, so an observed offline device returning during the gap still fired its trigger. Explicit hub leave cleared the baseline before joining again. For #883.
@@ -185,6 +191,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Paused automatic following as soon as a person scrolled towards older messages, and kept new reply chunks, tool cards and keyboard layout changes from resuming it. For #898.
 - Reserved output space before summarizing long conversations, so nearly full inputs were split instead of leaving the summary only a few output tokens. For #719.
 - Added progress rings to active main and side chats in the Muse drawer, using this phone's existing task tracking while preserving unread reply markers. Approval and per-chat step indicators remain separate work. For #531.
 - Requested JSON for connector OAuth sign-in, handled token errors returned with HTTP 200, and kept provider response text out of failure messages. Applied the same validation to token refresh. For #869.
