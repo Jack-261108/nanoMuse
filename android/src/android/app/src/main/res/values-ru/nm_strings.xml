@@ -1336,6 +1336,7 @@
     <string name="nm_hands_payment_takeover">Выполните этот шаг оплаты в приложении, затем нажмите «Продолжить». Агент проверит экран перед следующим действием.</string>
     <string name="nm_device_chats">Чаты на устройствах</string>
     <string name="nm_device_chat_start">Начать чат на этом устройстве</string>
+    <string name="nm_device_chat_here">На этом устройстве</string>
     <string name="nm_device_chat_uncertain">Доставка не подтверждена. Проверяем результат на устройстве.</string>
     <string name="nm_device_chat_interrupted">Прервано. Устройство могло уже выполнить некоторые действия.</string>
 </resources>

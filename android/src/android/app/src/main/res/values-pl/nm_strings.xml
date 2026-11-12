@@ -1336,6 +1336,7 @@
     <string name="nm_hands_payment_takeover">Wykonaj ten krok płatności w aplikacji, a następnie dotknij Kontynuuj. Agent sprawdzi ekran przed kolejną czynnością.</string>
     <string name="nm_device_chats">Rozmowy na urządzeniach</string>
     <string name="nm_device_chat_start">Rozmawiaj na tym urządzeniu</string>
+    <string name="nm_device_chat_here">Na tym urządzeniu</string>
     <string name="nm_device_chat_uncertain">Niepewne dostarczenie. Sprawdzanie wyniku na urządzeniu.</string>
     <string name="nm_device_chat_interrupted">Przerwano. Urządzenie mogło już wykonać niektóre działania.</string>
 </resources>

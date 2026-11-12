@@ -1294,6 +1294,7 @@
     <string name="nm_hands_payment_takeover">請在應用程式中親自處理這一步付款，然後點「繼續」。智慧體會先查看畫面結果，再繼續操作。</string>
     <string name="nm_device_chats">裝置對話</string>
     <string name="nm_device_chat_start">在此裝置上聊天</string>
+    <string name="nm_device_chat_here">在此裝置上</string>
     <string name="nm_device_chat_uncertain">送達狀態未知，正在查詢裝置上的結果。</string>
     <string name="nm_device_chat_interrupted">任務已中斷，裝置可能已經執行了部分操作。</string>
 </resources>

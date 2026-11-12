@@ -1328,6 +1328,7 @@
     <string name="nm_hands_payment_takeover">Gawin ang hakbang na ito ng pagbabayad sa app, pagkatapos ay i-tap ang Magpatuloy. Titingnan muna ng agent ang screen bago kumilos muli.</string>
     <string name="nm_device_chats">Mga usapan sa device</string>
     <string name="nm_device_chat_start">Makipag-usap sa device na ito</string>
+    <string name="nm_device_chat_here">Sa device na ito</string>
     <string name="nm_device_chat_uncertain">Hindi tiyak ang paghahatid. Sinusuri ang resulta sa device.</string>
     <string name="nm_device_chat_interrupted">Naantala. Maaaring may mga nagawa na ang device.</string>
 </resources>

@@ -1328,6 +1328,7 @@
     <string name="nm_hands_payment_takeover">Bu ödeme adımını uygulamada tamamlayıp Devam’a dokunun. Ajan yeniden işlem yapmadan önce ekranı kontrol eder.</string>
     <string name="nm_device_chats">Cihaz konuşmaları</string>
     <string name="nm_device_chat_start">Bu cihazda sohbet et</string>
+    <string name="nm_device_chat_here">Bu cihazda</string>
     <string name="nm_device_chat_uncertain">Teslim belirsiz. Sonuç cihazda kontrol ediliyor.</string>
     <string name="nm_device_chat_interrupted">Kesintiye uğradı. Cihaz bazı işlemleri zaten yapmış olabilir.</string>
 </resources>

@@ -8,6 +8,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Preserved desktop device-chat drafts edited while a send request was awaiting its response. For #815.
 
+- Added device-bound conversation choices to the standard new-chat flow on Android and desktop; offline or older devices keep a selectable route for drafts without local fallback or automatic resend. For #815.
+
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 - Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
@@ -45,6 +47,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the self-hosting help text complete when new options were added.
 
 ### Runtime
+
+- Fixed browser-enabled Docker builds failing because the Playwright driver could not load `libatomic.so.1`, and added a Chromium startup check alongside the standard image build in CI.
+
+- Refused local-file and custom-scheme pages before browser tool reads, screenshots and actions, limited blank-page aliases to `about:blank` and `about:srcdoc`, and kept browser fetch redirects on HTTP(S). In-memory data and blob resources and the user's take-over view remained available. For #339.
 
 - Added optional observation-only permission reviews to the Python runtime, using the active chat model or a separately configured model, with bounded requests and redacted audit records. For #724.
 
@@ -127,6 +133,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Desktop
 
+- Let the agent list accessible scheduled tasks across chats and request approval to delete one, with guidance to check existing tasks before creating another. For #905.
+
 - Documented launching the Linux AppImage with a separate self-hosted relay profile. For #895.
 
 - Preserved own-provider deletions made in Advanced settings across restarts, and kept loaded empty chat catalogs disabled without removing saved keys or unrelated sources. For #889.
@@ -191,6 +199,8 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 ### Android
 
+- Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
+- Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - **Fixed background screen isolation, manual takeover and input confirmation.** Empty tasks could open an app before taking their first screenshot. Unavailable background control stopped with an explanation; takeover resumed from a fresh observation without repeating the old click. Paste checked the target field and preserved new clipboard contents. Background mode required Android 12 or later and compatible display capabilities.
 - **Fixed privileged helper cleanup, audio restoration and pairing recovery.** Reused tasks were muted again, app exit closed active background tasks before restoring audio, and helper restarts used bounded retries. Background app launch stopped when the system did not apply the requested audio mute. Stop disabled automatic recovery. Unpair revoked permissions before deleting keys and retained failed cleanup records for retry.
 - **Kept the screen operator's Stop button responsive during gestures.** The capsule stayed touchable and moved clear of the full gesture path before input. Stop cancelled queued gestures, model waits and the second tap of a double tap; model timeouts remained retryable errors. A gesture already handed to Android could still finish.
@@ -239,6 +249,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - **Made Android summaries preserve the current task separately from completed work.** Summaries without an active task no longer describe historical requests as work to resume. Summary streams now stop after 120 seconds without activity, within a 900-second overall deadline; stopping the turn cancels the request. Qwen3.8-Max summary requests explicitly disable thinking under the default rules, and context notices follow the app language. For [#719](https://github.com/nano-muse/nanoMuse/issues/719).
 
 ### iOS
+
+- Replaced the missing Claude sign-in configuration trap with a recoverable provider error, including background title and warmup requests, while keeping API-key requests independent. For #911.
+
+- Distinguished unconfirmed exit markers from system crash diagnostics, separated report-generation times and delivery logs from incident evidence, and preserved reports delivered in the same second. For #911.
 
 - Kept iOS coding projects and session requests tied to the selected computer, and added refresh recovery for failed output and diff pages.
 

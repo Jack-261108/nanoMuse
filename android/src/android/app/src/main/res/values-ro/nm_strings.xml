@@ -1332,6 +1332,7 @@
     <string name="nm_hands_payment_takeover">Efectuează acest pas al plății în aplicație, apoi apasă Continuă. Agentul va verifica ecranul înainte de următoarea acțiune.</string>
     <string name="nm_device_chats">Conversații pe dispozitive</string>
     <string name="nm_device_chat_start">Conversează pe acest dispozitiv</string>
+    <string name="nm_device_chat_here">Pe acest dispozitiv</string>
     <string name="nm_device_chat_uncertain">Livrare incertă. Se verifică rezultatul pe dispozitiv.</string>
     <string name="nm_device_chat_interrupted">Întrerupt. Dispozitivul poate să fi executat deja unele acțiuni.</string>
 </resources>
