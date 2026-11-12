@@ -1299,4 +1299,8 @@
     <string name="nm_hands_virtual_screen_root_denied">root 授权被拒绝或已超时，请允许授权后重试。</string>
     <string name="nm_hands_spill_restore_failed">无法将跳到主屏的应用移回后台屏幕，屏幕操作已停止。</string>
     <string name="nm_hands_payment_takeover">请在应用中亲自处理这一步付款，然后点“继续”。智能体会先查看页面结果，再继续操作。</string>
+    <string name="nm_device_chats">设备对话</string>
+    <string name="nm_device_chat_start">在此设备上聊天</string>
+    <string name="nm_device_chat_uncertain">送达状态未知，正在查询设备上的结果。</string>
+    <string name="nm_device_chat_interrupted">任务已中断，设备可能已经执行了部分操作。</string>
 </resources>

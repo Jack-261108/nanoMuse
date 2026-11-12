@@ -1330,4 +1330,8 @@
     <string name="nm_hands_virtual_screen_root_denied">Accesul root a fost refuzat sau a expirat. Permite-l înainte de a reîncerca.</string>
     <string name="nm_hands_spill_restore_failed">Aplicația deschisă pe ecranul principal nu a putut fi readusă pe ecranul din fundal. Controlul ecranului a fost oprit.</string>
     <string name="nm_hands_payment_takeover">Efectuează acest pas al plății în aplicație, apoi apasă Continuă. Agentul va verifica ecranul înainte de următoarea acțiune.</string>
+    <string name="nm_device_chats">Conversații pe dispozitive</string>
+    <string name="nm_device_chat_start">Conversează pe acest dispozitiv</string>
+    <string name="nm_device_chat_uncertain">Livrare incertă. Se verifică rezultatul pe dispozitiv.</string>
+    <string name="nm_device_chat_interrupted">Întrerupt. Dispozitivul poate să fi executat deja unele acțiuni.</string>
 </resources>

@@ -1327,4 +1327,8 @@
     <string name="nm_hands_virtual_screen_root_denied">L’accès root a été refusé ou a expiré. Autorisez-le avant de réessayer.</string>
     <string name="nm_hands_spill_restore_failed">Impossible de renvoyer sur l’écran en arrière-plan une application ouverte sur l’écran principal. Le contrôle de l’écran est arrêté.</string>
     <string name="nm_hands_payment_takeover">Effectuez cette étape du paiement dans l’application, puis appuyez sur Continuer. L’agent vérifiera l’écran avant d’agir à nouveau.</string>
+    <string name="nm_device_chats">Conversations sur les appareils</string>
+    <string name="nm_device_chat_start">Discuter sur cet appareil</string>
+    <string name="nm_device_chat_uncertain">Envoi incertain. Recherche du résultat sur cet appareil.</string>
+    <string name="nm_device_chat_interrupted">Interrompu. Certaines actions ont peut-être déjà été effectuées.</string>
 </resources>

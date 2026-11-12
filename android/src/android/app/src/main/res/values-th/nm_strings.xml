@@ -1322,4 +1322,8 @@
     <string name="nm_hands_virtual_screen_root_denied">สิทธิ์ root ถูกปฏิเสธหรือหมดเวลารอ โปรดอนุญาตก่อนลองอีกครั้ง</string>
     <string name="nm_hands_spill_restore_failed">ย้ายแอปที่เปิดบนหน้าจอหลักกลับไปยังหน้าจอเบื้องหลังไม่ได้ หยุดการควบคุมหน้าจอแล้ว</string>
     <string name="nm_hands_payment_takeover">จัดการขั้นตอนการชำระเงินนี้ในแอป แล้วแตะดำเนินการต่อ เอเจนต์จะตรวจสอบหน้าจอก่อนทำงานต่อ</string>
+    <string name="nm_device_chats">การสนทนาบนอุปกรณ์</string>
+    <string name="nm_device_chat_start">สนทนาบนอุปกรณ์นี้</string>
+    <string name="nm_device_chat_uncertain">ยังไม่แน่ใจว่าส่งถึงแล้ว กำลังตรวจสอบผลบนอุปกรณ์</string>
+    <string name="nm_device_chat_interrupted">ถูกขัดจังหวะ อุปกรณ์อาจดำเนินการบางอย่างไปแล้ว</string>
 </resources>

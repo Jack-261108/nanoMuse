@@ -1334,4 +1334,8 @@
     <string name="nm_hands_virtual_screen_root_denied">В root-доступе отказано или время ожидания истекло. Разрешите его перед повторной попыткой.</string>
     <string name="nm_hands_spill_restore_failed">Не удалось вернуть приложение, открывшееся на основном экране, на фоновый экран. Управление экраном остановлено.</string>
     <string name="nm_hands_payment_takeover">Выполните этот шаг оплаты в приложении, затем нажмите «Продолжить». Агент проверит экран перед следующим действием.</string>
+    <string name="nm_device_chats">Чаты на устройствах</string>
+    <string name="nm_device_chat_start">Начать чат на этом устройстве</string>
+    <string name="nm_device_chat_uncertain">Доставка не подтверждена. Проверяем результат на устройстве.</string>
+    <string name="nm_device_chat_interrupted">Прервано. Устройство могло уже выполнить некоторые действия.</string>
 </resources>

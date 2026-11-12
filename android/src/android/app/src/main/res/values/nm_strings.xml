@@ -1306,4 +1306,8 @@
     <string name="nm_hands_virtual_screen_root_denied">Root access was denied or timed out. Allow it before retrying.</string>
     <string name="nm_hands_spill_restore_failed">Could not return an app that opened on the main screen to the background screen. Screen operation stopped.</string>
     <string name="nm_hands_payment_takeover">Handle this payment step in the app, then tap Continue. The agent will check the screen before acting again.</string>
+    <string name="nm_device_chats">Device conversations</string>
+    <string name="nm_device_chat_start">Chat on this device</string>
+    <string name="nm_device_chat_uncertain">Delivery uncertain. Checking the device for the result.</string>
+    <string name="nm_device_chat_interrupted">Interrupted. The device may have already performed some actions.</string>
 </resources>

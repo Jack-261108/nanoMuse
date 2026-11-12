@@ -1322,4 +1322,8 @@
     <string name="nm_hands_virtual_screen_root_denied">Akses root ditolak atau kehabisan waktu. Izinkan sebelum mencoba lagi.</string>
     <string name="nm_hands_spill_restore_failed">Aplikasi yang terbuka di layar utama tidak dapat dikembalikan ke layar latar belakang. Kontrol layar dihentikan.</string>
     <string name="nm_hands_payment_takeover">Tangani langkah pembayaran ini di aplikasi, lalu ketuk Lanjutkan. Agen akan memeriksa layar sebelum bertindak lagi.</string>
+    <string name="nm_device_chats">Percakapan perangkat</string>
+    <string name="nm_device_chat_start">Chat di perangkat ini</string>
+    <string name="nm_device_chat_uncertain">Pengiriman belum pasti. Memeriksa hasil di perangkat.</string>
+    <string name="nm_device_chat_interrupted">Terputus. Perangkat mungkin sudah melakukan beberapa tindakan.</string>
 </resources>

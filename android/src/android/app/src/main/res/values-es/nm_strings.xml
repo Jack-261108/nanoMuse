@@ -1326,4 +1326,8 @@
     <string name="nm_hands_virtual_screen_root_denied">El acceso root se denegó o agotó el tiempo de espera. Permítelo antes de reintentar.</string>
     <string name="nm_hands_spill_restore_failed">No se pudo devolver a la pantalla en segundo plano una app que se abrió en la pantalla principal. Se detuvo el control de pantalla.</string>
     <string name="nm_hands_payment_takeover">Completa este paso del pago en la app y luego toca Continuar. El agente revisará la pantalla antes de volver a actuar.</string>
+    <string name="nm_device_chats">Conversaciones en dispositivos</string>
+    <string name="nm_device_chat_start">Chatear en este dispositivo</string>
+    <string name="nm_device_chat_uncertain">Entrega incierta. Consultando el resultado en el dispositivo.</string>
+    <string name="nm_device_chat_interrupted">Interrumpido. El dispositivo puede haber realizado algunas acciones.</string>
 </resources>

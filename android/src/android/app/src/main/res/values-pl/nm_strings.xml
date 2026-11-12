@@ -1334,4 +1334,8 @@
     <string name="nm_hands_virtual_screen_root_denied">Odmówiono dostępu root lub upłynął czas oczekiwania. Zezwól na dostęp przed ponowieniem próby.</string>
     <string name="nm_hands_spill_restore_failed">Nie udało się przenieść aplikacji otwartej na ekranie głównym z powrotem na ekran w tle. Sterowanie ekranem zostało zatrzymane.</string>
     <string name="nm_hands_payment_takeover">Wykonaj ten krok płatności w aplikacji, a następnie dotknij Kontynuuj. Agent sprawdzi ekran przed kolejną czynnością.</string>
+    <string name="nm_device_chats">Rozmowy na urządzeniach</string>
+    <string name="nm_device_chat_start">Rozmawiaj na tym urządzeniu</string>
+    <string name="nm_device_chat_uncertain">Niepewne dostarczenie. Sprawdzanie wyniku na urządzeniu.</string>
+    <string name="nm_device_chat_interrupted">Przerwano. Urządzenie mogło już wykonać niektóre działania.</string>
 </resources>

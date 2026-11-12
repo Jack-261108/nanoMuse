@@ -1326,4 +1326,8 @@
     <string name="nm_hands_virtual_screen_root_denied">Der Root-Zugriff wurde abgelehnt oder ist abgelaufen. Erlaube ihn vor dem nächsten Versuch.</string>
     <string name="nm_hands_spill_restore_failed">Die auf dem Hauptbildschirm geöffnete App konnte nicht auf den Hintergrundbildschirm zurückkehren. Die Bildschirmsteuerung wurde gestoppt.</string>
     <string name="nm_hands_payment_takeover">Erledige diesen Zahlungsschritt in der App und tippe dann auf Weiter. Der Agent prüft den Bildschirm vor der nächsten Aktion.</string>
+    <string name="nm_device_chats">Gerätegespräche</string>
+    <string name="nm_device_chat_start">Auf diesem Gerät chatten</string>
+    <string name="nm_device_chat_uncertain">Zustellung unklar. Das Ergebnis wird auf dem Gerät abgefragt.</string>
+    <string name="nm_device_chat_interrupted">Unterbrochen. Das Gerät hat möglicherweise bereits Aktionen ausgeführt.</string>
 </resources>

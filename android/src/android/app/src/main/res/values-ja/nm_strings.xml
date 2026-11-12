@@ -1322,4 +1322,8 @@
     <string name="nm_hands_virtual_screen_root_denied">root 権限が拒否されたか、タイムアウトしました。許可してから再試行してください。</string>
     <string name="nm_hands_spill_restore_failed">メイン画面で開いたアプリをバックグラウンド画面へ戻せませんでした。画面操作を停止しました。</string>
     <string name="nm_hands_payment_takeover">アプリでこの支払い手順を操作してから「続ける」をタップしてください。エージェントは画面を確認してから次の操作を行います。</string>
+    <string name="nm_device_chats">デバイスの会話</string>
+    <string name="nm_device_chat_start">このデバイスで会話する</string>
+    <string name="nm_device_chat_uncertain">配信状況が不明です。デバイスに結果を問い合わせています。</string>
+    <string name="nm_device_chat_interrupted">中断されました。デバイスがすでに一部の操作を実行した可能性があります。</string>
 </resources>
