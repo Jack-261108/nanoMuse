@@ -608,6 +608,10 @@
     <string name="nm_hands_preview_live">Экран в реальном времени</string>
     <string name="nm_hands_preview_collapse">Свернуть</string>
     <string name="nm_hands_preview_zoom_hint">Нажмите для уменьшения</string>
+    <string name="nm_hands_pip_input">Управлять маленьким окном напрямую</string>
+    <string name="nm_hands_pip_input_sub">Нажатия и свайпы по увеличенному окну уходят на фоновый экран. Держите выключенным, пока работает агент, иначе случайное касание попадёт в его приложение.</string>
+    <string name="nm_hands_pip_back">Назад на фоновом экране</string>
+    <string name="nm_hands_audio_unmuted_note">Может воспроизводиться звук (беззвучный режим недоступен)</string>
     <string name="nm_hands_section_rules">Как он себя ведёт</string>
     <string name="nm_hands_rule_ladder">Экран идёт последним: сначала навык, команда или браузер.</string>
     <string name="nm_hands_rule_secrets">Никогда не вводит пароли, коды и номера карт; передаёт телефон вам.</string>

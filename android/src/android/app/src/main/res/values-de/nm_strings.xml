@@ -602,6 +602,10 @@
     <string name="nm_hands_preview_live">Live-Bildschirm</string>
     <string name="nm_hands_preview_collapse">Einklappen</string>
     <string name="nm_hands_preview_zoom_hint">Tippen zum Verkleinern</string>
+    <string name="nm_hands_pip_input">Kleinvorschau direkt bedienen</string>
+    <string name="nm_hands_pip_input_sub">Tippen und Wischen auf der vergrößerten Vorschau gehen an den Hintergrundbildschirm. Lass es aus, während der Agent arbeitet, sonst landet eine Berührung in seiner App.</string>
+    <string name="nm_hands_pip_back">Zurück auf dem Hintergrundbildschirm</string>
+    <string name="nm_hands_audio_unmuted_note">Ton möglich (Stummschaltung nicht verfügbar)</string>
     <string name="nm_hands_section_rules">Wie er sich verhält</string>
     <string name="nm_hands_rule_ladder">Der Bildschirm kommt zuletzt: zuerst ein Skill, ein Befehl oder der Browser.</string>
     <string name="nm_hands_rule_secrets">Tippt nie Passwörter, Codes oder Kartennummern; er gibt dir das Telefon.</string>

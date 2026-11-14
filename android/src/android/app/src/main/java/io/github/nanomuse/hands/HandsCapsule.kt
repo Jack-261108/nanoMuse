@@ -89,10 +89,13 @@ class HandsCapsule(private val context: Context) {
     // ── Virtual screen preview (Mika-style PiP Window) ──
     private var previewToggleBtn: TextView? = null
     private var pipWindow: HandsPipWindow? = null
+    private var pipInput: PipInput? = null
     private var pipVisible: Boolean = true
     private var isVirtualScreen: Boolean = false
     private var previewJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var audioNotice: String? = null
+    private var lastWorkingDetail: String? = null
 
     /** What the hands draw on the screen while they work. */
     val stage = HandsStage(context)
@@ -133,9 +136,10 @@ class HandsCapsule(private val context: Context) {
         stage.mood(HandsStage.Mood.WORKING)
         ring?.turning(true)
         bars?.visibility = View.VISIBLE
+        lastWorkingDetail = detail
         val stepText = context.getString(R.string.nm_hands_step, step)
         titleView?.text = stepText
-        detailView?.text = detail
+        detailView?.text = audioNotice?.let { "$detail\n$it" } ?: detail
         continueBtn?.visibility = View.GONE
         openBtn?.visibility = View.GONE
         allowBtn?.visibility = View.GONE
@@ -143,10 +147,23 @@ class HandsCapsule(private val context: Context) {
         pipWindow?.setNeedsYou(false)
     }
 
+    /** 记录设备不支持静音时的提示，工作态胶囊第二行持续展示，直到本轮结束。 */
+    fun setAudioNotice(notice: String?) = onMain {
+        audioNotice = notice
+        if (!stopRequested.get() && continueBtn?.visibility != View.VISIBLE &&
+            openBtn?.visibility != View.VISIBLE && allowBtn?.visibility != View.VISIBLE
+        ) {
+            lastWorkingDetail?.let { detail ->
+                detailView?.text = notice?.let { "$detail\n$it" } ?: detail
+            }
+        }
+    }
+
     /** The hands wait for the user to do something on the phone. */
     fun takeOver(reason: String) = onMain {
         if (stopRequested.get()) return@onMain
         ensure()
+        lastWorkingDetail = null
         stage.mood(HandsStage.Mood.WAITING)
         stage.clear()
         ring?.turning(false)
@@ -170,6 +187,7 @@ class HandsCapsule(private val context: Context) {
     fun approval(what: String, decidable: Boolean = false) = onMain {
         if (stopRequested.get()) return@onMain
         ensure()
+        lastWorkingDetail = null
         stage.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
         bars?.visibility = View.GONE
@@ -193,6 +211,7 @@ class HandsCapsule(private val context: Context) {
             previewToggleBtn?.visibility = View.GONE
             pipWindow?.hide()
             pipWindow = null
+            pipInput = null
             return@onMain
         }
         isVirtualScreen = true
@@ -201,7 +220,10 @@ class HandsCapsule(private val context: Context) {
         pipVisible = true
 
         if (pipWindow == null) {
-            pipWindow = HandsPipWindow(context).apply { show() }
+            pipWindow = HandsPipWindow(context).apply {
+                setPipInput(pipInput)
+                show()
+            }
         } else {
             pipWindow?.setVisible(true)
         }
@@ -215,6 +237,12 @@ class HandsCapsule(private val context: Context) {
         }
     }
 
+    /** 让展开的小窗把手势注入虚拟屏；null 表示这次运行不提供直接操作。 */
+    fun setPipInput(input: PipInput?) = onMain {
+        pipInput = input
+        pipWindow?.setPipInput(input)
+    }
+
     private fun togglePip() {
         if (!isVirtualScreen) return
         pipVisible = !pipVisible
@@ -226,8 +254,11 @@ class HandsCapsule(private val context: Context) {
         previewJob?.cancel()
         previewJob = null
         isVirtualScreen = false
+        audioNotice = null
+        lastWorkingDetail = null
         pipWindow?.hide()
         pipWindow = null
+        pipInput = null
         val v = root
         root = null; params = null; titleView = null; detailView = null; continueBtn = null; openBtn = null; allowBtn = null; denyBtn = null; stopBtn = null
         previewToggleBtn = null

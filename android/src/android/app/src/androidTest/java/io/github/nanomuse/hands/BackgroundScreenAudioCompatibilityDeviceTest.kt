@@ -25,7 +25,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Validates refusal on a real device that cannot mute apps. Uses only the test APK fixture. */
+/** Validates fallback background launch on a real device that cannot mute apps. Uses only the test APK fixture. */
 @RunWith(AndroidJUnit4::class)
 class BackgroundScreenAudioCompatibilityDeviceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -35,7 +35,7 @@ class BackgroundScreenAudioCompatibilityDeviceTest {
         get() = instrumentation.getUiAutomation(UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
 
     @Test
-    fun unsupportedMutingRejectsBackgroundLaunchAndRestart() {
+    fun unsupportedMutingAllowsBackgroundLaunchAndRestartWithoutChangingAudio() {
         assumeTrue("Background display requires Android 12", Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
         assumeTrue("Unlock the device before running this test", context.getSystemService(UserManager::class.java).isUserUnlocked)
         assertFalse("Do not run device validation during an active Hands task", Hands.active.value)
@@ -67,33 +67,66 @@ class BackgroundScreenAudioCompatibilityDeviceTest {
                 assertEquals("Skipping must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
                 checkpoint("audio-compatibility", "SKIP: muting works; run the full background screen regression")
             }
-            assumeFalse("This refusal test applies only when the device cannot mute apps", canMute)
+            assumeFalse("This fallback test applies only when the device cannot mute apps", canMute)
             assertEquals("Failed muting must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
             checkpoint("audio-compatibility", "PASS: unsupported muting reported failure without changing the original mode")
 
             val metrics = context.resources.displayMetrics
-            val background = AgentDisplay(shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi)
+            val background = AgentDisplay(
+                shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+                context.getSystemService(DisplayManager::class.java),
+            )
             display = background
             assertTrue("Virtual display must not be the main screen", background.displayId > 0)
             assertEquals("New display must start empty", -1, shell.topTaskId(background.displayId))
 
-            assertEquals("Start must fail when muting cannot be applied", ShellService.START_ERROR, shell.startApp(background.displayId, fixturePackage))
-            assertEquals("Rejected start must leave the display empty", -1, shell.topTaskId(background.displayId))
-            assertEquals("Rejected start must preserve the main task", beforeMain, shell.topTaskId(Display.DEFAULT_DISPLAY))
-            assertEquals("Rejected start must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
-            checkpoint("start-refused", "PASS: no virtual task, main task and audio unchanged")
+            assertEquals("Start must report unmuted fallback when muting cannot be applied", ShellService.START_OK_UNMUTED, shell.startApp(background.displayId, fixturePackage))
+            var taskId = -1
+            eventually("fixture task appears on virtual display") {
+                val id = shell.topTaskId(background.displayId)
+                if (id >= 0 && shell.packageOfTask(id) == fixturePackage) {
+                    taskId = id
+                    true
+                } else false
+            }
+            eventually("a real nonblack fixture frame arrives") {
+                background.latestFrameBitmap()?.let { bitmap ->
+                    try {
+                        (bitmap.getPixel(bitmap.width / 2, bitmap.height / 2) and 0x00ffffff) != 0
+                    } finally { bitmap.recycle() }
+                } ?: false
+            }
+            assertEquals("Unmuted start must preserve the main task", beforeMain, shell.topTaskId(Display.DEFAULT_DISPLAY))
+            assertEquals("Unmuted start must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
+            checkpoint("start-unmuted", "PASS: virtual task started with real frame without changing main task or audio")
 
-            assertEquals("Restart must fail when muting cannot be applied", ShellService.START_ERROR, shell.restartApp(background.displayId, fixturePackage))
-            assertEquals("Rejected restart must leave the display empty", -1, shell.topTaskId(background.displayId))
-            assertEquals("Rejected restart must preserve the main task", beforeMain, shell.topTaskId(Display.DEFAULT_DISPLAY))
-            assertEquals("Rejected restart must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
-            checkpoint("restart-refused", "PASS: no virtual task, main task and audio unchanged")
+            assertTrue("Move to main screen for takeover must succeed", shell.moveTask(taskId, Display.DEFAULT_DISPLAY))
+            eventually("fixture task moved to main display") { shell.displayOfTask(taskId) == Display.DEFAULT_DISPLAY }
+            assertTrue("Move back to virtual screen without muting must succeed", shell.moveTask(taskId, background.displayId))
+            eventually("fixture task returned to virtual display") { shell.displayOfTask(taskId) == background.displayId }
+            checkpoint("takeover-move", "PASS: task moved to main and back without muting")
 
+            assertEquals("Restart must report unmuted fallback when muting cannot be applied", ShellService.START_OK_UNMUTED, shell.restartApp(background.displayId, fixturePackage))
+            eventually("restarted fixture task appears on virtual display") {
+                val id = shell.topTaskId(background.displayId)
+                if (id >= 0 && shell.packageOfTask(id) == fixturePackage) {
+                    taskId = id
+                    true
+                } else false
+            }
+            assertEquals("Unmuted restart must preserve the main task", beforeMain, shell.topTaskId(Display.DEFAULT_DISPLAY))
+            assertEquals("Unmuted restart must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))
+            checkpoint("restart-unmuted", "PASS: virtual task restarted without changing main task or audio")
+
+            shell.finishDisplay(background.displayId, emptyArray(), arrayOf(fixturePackage))
             background.release()
             shell.releaseDisplay(background.displayId)
             shell.releaseDisplay(Display.DEFAULT_DISPLAY)
             eventually("virtual display is released") {
                 context.getSystemService(DisplayManager::class.java).getDisplay(background.displayId) == null
+            }
+            if (taskId >= 0) {
+                eventually("fixture task is closed after finishDisplay") { shell.displayOfTask(taskId) == -1 }
             }
             assertEquals("Repeated cleanup must preserve the main task", beforeMain, shell.topTaskId(Display.DEFAULT_DISPLAY))
             assertEquals("Cleanup must preserve the original audio mode", originalAudio, shell.getAudioMode(fixturePackage))

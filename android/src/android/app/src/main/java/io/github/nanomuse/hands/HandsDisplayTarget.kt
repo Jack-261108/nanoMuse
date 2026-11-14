@@ -19,6 +19,7 @@ import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.MainScreenWatch
 import io.github.nanomuse.shell.SystemPickers
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.Executors
 
 /**
  * 屏幕操作目标抽象：支持主屏 (MainDisplayTarget) 与虚拟屏 (VirtualDisplayTarget)。
@@ -42,6 +43,12 @@ interface HandsDisplayTarget {
     fun foregroundPackage(svc: MinisAccessibilityService): String?
     fun hasTask(): Boolean = true
     val previewFrames: StateFlow<Bitmap?>?
+
+    /** 小窗直接操作的口子；主屏没有小窗，所以默认 null。 */
+    val pipInput: PipInput? get() = null
+
+    /** 最新一帧的时刻（与 `System.nanoTime()` 同源）；主屏截图不走这条路径。 */
+    fun lastFrameAt(): Long? = null
 
     fun injectText(text: String): Boolean = false
     fun setClipText(text: String): Boolean = false
@@ -151,6 +158,46 @@ class VirtualDisplayTarget(
     override val previewFrames: StateFlow<Bitmap?> get() = display.frames
 
     private var takeoverTaskId: Int = -1
+
+    /**
+     * 注入会沿笔迹逐点等待，不能占界面线程，所以单开一条线程。
+     * 小窗操作是用户的额外手段，失败只记日志：它不决定任务的成败。
+     */
+    private val inputExecutor by lazy {
+        Executors.newSingleThreadExecutor { r -> Thread(r, "nanomuse-pip-input").apply { isDaemon = true } }
+    }
+
+    override val pipInput: PipInput by lazy {
+        object : PipInput {
+            override fun tap(fx: Float, fy: Float) = inject {
+                shell.injectTap(displayId, (fx * width).toInt(), (fy * height).toInt())
+            }
+
+            override fun swipe(points: List<Pair<Float, Float>>, durationMs: Long) {
+                if (points.size < 2) {
+                    points.firstOrNull()?.let { tap(it.first, it.second) }
+                    return
+                }
+                inject {
+                    val n = points.size
+                    shell.injectStroke(
+                        displayId,
+                        IntArray(n) { (points[it].first * width).toInt() },
+                        IntArray(n) { (points[it].second * height).toInt() },
+                        LongArray(n) { durationMs * it / (n - 1) },
+                    )
+                }
+            }
+
+            override fun back() = inject { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }
+
+            private fun inject(block: () -> Boolean) {
+                runCatching { inputExecutor.execute { runCatching(block) } }
+            }
+        }
+    }
+
+    override fun lastFrameAt(): Long? = display.lastFrameAt()
 
     override fun hasTask(): Boolean = shell.topTaskId(displayId) >= 0
 
@@ -275,6 +322,7 @@ class VirtualDisplayTarget(
     }
 
     override fun release() {
+        runCatching { inputExecutor.shutdownNow() }
         try {
             val bundle = shell.finishDisplay(displayId, emptyArray(), emptyArray())
             if (bundle != null) {

@@ -55,6 +55,30 @@ class DisplayAudioLeaseTest {
         assertTrue(audio.keys(1).isEmpty())
     }
 
+    @Test fun passiveDiscoverySkipsPreviouslyFailedMuteUntilResetOrExplicitRetry() {
+        var attempts = 0
+        var allowMute = false
+        val audio = DisplayAudioLease({ attempts++; allowMute }, { true })
+
+        assertFalse(audio.tryAcquire(1, "app", retryFailed = true))
+        assertEquals(1, attempts)
+        assertTrue(audio.hasFailed(1, "app"))
+
+        assertFalse(audio.tryAcquire(1, "app", retryFailed = false))
+        assertEquals("passive polling must not re-run failing mute probes", 1, attempts)
+
+        allowMute = true
+        assertTrue(audio.tryAcquire(1, "app", retryFailed = true))
+        assertEquals(2, attempts)
+        assertFalse(audio.hasFailed(1, "app"))
+
+        allowMute = false
+        assertFalse(audio.tryAcquire(2, "other", retryFailed = true))
+        assertTrue(audio.hasFailed(2, "other"))
+        audio.forgetFailed(2)
+        assertFalse(audio.hasFailed(2, "other"))
+    }
+
     @Test fun unfinishedTaskRemainsMutedWhileOtherAppsAreRestored() {
         val restored = mutableListOf<String>()
         val audio = DisplayAudioLease({ true }, { restored += it; true })

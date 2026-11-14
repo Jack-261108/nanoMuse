@@ -599,6 +599,9 @@
     <string name="nm_hands_preview_live">Layar langsung</string>
     <string name="nm_hands_preview_collapse">Ciutkan</string>
     <string name="nm_hands_preview_zoom_hint">Ketuk untuk memperkecil</string>
+    <string name="nm_hands_pip_input">Operasikan tampilan kecil secara langsung</string>
+    <string name="nm_hands_pip_input_sub">Ketukan dan geseran pada pratinjau yang diperbesar dikirim ke layar latar. Biarkan mati saat agen bekerja, atau sentuhan tak sengaja akan masuk ke aplikasinya.</string>
+    <string name="nm_hands_pip_back">Kembali di layar latar</string>
     <string name="nm_hands_section_rules">Cara kerjanya</string>
     <string name="nm_hands_rule_ladder">Layar paling akhir: skill, perintah atau browser dulu.</string>
     <string name="nm_hands_rule_secrets">Tidak pernah mengetik kata sandi, kode atau nomor kartu; ia menyerahkan ponsel padamu.</string>
@@ -609,6 +612,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">Langkah %1$d</string>
     <string name="nm_hands_looking">Melihat layar…</string>
+    <string name="nm_hands_audio_unmuted_note">Dapat bersuara (bisu tidak tersedia)</string>
     <string name="nm_hands_stop">Berhenti</string>
     <string name="nm_hands_continue">Lanjutkan</string>
     <string name="nm_hands_open">Buka</string>

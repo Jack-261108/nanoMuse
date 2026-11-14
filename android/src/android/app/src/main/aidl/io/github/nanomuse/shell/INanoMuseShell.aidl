@@ -6,7 +6,7 @@ import android.view.Surface;
 interface INanoMuseShell {
     int createDisplay(in Surface surface, int width, int height, int dpi) = 1;
     void releaseDisplay(int displayId) = 2;
-    // 0=started, 1=visible on main screen (not started), 2=no launcher entry, 3=error
+    // 0=started, 1=visible on main screen (not started), 2=no launcher entry, 3=error, 4=started without muting
     int startApp(int displayId, String packageName) = 3;
     int topTaskId(int displayId) = 4;
     boolean moveTask(int taskId, int displayId) = 5;

@@ -8,6 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Path
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -29,8 +30,10 @@ import com.openminis.app.service.SessionActivityTracker
 import io.github.nanomuse.cloud.ClientEvents
 import io.github.nanomuse.cloud.Provenance
 import io.github.nanomuse.display.AgentDisplay
+import io.github.nanomuse.display.FrameFreshness
 import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.SharedShell
+import io.github.nanomuse.shell.ShellService
 import io.github.nanomuse.shell.SystemPickers
 import io.github.nanomuse.guard.GateOutcome
 import io.github.nanomuse.guard.GuardKind
@@ -117,6 +120,12 @@ class HandsOperator(private val context: Context) {
     private val stopLock = Any()
     @Volatile private var workerThread: Thread? = null
     @Volatile private var currentJob: Job? = null
+
+    /**
+     * 最近一次把 App 启动或挪回虚拟屏的时刻（System.nanoTime，与帧时间戳同源）。
+     * 设着时只认这之后的帧：启动前已入队、启动后才读出来的旧帧不能交给模型。
+     */
+    @Volatile private var frameGuardSince: Long? = null
 
     /** The session this run's approval cards are filed under; see [ownPendingRequest]. */
     @Volatile private var gateSession: String? = null
@@ -287,7 +296,8 @@ class HandsOperator(private val context: Context) {
                 }
                 try {
                     val shell = SharedShell.shell.value!!
-                    val agentDisplay = AgentDisplay(shell, dm.widthPixels, dm.heightPixels, dm.densityDpi)
+                    val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+                    val agentDisplay = AgentDisplay(shell, dm.widthPixels, dm.heightPixels, dm.densityDpi, displayManager)
                     VirtualDisplayTarget(agentDisplay, shell, context)
                 } catch (t: Throwable) {
                     AppLogger.warning(TAG, "failed to create virtual display target: ${t.message}")
@@ -301,6 +311,7 @@ class HandsOperator(private val context: Context) {
             }
             displayTarget = target
             frameForwardJob = if (target.isVirtual) {
+                capsule.setPipInput(target.pipInput)
                 capsule.setPreviewFlow(target.previewFrames)
                 Hands.setLiveFrames(target.previewFrames?.value)
                 target.previewFrames?.let { flow ->
@@ -309,6 +320,7 @@ class HandsOperator(private val context: Context) {
                     }
                 }
             } else {
+                capsule.setPipInput(null)
                 capsule.setPreviewFlow(null)
                 Hands.setLiveFrames(null)
                 null
@@ -320,24 +332,35 @@ class HandsOperator(private val context: Context) {
                 val app = HandsApps.resolve(context, hint)
                 val spillWatch = target.armSpillWatch()
                 lastResult = if (app != null) {
+                    guardFramesFromNow()
                     val res = target.openApp(app.packageName)
                     if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
                     val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
+                    val unmuted = res == ShellService.START_OK_UNMUTED
                     if (spill is MainScreenSpill.PullBack) {
                         memoryApp = app.packageName
                         memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
+                        if (unmuted) capsule.setAudioNotice(context.getString(R.string.nm_hands_audio_unmuted_note))
                         if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                        "opened ${app.label} (restored to virtual screen)."
+                        awaitFreshFrame(target)
+                        if (unmuted) "opened ${app.label} (restored to virtual screen; audio muting unavailable, sound may play on the phone)."
+                        else "opened ${app.label} (restored to virtual screen)."
                     } else if (spill is MainScreenSpill.InUse) {
+                        clearFrameGuard()
                         "app ${app.label} is currently in use on the main screen; left on main screen."
-                    } else if (res == 0) {
+                    } else if (res == ShellService.START_OK || unmuted) {
                         memoryApp = app.packageName
                         memoryTicket = HandsRunMemory.shared.begin(opts.sessionId, app.packageName)
+                        if (unmuted) capsule.setAudioNotice(context.getString(R.string.nm_hands_audio_unmuted_note))
                         if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                        "opened ${app.label}."
-                    } else if (res == 1) {
+                        awaitFreshFrame(target)
+                        if (unmuted) "opened ${app.label} (audio muting unavailable; sound may play on the phone)."
+                        else "opened ${app.label}."
+                    } else if (res == ShellService.START_IN_USE_ON_MAIN) {
+                        clearFrameGuard()
                         "user is currently using ${app.label} on the main screen; waiting or continue on main screen."
                     } else {
+                        clearFrameGuard()
                         "could not open ${app.label} (code $res)."
                     }
                 } else "no installed app matches “$hint”; open the one you need yourself."
@@ -589,26 +612,37 @@ class HandsOperator(private val context: Context) {
                         val app = HandsApps.resolve(context, action.appName)
                         val spillWatch = target.armSpillWatch()
                         lastResult = if (app != null) {
+                            guardFramesFromNow()
                             val res = if (action.cold) target.restartApp(app.packageName) else target.openApp(app.packageName)
                             if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
                             val spill = target.checkSpill(spillWatch, notSpills, userTaps.toList())
+                            val unmuted = res == ShellService.START_OK_UNMUTED
                             if (spill is MainScreenSpill.PullBack) {
                                 // A note from a multi-app run must not be reused as one app's history.
                                 if (app.packageName != memoryApp) memoryTicket = null
+                                if (unmuted) capsule.setAudioNotice(context.getString(R.string.nm_hands_audio_unmuted_note))
                                 if (!target.isVirtual) capsule.stage.say(context.getString(com.openminis.app.R.string.nm_hands_fx_open, app.label))
                                 if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                                "opened ${app.label} (restored to virtual screen)."
+                                awaitFreshFrame(target)
+                                if (unmuted) "opened ${app.label} (restored to virtual screen; audio muting unavailable, sound may play on the phone)."
+                                else "opened ${app.label} (restored to virtual screen)."
                             } else if (spill is MainScreenSpill.InUse) {
+                                clearFrameGuard()
                                 "cannot open ${app.label}: user is currently using it on the main screen."
-                            } else if (res == 0) {
+                            } else if (res == ShellService.START_OK || unmuted) {
                                 // A note from a multi-app run must not be reused as one app's history.
                                 if (app.packageName != memoryApp) memoryTicket = null
+                                if (unmuted) capsule.setAudioNotice(context.getString(R.string.nm_hands_audio_unmuted_note))
                                 if (!target.isVirtual) capsule.stage.say(context.getString(com.openminis.app.R.string.nm_hands_fx_open, app.label))
                                 if (!sleepOrStop(OPEN_APP_SETTLE_MS)) return finish(Outcome.Stopped(stopReason.get() ?: "stopped"), steps, runId, lastScreen, traceDir, log, model.label)
-                                "opened ${app.label}."
-                            } else if (res == 1) {
+                                awaitFreshFrame(target)
+                                if (unmuted) "opened ${app.label} (audio muting unavailable; sound may play on the phone)."
+                                else "opened ${app.label}."
+                            } else if (res == ShellService.START_IN_USE_ON_MAIN) {
+                                clearFrameGuard()
                                 "cannot open ${app.label}: user is currently using it on the main screen."
                             } else {
+                                clearFrameGuard()
                                 "could not open ${app.label} (code $res)."
                             }
                         } else {
@@ -656,6 +690,7 @@ class HandsOperator(private val context: Context) {
             }
             tapListener?.let { a11ySvc?.removeEventListener(it) }
             frameForwardJob?.cancel()
+            capsule.setPipInput(null)
             capsule.setPreviewFlow(null)
             Hands.setLiveFrames(null)
             displayTarget?.release()
@@ -730,12 +765,15 @@ class HandsOperator(private val context: Context) {
             // Stop interrupts the worker, but moving the user's app back is still required cleanup.
             val interrupted = Thread.interrupted()
             try {
+                // 挪回虚拟屏后画面会重画一遍，之后的第一帧才是这块屏现在的样子。
+                if (target.isVirtual) guardFramesFromNow()
                 check(target.onTakeoverEnd()) { context.getString(R.string.nm_hands_takeover_restore_failed) }
             } finally {
                 if (interrupted) Thread.currentThread().interrupt()
             }
         }
         ensureRunning()
+        awaitFreshFrame(target)
         return continued
     }
 
@@ -1104,9 +1142,41 @@ class HandsOperator(private val context: Context) {
 
     // ── the eyes ───────────────────────────────────────────────────────────
 
+    /** 记下启动时刻：之后的第一张画面必须是这之后渲染出来的。 */
+    private fun guardFramesFromNow() {
+        frameGuardSince = System.nanoTime()
+    }
+
+    /** 启动没成，没有新画面可等，撤掉保护。 */
+    private fun clearFrameGuard() {
+        frameGuardSince = null
+    }
+
+    /**
+     * 启动或挪回之后等一次这次的第一帧（最多 [FrameFreshness.FRAME_WAIT_MS]）。
+     * 等不到就保持保护：之后的画面一律不给，直到新帧到达，由调用方的等待循环兜底。
+     */
+    private fun awaitFreshFrame(target: HandsDisplayTarget) {
+        if (!target.isVirtual) return
+        val since = frameGuardSince ?: return
+        val fresh = FrameFreshness.awaitNewFrame(
+            nowMs = SystemClock::uptimeMillis,
+            sleep = ::sleepOrStop,
+            frameAt = target::lastFrameAt,
+            since = since,
+        )
+        if (fresh) frameGuardSince = null
+    }
+
     private fun screenshot(svc: MinisAccessibilityService, target: HandsDisplayTarget): Bitmap? {
         if (stop.get()) return null
         if (target.isVirtual) {
+            // 启动之后还没有新帧时宁可不给画面，也不给启动前的旧帧。
+            val since = frameGuardSince
+            if (since != null) {
+                if ((target.lastFrameAt() ?: since) <= since) return null
+                frameGuardSince = null
+            }
             return target.captureScreenshot()
         }
         capsule.hideForCapture()

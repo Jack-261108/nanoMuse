@@ -599,6 +599,9 @@
     <string name="nm_hands_preview_live">ライブ画面</string>
     <string name="nm_hands_preview_collapse">閉じる</string>
     <string name="nm_hands_preview_zoom_hint">タップで縮小</string>
+    <string name="nm_hands_pip_input">小窓を直接操作する</string>
+    <string name="nm_hands_pip_input_sub">拡大した小窓へのタップとスワイプは、背景画面にそのまま送られます。エージェントが作業している間はオフにしておくと、誤って触れてもアプリに届きません。</string>
+    <string name="nm_hands_pip_back">背景画面で戻る</string>
     <string name="nm_hands_section_rules">ふるまい</string>
     <string name="nm_hands_rule_ladder">画面は最後です: まずスキル、コマンド、ブラウザーを使います。</string>
     <string name="nm_hands_rule_secrets">パスワード、コード、カード番号は決して入力しません。端末をあなたに渡します。</string>
@@ -609,6 +612,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">ステップ %1$d</string>
     <string name="nm_hands_looking">画面を見ています…</string>
+    <string name="nm_hands_audio_unmuted_note">消音できないため音が出る場合があります</string>
     <string name="nm_hands_stop">停止</string>
     <string name="nm_hands_continue">続ける</string>
     <string name="nm_hands_open">開く</string>

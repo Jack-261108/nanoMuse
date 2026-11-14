@@ -652,9 +652,10 @@ The output reports each checkpoint; a clipboard `SKIP` means that part was not v
 The test cleans up its screen tasks and stops the helper. Start the helper again in Hands
 settings when you want to resume background screen control.
 
-On a device that cannot apply app muting, optionally run this separate refusal test with
-the same setup. It checks that background launch and restart both fail, create no task,
-preserve the main task and original audio mode, and release the display and helper:
+On a device that cannot apply app muting, optionally run this separate compatibility test with
+the same setup. It checks that background launch and restart succeed with the unmuted fallback
+status, create the virtual task, preserve the main task and original audio mode, and release
+the display and helper:
 
 ```bash
 adb shell am force-stop com.android.cli.interact.instrumentation
@@ -664,9 +665,9 @@ adb shell am instrument -w \
 ```
 
 If muting works, this test restores the original audio mode and reports a skipped test.
-A pass verifies refusal on an incompatible device; it does not establish that the full
-background screen regression passed. This test also uses only the local fixture, makes
-no model call or payment, and leaves the helper stopped.
+A pass verifies fallback launch on a device that blocks app muting; it does not establish
+that the full background screen regression passed. This test also uses only the local
+fixture, makes no model call or payment, and leaves the helper stopped.
 
 ## Releases
 

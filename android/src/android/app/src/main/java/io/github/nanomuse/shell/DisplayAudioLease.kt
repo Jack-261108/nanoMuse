@@ -6,16 +6,33 @@ internal class DisplayAudioLease(
     private val restore: (String) -> Boolean,
 ) {
     private val owners = LinkedHashMap<Int, MutableSet<String>>()
+    private val failed = HashMap<Int, MutableSet<String>>()
 
     fun keys(displayId: Int): Set<String> = owners[displayId]?.toSet().orEmpty()
     fun displays(): Set<Int> = owners.keys.toSet()
     fun activeKeys(): Set<String> = owners.values.flatten().toSet()
+    fun hasFailed(displayId: Int, key: String): Boolean = failed[displayId]?.contains(key) == true
 
-    fun acquire(displayId: Int, key: String): Boolean {
+    fun acquire(displayId: Int, key: String): Boolean = tryAcquire(displayId, key, retryFailed = true)
+
+    fun tryAcquire(displayId: Int, key: String, retryFailed: Boolean = true): Boolean {
         if (key in keys(displayId)) return true
-        if (key !in activeKeys() && !mute(key)) return false
+        if (!retryFailed && hasFailed(displayId, key)) return false
+        if (key !in activeKeys() && !mute(key)) {
+            failed.getOrPut(displayId) { LinkedHashSet() }.add(key)
+            return false
+        }
+        failed[displayId]?.remove(key)
         owners.getOrPut(displayId) { LinkedHashSet() }.add(key)
         return true
+    }
+
+    fun forgetFailed(displayId: Int) {
+        failed.remove(displayId)
+    }
+
+    fun clearFailures() {
+        failed.clear()
     }
 
     fun release(displayId: Int, keys: Set<String> = keys(displayId)): Boolean {

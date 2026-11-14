@@ -593,6 +593,9 @@
     <string name="nm_hands_preview_live">LIVE</string>
     <string name="nm_hands_preview_collapse">Collapse</string>
     <string name="nm_hands_preview_zoom_hint">Tap to shrink</string>
+    <string name="nm_hands_pip_input">Operate the small view</string>
+    <string name="nm_hands_pip_input_sub">Taps and swipes on the expanded preview go to the background screen. Leave it off while the agent is working, or a stray touch lands in its app.</string>
+    <string name="nm_hands_pip_back">Back on the background screen</string>
     <string name="nm_hands_section_rules">How it behaves</string>
     <string name="nm_hands_rule_ladder">The screen comes last: a skill, a command or the browser first.</string>
     <string name="nm_hands_rule_secrets">Never types passwords, codes or card numbers; it hands the phone to you.</string>
@@ -602,6 +605,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">Step %1$d</string>
     <string name="nm_hands_looking">Looking at the screen…</string>
+    <string name="nm_hands_audio_unmuted_note">May play sound (muting unavailable)</string>
     <string name="nm_hands_stop">Stop</string>
     <string name="nm_hands_continue">Continue</string>
     <string name="nm_hands_open">Open</string>

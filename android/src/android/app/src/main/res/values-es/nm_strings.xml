@@ -602,6 +602,10 @@
     <string name="nm_hands_preview_live">Pantalla en vivo</string>
     <string name="nm_hands_preview_collapse">Contraer</string>
     <string name="nm_hands_preview_zoom_hint">Tocar para reducir</string>
+    <string name="nm_hands_pip_input">Usar la vista pequeña directamente</string>
+    <string name="nm_hands_pip_input_sub">Los toques y deslizamientos en la vista ampliada van a la pantalla en segundo plano. Déjalo apagado mientras el agente trabaja, o un toque perdido caerá en su app.</string>
+    <string name="nm_hands_pip_back">Atrás en la pantalla en segundo plano</string>
+    <string name="nm_hands_audio_unmuted_note">Puede sonar (silencio no disponible)</string>
     <string name="nm_hands_section_rules">Cómo se comporta</string>
     <string name="nm_hands_rule_ladder">La pantalla va al final: primero una habilidad, un comando o el navegador.</string>
     <string name="nm_hands_rule_secrets">Nunca escribe contraseñas, códigos ni números de tarjeta; te pasa el teléfono a ti.</string>

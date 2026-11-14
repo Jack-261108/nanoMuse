@@ -589,6 +589,9 @@
     <string name="nm_hands_preview_live">实时画面</string>
     <string name="nm_hands_preview_collapse">收起</string>
     <string name="nm_hands_preview_zoom_hint">点击缩小</string>
+    <string name="nm_hands_pip_input">直接操作小画面</string>
+    <string name="nm_hands_pip_input_sub">在展开的小画面上点按、滑动会真的送到后台屏幕。AI 正在操作时建议关着，免得误触到它正在用的 App。</string>
+    <string name="nm_hands_pip_back">在后台屏幕上返回</string>
     <string name="nm_hands_section_rules">它会怎么做</string>
     <string name="nm_hands_rule_ladder">屏幕排最后：先试技能、命令行、浏览器。</string>
     <string name="nm_hands_rule_secrets">从不代输密码、验证码、卡号；遇到就把手机交还给你。</string>
@@ -598,6 +601,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">第 %1$d 步</string>
     <string name="nm_hands_looking">正在看屏幕…</string>
+    <string name="nm_hands_audio_unmuted_note">无法静音，可能会出声</string>
     <string name="nm_hands_stop">停止</string>
     <string name="nm_hands_continue">继续</string>
     <string name="nm_hands_open">打开</string>

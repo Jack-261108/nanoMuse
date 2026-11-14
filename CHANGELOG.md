@@ -216,6 +216,10 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 
 - Retried interrupted OpenAI-compatible streams within the existing bounded model-request budget, including partial EOF, and surfaced socket failures as recoverable errors instead of cancellation. For #934.
 
+- Allowed background virtual screen launches and task restores to continue when a device refuses per-app audio muting, showing a sound warning in the capsule and step log instead of failing with code 3 and leaving a black preview.
+- Added direct operation of the background screen preview on Android: with *Operate the small view* on, taps, swipes and Back on the expanded preview go to the virtual display, off by default so a stray touch cannot reach the app the agent is driving.
+- Corrected the virtual display's orientation to follow the app on top, and turned screenshots and the preview upright on every rotation, so taps on landscape and portrait pages land where the model aimed.
+- Held back a screen frame taken before an app was launched or moved back to the virtual display, so the model no longer acts on the screen it replaced.
 - Disclosed every enabled skill with up to 1024 Unicode description characters, preserved imported SKILL.md metadata, parsed quoted and nested frontmatter correctly, and accepted non-ASCII skill names. For #912.
 - Kept device-chat drafts edited while another turn was running, and made long device and bound-conversation lists scrollable. For #815.
 - **Fixed background screen isolation, manual takeover and input confirmation.** Empty tasks could open an app before taking their first screenshot. Unavailable background control stopped with an explanation; takeover resumed from a fresh observation without repeating the old click. Paste checked the target field and preserved new clipboard contents. Background mode required Android 12 or later and compatible display capabilities.

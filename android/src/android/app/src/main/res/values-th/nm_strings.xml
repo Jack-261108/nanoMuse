@@ -599,6 +599,9 @@
     <string name="nm_hands_preview_live">หน้าจอสด</string>
     <string name="nm_hands_preview_collapse">ยุบ</string>
     <string name="nm_hands_preview_zoom_hint">แตะเพื่อย่อ</string>
+    <string name="nm_hands_pip_input">ควบคุมหน้าต่างเล็กโดยตรง</string>
+    <string name="nm_hands_pip_input_sub">การแตะและการปัดบนหน้าต่างที่ขยายจะถูกส่งไปยังหน้าจอพื้นหลัง ปิดไว้ขณะที่เอเจนต์กำลังทำงาน ไม่อย่างนั้นการแตะพลาดจะไปโดนแอปของมัน</string>
+    <string name="nm_hands_pip_back">ย้อนกลับบนหน้าจอพื้นหลัง</string>
     <string name="nm_hands_section_rules">มันทำงานอย่างไร</string>
     <string name="nm_hands_rule_ladder">หน้าจอมาเป็นลำดับสุดท้าย: ทักษะ คำสั่ง หรือเบราว์เซอร์มาก่อน</string>
     <string name="nm_hands_rule_secrets">ไม่พิมพ์รหัสผ่าน รหัสยืนยัน หรือหมายเลขบัตรเด็ดขาด มันจะส่งโทรศัพท์ให้คุณทำเอง</string>
@@ -609,6 +612,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">ขั้นตอนที่ %1$d</string>
     <string name="nm_hands_looking">กำลังดูหน้าจอ…</string>
+    <string name="nm_hands_audio_unmuted_note">อาจมีเสียงออก (ปิดเสียงไม่ได้)</string>
     <string name="nm_hands_stop">หยุด</string>
     <string name="nm_hands_continue">ดำเนินการต่อ</string>
     <string name="nm_hands_open">เปิด</string>

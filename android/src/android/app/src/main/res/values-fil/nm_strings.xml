@@ -602,6 +602,10 @@
     <string name="nm_hands_preview_live">Live screen</string>
     <string name="nm_hands_preview_collapse">I-collapse</string>
     <string name="nm_hands_preview_zoom_hint">I-tap para lumiit</string>
+    <string name="nm_hands_pip_input">Gamitin nang direkta ang maliit na view</string>
+    <string name="nm_hands_pip_input_sub">Ang mga tap at swipe sa pinalaking preview ay napupunta sa background screen. Iwang nakapatay habang nagtatrabaho ang agent, o may maling tap na mahuhulog sa app nito.</string>
+    <string name="nm_hands_pip_back">Bumalik sa background screen</string>
+    <string name="nm_hands_audio_unmuted_note">Maaaring tumunog (hindi ma-mute)</string>
     <string name="nm_hands_section_rules">Paano ito kumikilos</string>
     <string name="nm_hands_rule_ladder">Nahuhuli ang screen: isang skill, isang command o ang browser muna.</string>
     <string name="nm_hands_rule_secrets">Hindi kailanman nagta-type ng mga password, code o numero ng card; iniaabot nito sa iyo ang telepono.</string>

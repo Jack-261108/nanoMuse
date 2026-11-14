@@ -34,3 +34,6 @@
 # Keep the entire package so classes, entry points, and AIDL stubs remain intact in Release builds.
 -keep class io.github.nanomuse.shell.** { *; }
 
+# snakeyaml references java.beans which does not exist on Android
+-dontwarn java.beans.**
+

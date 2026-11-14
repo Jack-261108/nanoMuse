@@ -599,6 +599,9 @@
     <string name="nm_hands_preview_live">Skrin langsung</string>
     <string name="nm_hands_preview_collapse">Runtuhkan</string>
     <string name="nm_hands_preview_zoom_hint">Ketik untuk mengecilkan</string>
+    <string name="nm_hands_pip_input">Kendalikan paparan kecil secara terus</string>
+    <string name="nm_hands_pip_input_sub">Ketik dan leret pada pratonton yang dibesarkan dihantar ke skrin latar. Biarkan ia dimatikan semasa ejen bekerja, jika tidak sentuhan tersasar akan masuk ke aplikasinya.</string>
+    <string name="nm_hands_pip_back">Kembali pada skrin latar</string>
     <string name="nm_hands_section_rules">Cara ia bertindak</string>
     <string name="nm_hands_rule_ladder">Skrin yang terakhir: kemahiran, perintah atau pelayar dahulu.</string>
     <string name="nm_hands_rule_secrets">Tidak pernah menaip kata laluan, kod atau nombor kad; ia menyerahkan telefon kepada anda.</string>
@@ -609,6 +612,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">Langkah %1$d</string>
     <string name="nm_hands_looking">Melihat skrin…</string>
+    <string name="nm_hands_audio_unmuted_note">Mungkin berbunyi (senyap tidak tersedia)</string>
     <string name="nm_hands_stop">Berhenti</string>
     <string name="nm_hands_continue">Teruskan</string>
     <string name="nm_hands_open">Buka</string>

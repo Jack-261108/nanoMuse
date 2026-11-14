@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -185,6 +186,7 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
 
         // ── virtual screen ──
         val virtualScreenEnabled by remember(context) { Hands.virtualScreenEnabledFlow(context) }.collectAsState(initial = Hands.virtualScreenEnabled(context))
+        val pipInputEnabled by remember(context) { Hands.pipInputEnabledFlow(context) }.collectAsState(initial = Hands.pipInputEnabled(context))
         val shellInstance by SharedShell.shell.collectAsState()
         val builtin = remember(context) { BuiltinShellManager.instance(context) }
         val builtinStatus by builtin.status.collectAsState()
@@ -286,6 +288,17 @@ fun HandsScreen(onBack: () -> Unit, onOpenProviders: () -> Unit, onOpenHandsMode
                 },
                 icon = Icons.Outlined.Layers,
                 iconColor = if (virtualScreenEnabled && shellInstance != null) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
+                showDivider = true,
+            )
+
+            SettingsSwitchRow(
+                title = stringResource(R.string.nm_hands_pip_input),
+                subtitle = stringResource(R.string.nm_hands_pip_input_sub),
+                checked = pipInputEnabled,
+                enabled = virtualScreenEnabled,
+                onCheckedChange = { Hands.setPipInputEnabled(context, it) },
+                icon = Icons.Outlined.TouchApp,
+                iconColor = if (pipInputEnabled) MuseTones.action else MaterialTheme.colorScheme.onSurfaceVariant,
                 showDivider = true,
             )
 

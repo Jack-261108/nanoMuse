@@ -603,6 +603,9 @@
     <string name="nm_hands_preview_live">Tela ao vivo</string>
     <string name="nm_hands_preview_collapse">Recolher</string>
     <string name="nm_hands_preview_zoom_hint">Toque para reduzir</string>
+    <string name="nm_hands_pip_input">Usar a visualização pequena diretamente</string>
+    <string name="nm_hands_pip_input_sub">Toques e deslizes na visualização ampliada vão para a tela em segundo plano. Deixe desligado enquanto o agente trabalha, ou um toque perdido cai no app dele.</string>
+    <string name="nm_hands_pip_back">Voltar na tela em segundo plano</string>
     <string name="nm_hands_section_rules">Como ele se comporta</string>
     <string name="nm_hands_rule_ladder">A tela vem por último: primeiro uma skill, um comando ou o navegador.</string>
     <string name="nm_hands_rule_secrets">Nunca digita senhas, códigos ou números de cartão; ele passa o celular para você.</string>
@@ -613,6 +616,7 @@
     <!-- the capsule -->
     <string name="nm_hands_step">Passo %1$d</string>
     <string name="nm_hands_looking">Olhando a tela…</string>
+    <string name="nm_hands_audio_unmuted_note">Pode emitir som (sem silenciamento)</string>
     <string name="nm_hands_stop">Parar</string>
     <string name="nm_hands_continue">Continuar</string>
     <string name="nm_hands_open">Abrir</string>

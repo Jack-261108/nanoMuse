@@ -74,8 +74,9 @@ class BackgroundScreenDeviceTest {
             val originalAudio = shell.getAudioMode(fixturePackage)
             assertNotNull("Fixture audio mode must be readable", originalAudio)
             val metrics = context.resources.displayMetrics
+            val displayManager = context.getSystemService(DisplayManager::class.java)
             fun newDisplay(): AgentDisplay = AgentDisplay(
-                shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+                shell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi, displayManager,
             ).also { displays += it }
             val display = newDisplay()
             val target = VirtualDisplayTarget(display, shell, context)
@@ -185,7 +186,10 @@ class BackgroundScreenDeviceTest {
                         displays.none { it.displayId == on }
                     ) {
                         val metrics = context.resources.displayMetrics
-                        val cleanup = AgentDisplay(remainingShell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi)
+                        val cleanup = AgentDisplay(
+                            remainingShell, metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+                            context.getSystemService(DisplayManager::class.java),
+                        )
                         displays += cleanup
                         remainingShell.moveTask(taskId, cleanup.displayId)
                     }

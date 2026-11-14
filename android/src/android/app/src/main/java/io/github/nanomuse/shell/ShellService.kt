@@ -3,6 +3,7 @@ package io.github.nanomuse.shell
 import android.annotation.SuppressLint
 import android.app.ActivityOptions
 import android.content.ClipData
+import android.content.pm.ActivityInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -78,6 +79,11 @@ class ShellService(
 
     private val mainWatch by lazy { MainScreenWatch({ taskManager }, ::taskRows) }
 
+    /** 有虚拟屏时按任务方向纠正屏方向；见 [ensureOrientationWatch]。 */
+    @Volatile private var orientationWatch: DisplayOrientationWatch? = null
+    /** 各任务请求的方向（来自任务栈回调），任务移除时清掉。 */
+    private val requestedOrientations = HashMap<Int, Int>()
+
     override fun watchMainScreen(windowMs: Int): Int = try {
         mainWatch.watch(windowMs)
     } catch (t: Throwable) {
@@ -152,6 +158,9 @@ class ShellService(
             check(id != Display.DEFAULT_DISPLAY && setDisplayImePolicy(id)) { "display IME isolation unavailable" }
             synchronized(displays) { displays[id] = vd }
             sessionTasks[id] = LinkedHashSet()
+            // freeform 小窗会让无障碍坐标随窗口缩放，全屏窗口模式下坐标才是屏的逻辑坐标。
+            setFullscreenWindowingMode(id)
+            ensureOrientationWatch()
             if (DisplayAwake.needed(flags, FLAG_OWN_DISPLAY_GROUP, displayGroup(id))) awake.start(id)
             return id
         } catch (t: Throwable) {
@@ -161,6 +170,87 @@ class ShellService(
             vd.release()
             throw t
         }
+    }
+
+    /** IWindowManager.setWindowingMode(displayId, WINDOWING_MODE_FULLSCREEN);退回 `wm` 命令。 */
+    @SuppressLint("PrivateApi")
+    private fun setFullscreenWindowingMode(displayId: Int) {
+        val ok = runCatching {
+            val wm = windowManagerService()
+            wm.javaClass.getMethod("setWindowingMode", Int::class.java, Int::class.java)
+                .invoke(wm, displayId, WINDOWING_MODE_FULLSCREEN)
+        }.isSuccess
+        if (!ok && exec("wm", "set-display-windowing-mode", "-d", "$displayId", "$WINDOWING_MODE_FULLSCREEN") != 0) {
+            Log.w(TAG, "could not set fullscreen windowing mode on display $displayId")
+        }
+    }
+
+    @SuppressLint("PrivateApi")
+    private fun windowManagerService(): Any =
+        Class.forName("android.view.WindowManagerGlobal").getMethod("getWindowManagerService").invoke(null)!!
+
+    /**
+     * STEAL_TOP_FOCUS_DISABLED 保住主屏焦点，但有的系统因此不再采纳后台 Activity 的转屏请求。
+     * 有我们的屏时开一个方向监听，只纠正自己这块屏的方向，保留原来的焦点隔离。
+     */
+    private fun ensureOrientationWatch() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        if (orientationWatch != null) return
+        val watch = runCatching {
+            DisplayOrientationWatch(
+                taskManager,
+                active = { synchronized(displays) { displays.isNotEmpty() } },
+                onRequestedOrientation = { taskId, orientation -> synchronized(requestedOrientations) { requestedOrientations[taskId] = orientation } },
+                onTaskRemoved = { taskId -> synchronized(requestedOrientations) { requestedOrientations.remove(taskId) } },
+                sync = ::syncDisplayOrientations,
+            )
+        }.onFailure { Log.w(TAG, "display orientation watcher unavailable", it) }.getOrNull() ?: return
+        // 两次建屏同时进来时只留一个，多出来的立刻关掉。
+        val spare = synchronized(displays) {
+            if (orientationWatch == null && displays.isNotEmpty()) {
+                orientationWatch = watch
+                null
+            } else {
+                watch
+            }
+        }
+        spare?.close()
+    }
+
+    /**
+     * 按各屏最上面任务的应用窗口比例纠正屏方向。锁里只拍一份屏的快照；
+     * 查任务、读字段、freezeDisplayRotation 和退回的 `wm` 命令都在锁外，不挡建屏、放屏和启动。
+     */
+    @SuppressLint("PrivateApi")
+    private fun syncDisplayOrientations() {
+        val ours = synchronized(displays) { displays.toMap() }
+        if (ours.isEmpty()) return
+        val top = runCatching { allTasks() }.getOrElse { return }.groupBy { TASK_INFO.getField("displayId").getInt(it) }
+        for ((id, vd) in ours) runCatching {
+            val task = top[id]?.firstOrNull() ?: return@runCatching
+            val taskId = TASK_INFO.getField("taskId").getInt(task)
+            val compat = runCatching { TASK_INFO.getField("appCompatTaskInfo").get(task) }.getOrNull() ?: task
+            val cls = compat.javaClass
+            // 安卓 15 起另有明确的 letterbox 标志；14 的宽高只在部分 letterbox 模式下填充。
+            if (runCatching { cls.getField("topActivityBoundsLetterboxed").getBoolean(compat) }.getOrDefault(true).not()) return@runCatching
+            val width = runCatching { cls.getField("topActivityLetterboxWidth").getInt(compat) }.getOrDefault(0)
+            val height = runCatching { cls.getField("topActivityLetterboxHeight").getInt(compat) }.getOrDefault(0)
+            val display = vd.display
+            val mode = display.mode
+            val requested = synchronized(requestedOrientations) { requestedOrientations[taskId] }
+                ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            val rotation = DisplayOrientation.rotation(
+                mode.physicalWidth, mode.physicalHeight, display.rotation, width, height, requested,
+            ) ?: return@runCatching
+            // 快照之后这块屏可能已经放掉了
+            if (!ownDisplay(id)) return@runCatching
+            val ok = runCatching {
+                val wm = windowManagerService()
+                val method = wm.javaClass.methods.first { it.name == "freezeDisplayRotation" }
+                if (method.parameterTypes.size == 3) method.invoke(wm, id, rotation, "nanomuse") else method.invoke(wm, id, rotation)
+            }.isSuccess
+            if (!ok) exec("wm", "user-rotation", "-d", "$id", "lock", "$rotation")
+        }.onFailure { Log.w(TAG, "orientation sync failed on display $id", it) }
     }
 
     @SuppressLint("PrivateApi")
@@ -183,7 +273,15 @@ class ShellService(
         // Remove only tasks created or moved into this display, never force-stop their package.
         owned.forEach { id -> runCatching { removeTask(id) } }
         vd?.release()
-        synchronized(displays) { displays.remove(displayId) }
+        // 锁里只摘下来，关监听（binder 往返）在锁外做。
+        val watch = synchronized(displays) {
+            displays.remove(displayId)
+            if (displays.isEmpty()) orientationWatch.also { orientationWatch = null } else null
+        }
+        if (watch != null) {
+            watch.close()
+            synchronized(requestedOrientations) { requestedOrientations.clear() }
+        }
         val remaining = runCatching {
             allTasks().filter { TASK_INFO.getField("taskId").getInt(it) in owned }
         }.getOrNull()
@@ -193,6 +291,7 @@ class ShellService(
             if (remaining.isEmpty()) sessionTasks.remove(displayId)
             else sessionTasks[displayId] = remaining.map { TASK_INFO.getField("taskId").getInt(it) }.toMutableSet()
         }
+        sessionAudio.forgetFailed(displayId)
     }
 
     override fun startApp(displayId: Int, packageName: String): Int = synchronized(launchLock) {
@@ -206,13 +305,16 @@ class ShellService(
         val intent = launchIntent(packageName, myUser) ?: return START_NOT_FOUND
         val before = sessionAudio.keys(displayId)
         val key = AppsAfterTask.keyOf(packageName, myUser, myUser)
-        if (!sessionAudio.acquire(displayId, key)) return START_ERROR
+        val mutedNow = sessionAudio.tryAcquire(displayId, key, retryFailed = true)
+        if (!mutedNow) {
+            Log.w(TAG, "could not mute $packageName on display $displayId; starting without muting")
+        }
         var started = false
         try {
             // Kept tasks need the same mute lease as a newly launched task.
             if (resumeKept(displayId, packageName, myUser)) {
                 started = true
-                return START_OK
+                return if (mutedNow) START_OK else START_OK_UNMUTED
             }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle()
@@ -233,7 +335,7 @@ class ShellService(
             } == true
             if (started) {
                 runCatching { rememberTasks(displayId, tasksOn(displayId)) }
-                START_OK
+                if (mutedNow) START_OK else START_OK_UNMUTED
             } else START_ERROR
         } finally {
             if (!started) sessionAudio.release(displayId, sessionAudio.keys(displayId) - before)
@@ -360,9 +462,8 @@ class ShellService(
         val before = sessionAudio.keys(displayId)
         if (ownDisplay(displayId)) {
             for (key in keys) {
-                if (!sessionAudio.acquire(displayId, key)) {
-                    sessionAudio.release(displayId, sessionAudio.keys(displayId) - before)
-                    return false
+                if (!sessionAudio.tryAcquire(displayId, key, retryFailed = true)) {
+                    Log.w(TAG, "could not mute $key when moving task $taskId to display $displayId; continuing without muting")
                 }
             }
         }
@@ -602,7 +703,10 @@ class ShellService(
         for (row in rows) {
             sessionTasks.getOrPut(displayId) { LinkedHashSet() }.add(TASK_INFO.getField("taskId").getInt(row))
             for (key in audioKeysOf(row)) {
-                if (!sessionAudio.acquire(displayId, key)) Log.w(TAG, "could not mute an app arriving on the virtual display")
+                val alreadyFailed = sessionAudio.hasFailed(displayId, key)
+                if (!sessionAudio.tryAcquire(displayId, key, retryFailed = false) && !alreadyFailed) {
+                    Log.w(TAG, "could not mute an app arriving on the virtual display")
+                }
             }
         }
     }
@@ -849,8 +953,12 @@ class ShellService(
             }
             // Pending audio records are retained when the corresponding task could not be removed.
             if (clientAttached) recoverMuted()
+            sessionAudio.clearFailures()
             restoreClip()
             runCatching { mainWatch.close() }
+            orientationWatch?.close()
+            orientationWatch = null
+            synchronized(requestedOrientations) { requestedOrientations.clear() }
         }
     }
 
@@ -892,6 +1000,7 @@ class ShellService(
         const val START_IN_USE_ON_MAIN = 1
         const val START_NOT_FOUND = 2
         const val START_ERROR = 3
+        const val START_OK_UNMUTED = 4
 
         private const val ACTIVITY_TYPE_UNDEFINED = 0
         private const val ACTIVITY_TYPE_STANDARD = 1
@@ -906,6 +1015,9 @@ class ShellService(
         private val TASK_INFO: Class<*> by lazy { Class.forName("android.app.TaskInfo") }
         private const val INJECT_MODE_ASYNC = 0
         private const val INJECT_MODE_WAIT_FOR_RESULT = 1
+
+        /** WindowConfiguration.WINDOWING_MODE_FULLSCREEN(隐藏常量)。 */
+        private const val WINDOWING_MODE_FULLSCREEN = 1
 
         private const val FLAG_PUBLIC = 1 shl 0
         private const val FLAG_OWN_CONTENT_ONLY = 1 shl 3

@@ -112,6 +112,19 @@ class VirtualDisplayInputTest {
         verify(shell, never()).moveTask(anyInt(), anyInt())
     }
 
+    @Test
+    fun `unmuted fallback status from shell is preserved by openApp and restartApp`() {
+        val shell = mock(INanoMuseShell::class.java)
+        val display = mock(AgentDisplay::class.java)
+        `when`(display.displayId).thenReturn(42)
+        `when`(shell.startApp(42, "com.example.app")).thenReturn(io.github.nanomuse.shell.ShellService.START_OK_UNMUTED)
+        `when`(shell.restartApp(42, "com.example.app")).thenReturn(io.github.nanomuse.shell.ShellService.START_OK_UNMUTED)
+        val target = VirtualDisplayTarget(display, shell)
+
+        assertEquals(io.github.nanomuse.shell.ShellService.START_OK_UNMUTED, target.openApp("com.example.app"))
+        assertEquals(io.github.nanomuse.shell.ShellService.START_OK_UNMUTED, target.restartApp("com.example.app"))
+    }
+
     private fun arrival(): Bundle = mock(Bundle::class.java).also {
         `when`(it.getIntArray(MainScreenWatch.KEY_TASK)).thenReturn(intArrayOf(101))
         `when`(it.getStringArray(MainScreenWatch.KEY_PACKAGE)).thenReturn(arrayOf("com.example.app"))

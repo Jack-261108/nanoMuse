@@ -605,6 +605,10 @@
     <string name="nm_hands_preview_live">Ecran în direct</string>
     <string name="nm_hands_preview_collapse">Restrânge</string>
     <string name="nm_hands_preview_zoom_hint">Atingeți pentru micșorare</string>
+    <string name="nm_hands_pip_input">Folosește direct vizualizarea mică</string>
+    <string name="nm_hands_pip_input_sub">Atingerile și glisările pe vizualizarea mărită ajung pe ecranul din fundal. Lasă opțiunea închisă cât timp agentul lucrează, altfel o atingere greșită ajunge în aplicația lui.</string>
+    <string name="nm_hands_pip_back">Înapoi pe ecranul din fundal</string>
+    <string name="nm_hands_audio_unmuted_note">Poate reda sunet (opțiunea fără sunet indisponibilă)</string>
     <string name="nm_hands_section_rules">Cum se comportă</string>
     <string name="nm_hands_rule_ladder">Ecranul vine ultimul: mai întâi o abilitate, o comandă sau browserul.</string>
     <string name="nm_hands_rule_secrets">Nu tastează niciodată parole, coduri sau numere de card; îți dă telefonul ție.</string>

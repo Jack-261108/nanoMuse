@@ -608,6 +608,10 @@
     <string name="nm_hands_preview_live">Ekran na żywo</string>
     <string name="nm_hands_preview_collapse">Zwiń</string>
     <string name="nm_hands_preview_zoom_hint">Dotknij, aby zmniejszyć</string>
+    <string name="nm_hands_pip_input">Steruj małym podglądem bezpośrednio</string>
+    <string name="nm_hands_pip_input_sub">Dotknięcia i przesunięcia na powiększonym podglądzie trafiają do ekranu w tle. Zostaw to wyłączone, gdy agent pracuje, inaczej przypadkowe muśnięcie trafi do jego aplikacji.</string>
+    <string name="nm_hands_pip_back">Wstecz na ekranie w tle</string>
+    <string name="nm_hands_audio_unmuted_note">Może wydawać dźwięk (wyciszenie niedostępne)</string>
     <string name="nm_hands_section_rules">Jak się zachowuje</string>
     <string name="nm_hands_rule_ladder">Ekran na końcu: najpierw umiejętność, polecenie albo przeglądarka.</string>
     <string name="nm_hands_rule_secrets">Nigdy nie wpisuje haseł, kodów ani numerów kart; oddaje telefon tobie.</string>

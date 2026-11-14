@@ -603,6 +603,10 @@
     <string name="nm_hands_preview_live">Écran en direct</string>
     <string name="nm_hands_preview_collapse">Réduire</string>
     <string name="nm_hands_preview_zoom_hint">Appuyer pour réduire</string>
+    <string name="nm_hands_pip_input">Utiliser directement le petit aperçu</string>
+    <string name="nm_hands_pip_input_sub">Les appuis et les glissements sur l’aperçu agrandi vont à l’écran d’arrière-plan. Laissez-le désactivé pendant que l’agent travaille, sinon un appui perdu tombera dans son application.</string>
+    <string name="nm_hands_pip_back">Retour sur l’écran d’arrière-plan</string>
+    <string name="nm_hands_audio_unmuted_note">Peut émettre du son (mise en sourdine indisponible)</string>
     <string name="nm_hands_section_rules">Comment il se comporte</string>
     <string name="nm_hands_rule_ladder">L’écran vient en dernier : une compétence, une commande ou le navigateur d’abord.</string>
     <string name="nm_hands_rule_secrets">Ne tape jamais de mots de passe, codes ou numéros de carte ; il vous tend le téléphone.</string>

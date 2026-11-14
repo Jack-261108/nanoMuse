@@ -34,6 +34,7 @@ object Hands {
     private const val KEY_ENABLED = "hands.enabled"
     private const val KEY_MODEL = "hands.model_entry"
     private const val KEY_VIRTUAL_SCREEN = "hands.virtual_screen"
+    private const val KEY_PIP_INPUT = "hands.pip_input"
     const val DEEP_LINK = "minis://settings/hands"
     const val MIN_SDK = Build.VERSION_CODES.R
 
@@ -52,6 +53,24 @@ object Hands {
         }
         p.registerOnSharedPreferenceChangeListener(listener)
         trySend(p.getBoolean(KEY_VIRTUAL_SCREEN, true))
+        awaitClose { p.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+
+    /**
+     * Let the person tap, swipe and go back on the preview window itself, without moving the app
+     * to the main screen. Off by default: with it on, a stray touch lands in the app the hands
+     * are driving.
+     */
+    fun pipInputEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_PIP_INPUT, false)
+    fun setPipInputEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY_PIP_INPUT, on).apply() }
+
+    fun pipInputEnabledFlow(context: Context): Flow<Boolean> = callbackFlow {
+        val p = prefs(context.applicationContext)
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_PIP_INPUT) trySend(p.getBoolean(KEY_PIP_INPUT, false))
+        }
+        p.registerOnSharedPreferenceChangeListener(listener)
+        trySend(p.getBoolean(KEY_PIP_INPUT, false))
         awaitClose { p.unregisterOnSharedPreferenceChangeListener(listener) }
     }
 
