@@ -55,6 +55,13 @@ object EncryptedPrefsFactory {
         return context.getSharedPreferences("${fileName}_plain_fallback", Context.MODE_PRIVATE)
     }
 
+    // nanoMuse: one attempt, no wipe and no plain-text fallback. The email
+    // connector refuses to store its authorization code when this returns null.
+    fun createOrNull(context: Context, fileName: String): SharedPreferences? =
+        runCatching { build(context, fileName) }
+            .onFailure { Log.w(TAG, "createOrNull($fileName) failed: ${it.message}") }
+            .getOrNull()
+
     private fun build(context: Context, fileName: String): SharedPreferences {
         val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)

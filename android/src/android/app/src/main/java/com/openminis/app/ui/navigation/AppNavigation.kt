@@ -738,6 +738,15 @@ fun AppNavigation(
             io.github.nanomuse.ui.connectors.ConnectorsScreen(
                 onBack = { navController.safePopBackStack() },
                 onOpenMcp = { navController.safeNavigate(Routes.MCP) },
+                onOpenEmail = {
+                    navController.safeNavigate(io.github.nanomuse.ui.connectors.ROUTE_EMAIL_CONNECTOR)
+                },
+            )
+        }
+        // nanoMuse: the built-in mailbox (IMAP/SMTP) behind Settings → Connectors.
+        composable(io.github.nanomuse.ui.connectors.ROUTE_EMAIL_CONNECTOR) {
+            io.github.nanomuse.ui.connectors.EmailConnectorScreen(
+                onBack = { navController.safePopBackStack() },
             )
         }
         // nanoMuse: the coding agents (Cursor, Codex, Claude Code) on the account's computers.
@@ -1525,6 +1534,10 @@ fun AppNavigation(
                     mcpRepository = mcpRepository,
                     onBack = { navController.safePopBackStack() },
                     envVarRepository = envVarRepository,
+                    // nanoMuse: the built-in mailbox row on this page opens its settings.
+                    onOpenEmail = {
+                        navController.safeNavigate(io.github.nanomuse.ui.connectors.ROUTE_EMAIL_CONNECTOR)
+                    },
                 )
             }
         }

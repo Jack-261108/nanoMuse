@@ -22,9 +22,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.openminis.app.ui.settings.SettingsSwitch
@@ -48,7 +51,16 @@ fun SessionMcpsSheet(
     mcpRepository: MCPRepository,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val servers by mcpRepository.servers.collectAsState()
+    // nanoMuse: the built-in mailbox is not an MCP server, but it is switched per chat here too.
+    val emailVersion by io.github.nanomuse.email.EmailStore.version.collectAsState()
+    val emailConnected = remember(emailVersion) { io.github.nanomuse.email.EmailStore.configured(context) }
+    var emailOn by remember(sessionId, emailConnected, emailVersion) {
+        mutableStateOf(
+            emailConnected && io.github.nanomuse.email.EmailStore.sessionEnabled(context, sessionId),
+        )
+    }
 
     // [T-mcp-review-fixes-android] Key the seed on `servers` so the override map
     // re-derives when the live server list arrives. A keyless remember{} seeds
@@ -71,12 +83,37 @@ fun SessionMcpsSheet(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
         ) {
-            if (servers.isEmpty()) {
+            if (servers.isEmpty() && !emailConnected) {
                 EmptyMcpsCard()
             } else {
                 SettingsSection(
-                    footer = stringResource(R.string.session_mcps_footer),
+                    footer = when {
+                        emailConnected && servers.isNotEmpty() ->
+                            stringResource(R.string.nm_session_mcps_footer_builtin)
+                        servers.isNotEmpty() -> stringResource(R.string.session_mcps_footer)
+                        else -> null
+                    },
                 ) {
+                    // nanoMuse: one continuous list, same indent and divider as the MCP rows;
+                    // the subtitle says the mailbox is built in.
+                    if (emailConnected) {
+                        SettingsRow(
+                            title = stringResource(R.string.nm_connectors_email_title),
+                            subtitle = stringResource(R.string.nm_mcp_email_builtin_sub),
+                            showChevron = false,
+                            showDivider = servers.isNotEmpty(),
+                            trailing = {
+                                SettingsSwitch(
+                                    checked = emailOn,
+                                    onCheckedChange = { enabled ->
+                                        emailOn = enabled
+                                        io.github.nanomuse.email.EmailStore.forContext(context)
+                                            .setEnabledForSession(sessionId, enabled)
+                                    },
+                                )
+                            },
+                        )
+                    }
                     servers.forEachIndexed { index, server ->
                         val note = server.note?.trim().orEmpty()
                         val sub = note

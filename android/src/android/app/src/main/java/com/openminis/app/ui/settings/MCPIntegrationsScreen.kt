@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
@@ -70,8 +71,13 @@ fun MCPIntegrationsScreen(
     // "insert app var" picker ($$VAR references resolve at runtime in PRoot).
     // Null when the caller hasn't wired it — the picker affordance hides.
     envVarRepository: com.openminis.app.data.repository.EnvVarRepository? = null,
+    // nanoMuse: the built-in mailbox appears here too; it is not an MCP server.
+    onOpenEmail: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val servers by mcpRepository.servers.collectAsState()
+    val emailVersion by io.github.nanomuse.email.EmailStore.version.collectAsState()
+    val emailConfigured = remember(emailVersion) { io.github.nanomuse.email.EmailStore.configured(context) }
 
     // [T-android-mcp-list-reload-on-appear] MCPRepository reads servers.json
     // only in init() (app launch). A server the agent writes via minis-mcp-cli
@@ -97,6 +103,28 @@ fun MCPIntegrationsScreen(
             }
         },
     ) {
+        // nanoMuse: the mailbox is a built-in tool, not an MCP server, but this is
+        // where people look for the services they have connected.
+        SettingsSection(header = stringResource(R.string.nm_connectors_email_builtin)) {
+            SettingsRow(
+                title = stringResource(R.string.nm_connectors_email_title),
+                subtitle = stringResource(R.string.nm_mcp_email_builtin_sub),
+                icon = Icons.Outlined.Email,
+                onClick = onOpenEmail,
+                showDivider = false,
+                trailing = {
+                    Text(
+                        if (emailConfigured) {
+                            stringResource(R.string.nm_connectors_connected)
+                        } else {
+                            stringResource(R.string.nm_connectors_email_off)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+            )
+        }
         SettingsSection(
             header = stringResource(R.string.mcp_section_servers),
             footer = stringResource(R.string.mcp_section_footer),

@@ -5,12 +5,14 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -103,6 +105,32 @@ class RiskGateTest {
         RiskGate.decide(first.id, RiskDecision.ALLOW_ONCE)
         runCurrent()
         assertEquals(RiskDecision.ALLOW_ONCE, front.await())
+        assertNull(RiskGate.pending.value)
+    }
+
+    @Test fun `a request with no timeout waits until it is answered and offers no grant`() = runTest(dispatcher) {
+        val req = RiskRequest(
+            sessionId = "s1",
+            kind = GuardKind.IME,
+            assessment = RiskAssessment(RiskClass.SAFE, "switch the keyboard"),
+            preview = "Keyboard",
+            timeoutMs = 0,
+        )
+        assertFalse(req.canSession)
+        assertFalse(req.canAlways)
+
+        val answer = async { RiskGate.ask(req) }
+        runCurrent()
+        assertEquals(req.id, RiskGate.pending.value?.id)
+
+        advanceTimeBy(10 * 60_000L)
+        runCurrent()
+        assertEquals(req.id, RiskGate.pending.value?.id)
+        assertFalse(answer.isCompleted)
+
+        RiskGate.decide(req.id, RiskDecision.ALLOW_ONCE)
+        runCurrent()
+        assertEquals(RiskDecision.ALLOW_ONCE, answer.await())
         assertNull(RiskGate.pending.value)
     }
 

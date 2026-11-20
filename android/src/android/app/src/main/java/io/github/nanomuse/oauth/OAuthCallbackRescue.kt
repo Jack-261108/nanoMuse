@@ -48,6 +48,11 @@ private const val SHOW_AFTER_MS = 10_000L
 @Composable
 fun OAuthCallbackRescue(active: Boolean, providerType: ProviderType, modifier: Modifier = Modifier) {
     val target = remember(providerType) { LoopbackCallback.target(providerType) } ?: return
+    OAuthCallbackRescue(active = active, target = target, modifier = modifier)
+}
+
+@Composable
+fun OAuthCallbackRescue(active: Boolean, target: LoopbackCallback.Target, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var shown by remember { mutableStateOf(false) }

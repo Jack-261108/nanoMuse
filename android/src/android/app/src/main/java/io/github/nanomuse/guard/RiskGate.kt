@@ -33,7 +33,7 @@ data class RiskRequest(
     val elementText: String? = null,
     /** For a computer's scheduled task: the app the step acts in there. */
     val app: String? = null,
-    /** How long the card waits before silence counts as no. */
+    /** How long the card waits before silence counts as no. `<= 0` waits until answered. */
     val timeoutMs: Long = RiskGate.TIMEOUT_MS,
     val createdAt: Long = System.currentTimeMillis(),
 ) {
@@ -44,8 +44,8 @@ data class RiskRequest(
      * confirms with the phone's screen lock ([needsCredential]), and the first time is always
      * asked because the grant can only come from the card.
      */
-    val canSession: Boolean get() = assessment.warnings.isEmpty() && assessment.riskClass != RiskClass.MONEY && kind != GuardKind.DEVICE && kind != GuardKind.SCHEDULED
-    val canAlways: Boolean get() = assessment.warnings.isEmpty() && !assessment.target.isNullOrBlank()
+    val canSession: Boolean get() = assessment.warnings.isEmpty() && assessment.riskClass != RiskClass.MONEY && kind != GuardKind.DEVICE && kind != GuardKind.SCHEDULED && kind != GuardKind.IME
+    val canAlways: Boolean get() = assessment.warnings.isEmpty() && kind != GuardKind.IME && !assessment.target.isNullOrBlank()
     val canRemember: Boolean get() = canSession || canAlways
     val needsCredential: Boolean get() = assessment.riskClass == RiskClass.MONEY
 }
@@ -63,7 +63,8 @@ sealed class GateOutcome {
  * The approval queue: one card at a time, requests behind it wait their turn. Same shape as
  * OpenMinis' `ConfigConfirmationGate` so the background-notification plumbing can be shared.
  * A request that gets no answer within [TIMEOUT_MS] is a denial — the agent stops and waits
- * rather than doing the thing on a stale "yes".
+ * rather than doing the thing on a stale "yes". A request with `timeoutMs <= 0` waits until
+ * it is answered or withdrawn (the keyboard consent for the background screen).
  */
 object RiskGate {
     private const val TAG = "RiskGate"
@@ -112,9 +113,11 @@ object RiskGate {
             mutex.withLock {
                 if (!cont.isActive) return@withLock
                 awaiters[request.id] = cont
-                timeouts[request.id] = scope.launch {
-                    delay(request.timeoutMs)
-                    resolve(request.id, RiskDecision.TIMEOUT)
+                if (request.timeoutMs > 0) {
+                    timeouts[request.id] = scope.launch {
+                        delay(request.timeoutMs)
+                        resolve(request.id, RiskDecision.TIMEOUT)
+                    }
                 }
                 if (_pending.value == null) {
                     _pending.value = request

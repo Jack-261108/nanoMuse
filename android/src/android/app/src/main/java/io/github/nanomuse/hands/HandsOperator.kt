@@ -131,6 +131,10 @@ class HandsOperator(private val context: Context) {
     @Volatile private var gateSession: String? = null
     /** The chat the run came from, for the record's events (null for a run without one). */
     @Volatile private var eventSession: String? = null
+    /** This task's answer to the keyboard-consent question; null until it is asked. */
+    private var imeConsent: Boolean? = null
+    /** Consecutive IME typing failures; two stop trying it for the rest of the task. */
+    private var imeFailures = 0
 
     private val notSpills: Set<String> by lazy {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
@@ -142,10 +146,13 @@ class HandsOperator(private val context: Context) {
 
     /**
      * The approval card waiting on this run, if the one on top is ours: a tap or an Enter the
-     * hands asked about, not a shell or browser request of some other conversation.
+     * hands asked about, or the keyboard consent, not a shell or browser request of some other
+     * conversation.
      */
     private fun ownPendingRequest(): RiskRequest? =
-        RiskGate.pending.value?.takeIf { it.kind == GuardKind.SCREEN && it.sessionId == gateSession }
+        RiskGate.pending.value?.takeIf {
+            (it.kind == GuardKind.SCREEN || it.kind == GuardKind.IME) && it.sessionId == gateSession
+        }
 
     private fun sleepOrStop(ms: Long): Boolean {
         if (stop.get()) return false
@@ -239,6 +246,8 @@ class HandsOperator(private val context: Context) {
         Hands.setActive(true)
         Hands.current = this
         gateSession = opts.sessionId ?: "hands"
+        imeConsent = null
+        imeFailures = 0
         SessionActivityTracker.setCameraSuppressActive(true) // one capsule at a time: ours, not OpenMinis'
         capsule.onStop = { requestStop() }
         capsule.onContinue = { userSignal.get()?.countDown() }
@@ -971,7 +980,12 @@ class HandsOperator(private val context: Context) {
     }
 
     /** Types into the field with the cursor; [HANDOFF] when that field is a secret. */
-    internal fun typeText(svc: MinisAccessibilityService, action: HandsAction.InputText, target: HandsDisplayTarget? = null): String {
+    internal fun typeText(
+        svc: MinisAccessibilityService,
+        action: HandsAction.InputText,
+        target: HandsDisplayTarget? = null,
+        askImeConsent: () -> Boolean = { promptForImeConsent() },
+    ): String {
         ensureRunning()
         if (TapWords.looksSecret(action.field)) return HANDOFF
         val node = focusedField(svc, target)
@@ -979,10 +993,9 @@ class HandsOperator(private val context: Context) {
         val hint = listOfNotNull(node?.hintText?.toString(), node?.contentDescription?.toString()).joinToString(" ")
         if (hint.isNotBlank() && TapWords.looksSecret(hint)) return HANDOFF
 
-        // 1. Try ADB Keyboard if available (Open-AutoGLM pattern: triggers TextWatcher & commitText, restores on finally).
-        // Note: ADB Keyboard operates on the global system IME and expects main display IME focus.
-        // It is strictly reserved for the physical main screen (target?.isVirtual != true) to avoid hijacking
-        // the user's foreground keyboard or failing to bind to the background virtual display.
+        // 1. On the main screen, try ADB Keyboard directly if available (Open-AutoGLM pattern:
+        // triggers TextWatcher & commitText, restores on finally). The background display has its
+        // own consent-gated attempt below, because switching the global IME affects the main screen.
         if (target?.isVirtual != true && AdbKeyboardHelper.isAvailable(context)) {
             val typed = attemptInput { AdbKeyboardHelper.typeText(action.text) }
             if (typed) return "typed “${action.text.take(60)}” into the field."
@@ -998,7 +1011,43 @@ class HandsOperator(private val context: Context) {
                 return "no text field has the cursor on virtual display; tap the field first, then type in the next turn."
             }
 
-            // When on a virtual display and ADB keyboard isn't enabled, avoid displaying soft keyboard (IME) on the main screen:
+            // A display that holds its own focus (Android 14+) can take the keyboard, which is a
+            // stronger input path than ACTION_SET_TEXT. Switching the IME is global, so ask once
+            // per task; a refusal, a missing keyboard or a failed switch falls through below.
+            if (AdbKeyboardHelper.isAvailable(context) &&
+                AdbKeyboardHelper.virtualScreenImeSupported() &&
+                imeConsent != false
+            ) {
+                val allowed = imeConsent ?: askImeConsent()
+                ensureRunning()
+                imeConsent = allowed
+                if (allowed) {
+                    // The person may have taken a while to answer; never type into a field that
+                    // lost focus, or into a password field that gained it, while waiting.
+                    val live = focusedField(svc, target)
+                    if (live == null) {
+                        return "no text field has the cursor on virtual display; tap the field first, then type in the next turn."
+                    }
+                    val liveHint = listOfNotNull(live.hintText?.toString(), live.contentDescription?.toString()).joinToString(" ")
+                    if (live.isPassword || (liveHint.isNotBlank() && TapWords.looksSecret(liveHint))) return HANDOFF
+                    if (attemptInput { AdbKeyboardHelper.typeText(action.text, settleMs = VIRTUAL_IME_SETTLE_MS) }) {
+                        val confirmed = awaitText(live, action.text)
+                        if (confirmed) {
+                            imeFailures = 0
+                        } else {
+                            imeFailures++
+                            if (imeFailures >= IME_FAILURE_LIMIT) imeConsent = false
+                        }
+                        return confirmedInput(confirmed, action.text)
+                    }
+                    imeFailures++
+                    if (imeFailures >= IME_FAILURE_LIMIT) imeConsent = false
+                    AppLogger.warning(TAG, "ADBKeyBoard typing failed on the virtual display, falling back to accessibility")
+                }
+            }
+
+            // When the keyboard is unavailable, declined or failed on a virtual display, avoid
+            // showing a soft keyboard (IME) on the main screen:
             // a. First try direct accessibility ACTION_SET_TEXT if node is editable (sets text without IME)
             if (attemptInput { svc.setNodeText(node, action.text) }) {
                 return confirmedInput(node, action.text)
@@ -1059,8 +1108,40 @@ class HandsOperator(private val context: Context) {
         return "the field did not accept text (ACTION_SET_TEXT failed); tap it and try again."
     }
 
+    /**
+     * Asks once per task before the hands switch the phone's keyboard to type on the background
+     * screen. Waits until the person answers; Stop withdraws the request. Only an allow is a yes.
+     */
+    private fun promptForImeConsent(): Boolean {
+        ensureRunning()
+        val request = RiskRequest(
+            sessionId = gateSession ?: "hands",
+            kind = GuardKind.IME,
+            assessment = RiskAssessment(RiskClass.SAFE, "switch the keyboard temporarily for text input"),
+            preview = context.getString(R.string.nm_hands_ime_action),
+            timeoutMs = 0,
+        )
+        capsule.approval(context.getString(R.string.nm_hands_ime_ask), decidable = true)
+        val decision = try {
+            runBlocking { RiskGate.ask(request) }
+        } catch (t: Throwable) {
+            // An interrupted runBlocking can leave the request queued; without a timeout it
+            // would otherwise live on as a card nobody asked for.
+            RiskGate.withdraw(request.id)
+            throw t
+        }
+        ensureRunning()
+        capsule.working(0, context.getString(R.string.nm_hands_looking))
+        return decision == RiskDecision.ALLOW_ONCE ||
+            decision == RiskDecision.ALLOW_SESSION ||
+            decision == RiskDecision.ALLOW_ALWAYS
+    }
+
     private fun confirmedInput(node: AccessibilityNodeInfo, text: String): String =
-        if (awaitText(node, text)) "typed “${text.take(60)}” into the field."
+        confirmedInput(awaitText(node, text), text)
+
+    private fun confirmedInput(confirmed: Boolean, text: String): String =
+        if (confirmed) "typed “${text.take(60)}” into the field."
         else "text input was accepted, but the field did not confirm the requested text. No retry was sent; inspect the next screen before continuing."
 
     internal fun awaitText(
@@ -1298,6 +1379,10 @@ class HandsOperator(private val context: Context) {
         private const val MAX_FRAME_WAITS = 5
         private const val TEXT_CONFIRM_ATTEMPTS = 16
         private const val TEXT_CONFIRM_POLL_MS = 100L
+        /** Longer than the main screen: the keyboard has to bind on the background display. */
+        private const val VIRTUAL_IME_SETTLE_MS = 300L
+        /** Consecutive keyboard failures before this task stops trying it and asks no more. */
+        private const val IME_FAILURE_LIMIT = 2
         private const val TAKE_OVER_TIMEOUT_MS = 5 * 60_000L
         private const val MAX_RUN_MS = 30 * 60_000L
         private const val TAP_SETTLE_MS = 900L

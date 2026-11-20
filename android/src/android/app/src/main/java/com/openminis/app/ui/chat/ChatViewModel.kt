@@ -1245,6 +1245,8 @@ class ChatViewModel(
                 providerRepository, context,
             ),
             memoryEnabled = _memoryEnabled.value,
+            // nanoMuse: a verified mailbox adds read_emails / send_email unless this chat turned it off.
+            emailEnabled = io.github.nanomuse.email.EmailConnector.configuredFor(context, activeSessionId),
         ))
 
     /**
@@ -9525,6 +9527,11 @@ class ChatViewModel(
             "browser_use" -> executeBrowserUseTool(argsJson)
             "memory_write" -> executeMemoryWriteTool(argsJson)
             "memory_get" -> executeMemoryGetTool(argsJson)
+            // nanoMuse: native mailbox tools, present only while a verified connector exists.
+            io.github.nanomuse.email.EmailTools.READ ->
+                io.github.nanomuse.email.EmailTools.read(context, activeSessionId, argsJson)
+            io.github.nanomuse.email.EmailTools.SEND ->
+                io.github.nanomuse.email.EmailTools.send(context, activeSessionId, argsJson)
             else -> ToolExecutionResult("Unknown tool: $name", false)
         }
     }
@@ -10646,6 +10653,7 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
             volatileSections = listOf(
                 skillFragment,
                 mcpFragment,
+                io.github.nanomuse.email.EmailTools.promptParagraph(context, activeSessionId), // nanoMuse: volatile mailbox tools hint
                 namingAddendum,
                 io.github.nanomuse.media.MediaModels.promptParagraph(context),
                 io.github.nanomuse.reach.Computers.promptParagraph(context),
@@ -12773,6 +12781,8 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         "memory_write" -> "Write Memory"
         "memory_get" -> "Read Memory"
         "web_search" -> "Search Web"
+        "read_emails" -> "Read Mail"
+        "send_email" -> "Send Mail"
         else -> toolName
             .split('_')
             .filter { it.isNotEmpty() }

@@ -53,7 +53,7 @@ class RiskApprovalNotifier(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_nanomuse)
             .setLargeIcon(NanoMuseIdentity.face(context))
             .setContentTitle(title)
@@ -66,8 +66,9 @@ class RiskApprovalNotifier(
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
-            .setTimeoutAfter(request.timeoutMs)
-            .build()
+        // A request with no timeout (the keyboard consent) stays until it is answered.
+        if (request.timeoutMs > 0) builder.setTimeoutAfter(request.timeoutMs)
+        val notification = builder.build()
         return try {
             nm.notify(TAG_NOTIF, request.id.hashCode(), notification)
             true

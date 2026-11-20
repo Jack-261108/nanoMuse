@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.MailOutline
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Terminal
@@ -59,6 +60,7 @@ internal fun toolAccentColor(toolName: String): Color = when (toolName) {
     "read_image" -> Color(0xFFAF52DE)
     "memory_write", "memory_get" -> Color(0xFFFF2D55)
     "web_search" -> Color(0xFF32ADE6)    // iOS: .cyan for search
+    "read_emails", "send_email" -> Color(0xFF5856D6)
     else -> Color(0xFF8E8E93)
 }
 
@@ -72,6 +74,7 @@ internal fun toolIconFor(toolName: String) = when (toolName) {
     "read_image" -> Icons.Default.Image                // iOS: photo
     "memory_write", "memory_get" -> Icons.Default.Psychology // iOS: brain.head.profile
     "web_search" -> Icons.Default.Search               // iOS: magnifyingglass
+    "read_emails", "send_email" -> Icons.Default.MailOutline
     else -> Icons.Default.Build
 }
 
@@ -86,6 +89,7 @@ internal fun toolDisplayName(toolName: String): String = when (toolName) {
     "memory_write" -> "memory"
     "memory_get" -> "memory"
     "web_search" -> "search"
+    "read_emails", "send_email" -> "mail"
     else -> toolName
 }
 
@@ -102,6 +106,7 @@ internal fun toolTitleLabel(toolName: String): String = when (toolName) {
     "read_image" -> "nanoMuse is reading Image"
     "memory_write", "memory_get" -> "nanoMuse is using Memory"
     "web_search" -> "nanoMuse is using Search"
+    "read_emails", "send_email" -> "nanoMuse is using Mail"
     else -> "nanoMuse is using ${toolDisplayName(toolName)}"
 }
 
@@ -119,6 +124,7 @@ internal fun toolTitleLabel(toolName: String, status: ToolBlockStatus?): String 
         "read_image" -> "nanoMuse read Image"
         "memory_write", "memory_get" -> "nanoMuse used Memory"
         "web_search" -> "nanoMuse used Search"
+        "read_emails", "send_email" -> "nanoMuse used Mail"
         else -> "nanoMuse used ${toolDisplayName(toolName)}"
     }
     ToolBlockStatus.FAILED -> "${toolDisplayName(toolName).replaceFirstChar { it.uppercase() }} failed"

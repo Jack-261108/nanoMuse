@@ -359,7 +359,9 @@ object HubActions {
         val seen = HashSet<String>()
         scope.launch {
             RiskGate.pending.collect { req ->
-                if (req != null && req.sessionId == sessionId && seen.add(req.id)) {
+                // The keyboard consent waits without a timeout and stays on this phone; the hub's
+                // approval event carries a 3-minute timeout that would not be true here.
+                if (req != null && req.kind != GuardKind.IME && req.sessionId == sessionId && seen.add(req.id)) {
                     relayed[req.id] = call.from.optString("id")
                     emit(
                         JSONObject().put("stage", "approval").put("approval_id", req.id).put("preview", req.preview)

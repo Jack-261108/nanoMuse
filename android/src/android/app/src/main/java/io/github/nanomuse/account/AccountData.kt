@@ -212,6 +212,7 @@ object AccountData {
                 repo.dao.deleteMessages(id)
                 repo.dao.deleteSession(id)
                 io.github.nanomuse.guard.Grants.clearSession(id)
+                io.github.nanomuse.email.EmailStore.clearSession(ctx, id)
                 File(ctx.filesDir, "minis-sessions/$id").deleteRecursively()
             }.onFailure { AppLogger.warning(TAG, "chat $id not removed: ${it.message}") }
         }

@@ -3,6 +3,7 @@ package io.github.nanomuse.hands
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import com.openminis.app.logging.AppLogger
@@ -46,6 +47,15 @@ object AdbKeyboardHelper {
      */
     var sleepRunner: (Long) -> Unit = { ms ->
         Thread.sleep(ms)
+    }
+
+    /**
+     * Whether a background virtual display can hold its own input focus. From Android 14 the
+     * display is created with FLAG_OWN_FOCUS, which is what lets the keyboard bind to it.
+     * A function so unit tests, which run without a real SDK level, can choose the answer.
+     */
+    var virtualScreenImeSupported: () -> Boolean = {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
     }
 
     /**
@@ -114,9 +124,10 @@ object AdbKeyboardHelper {
 
     /**
      * Types text using the Open-AutoGLM ADBKeyBoard broadcast protocol.
-     * Always restores the original IME in a finally block.
+     * Always restores the original IME in a finally block. [settleMs] is the wait for the IME
+     * to bind after the switch; a background display needs longer than the main screen.
      */
-    fun typeText(text: String, clearBefore: Boolean = true): Boolean {
+    fun typeText(text: String, clearBefore: Boolean = true, settleMs: Long = 60L): Boolean {
         if (!isPrivilegedReady()) return false
 
         // 1. Detect current IME
@@ -137,7 +148,7 @@ object AdbKeyboardHelper {
                     AppLogger.warning(TAG, "ime set $ADB_KEYBOARD_IME failed: ${setRes.combined}")
                     return false
                 }
-                sleepRunner(60L)
+                sleepRunner(settleMs)
             } else {
                 switched = true
             }

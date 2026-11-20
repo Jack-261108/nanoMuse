@@ -132,6 +132,13 @@ android {
         }
     }
 
+    packaging {
+        resources {
+            // nanoMuse: apache-mime4j-core and apache-mime4j-dom both ship META-INF/DEPENDENCIES.
+            excludes += "META-INF/DEPENDENCIES"
+        }
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -293,6 +300,10 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-sse:4.12.0")
+
+    // nanoMuse: MIME parsing for the native email connector (Apache-2.0).
+    implementation("org.apache.james:apache-mime4j-core:0.8.11")
+    implementation("org.apache.james:apache-mime4j-dom:0.8.11")
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")

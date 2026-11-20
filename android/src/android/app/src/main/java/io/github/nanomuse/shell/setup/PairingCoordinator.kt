@@ -6,7 +6,6 @@ import android.os.Looper
 import android.os.SystemClock
 import android.widget.Toast
 import com.openminis.app.R
-import com.openminis.app.accessibility.MinisAccessibilityService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +45,7 @@ internal class SlidingDeadline(private val lengthMs: Long, private val now: () -
 
 /**
  * 配对流程总协调器:
- * 调度 mDNS 配对端口探测、无障碍自动读码 (PairingCodeReader) 与前台 RemoteInput 通知栏输入。
+ * 调度 mDNS 配对端口探测与前台 RemoteInput 通知栏输入。
  */
 class PairingCoordinator(context: Context, private val control: BuiltinShellControl) {
     private val app = context.applicationContext
@@ -89,7 +88,6 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
         if (watch?.isActive == true) return
         val token = session.begin()
         watch = scope.launch {
-            val reader = launch { PairingCodeReader.run(app, control, this@PairingCoordinator, token) }
             val notices = launch {
                 combine(control.status, control.pairingDiscovery, _repairing) { _, _, _ ->
                     val d = control.pairingDiscovery.value
@@ -107,7 +105,6 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
                     if (session.accepts(token)) cancelNotice()
                 }
             }
-            reader.cancel()
             synchronized(this@PairingCoordinator) {
                 if (session.accepts(token)) {
                     session.end()
@@ -118,7 +115,6 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
     }
 
     private suspend fun post(notice: PairingNotice, token: Long) {
-        delay(PairingNotice.delayBefore(notice, autoRead = MinisAccessibilityService.getInstance() != null))
         show(notice, token)
         var sent = 0
         while (true) {
@@ -166,7 +162,7 @@ class PairingCoordinator(context: Context, private val control: BuiltinShellCont
         if (!session.accepts(token)) return false
         val code = PairingCode.normalize(raw)
         if (code == null) {
-            show(PairingNotice.EnterCode(port, "Please enter a valid 6-digit number."), token)
+            show(PairingNotice.EnterCode(port, R.string.nm_pair_notice_invalid_code), token)
             return false
         }
         submitted = true

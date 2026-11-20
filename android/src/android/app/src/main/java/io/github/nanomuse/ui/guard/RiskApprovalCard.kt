@@ -302,6 +302,8 @@ private fun Preview(request: RiskRequest, expanded: Boolean, onToggle: () -> Uni
                     GuardKind.COMPUTER -> R.string.nm_risk_preview_computer
                     GuardKind.DEVICE -> R.string.nm_risk_preview_device
                     GuardKind.SCHEDULED -> R.string.nm_risk_preview_scheduled
+                    GuardKind.IME -> R.string.nm_risk_preview_ime
+                    GuardKind.EMAIL -> R.string.nm_risk_preview_email
                 },
             ),
             fontSize = 11.sp,
@@ -309,11 +311,12 @@ private fun Preview(request: RiskRequest, expanded: Boolean, onToggle: () -> Uni
             color = ChatColors.secondaryText,
         )
         Spacer(Modifier.height(4.dp))
-        if (request.kind == GuardKind.SHELL) {
+        // nanoMuse: mail is read before it is approved, like a command; both fold.
+        if (request.kind == GuardKind.SHELL || request.kind == GuardKind.EMAIL) {
             val folded = PreviewLines.hasMore(request.preview)
             Text(
                 if (expanded || !folded) request.preview else PreviewLines.collapsed(request.preview),
-                fontFamily = FontFamily.Monospace,
+                fontFamily = if (request.kind == GuardKind.SHELL) FontFamily.Monospace else FontFamily.Default,
                 fontSize = 12.5.sp,
                 lineHeight = 17.sp,
                 color = MaterialTheme.colorScheme.onSurface,

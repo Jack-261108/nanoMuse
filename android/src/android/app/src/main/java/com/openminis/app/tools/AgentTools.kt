@@ -27,6 +27,8 @@ object AgentTools {
         // attempt those calls. Mirrors the iOS gate at
         // AIChatViewModel.makeAgentTools(memoryEnabled:).
         memoryEnabled: Boolean = true,
+        // nanoMuse: read_emails / send_email exist only while a verified mailbox is set up.
+        emailEnabled: Boolean = false,
     ): List<AgentToolDefinition> = buildList {
         add(shellExecuteDefinition())
         add(FileReadTool.definition())
@@ -39,6 +41,9 @@ object AgentTools {
         if (memoryEnabled) {
             add(memoryWriteDefinition())
             add(memoryGetDefinition())
+        }
+        if (emailEnabled) {
+            addAll(io.github.nanomuse.email.EmailTools.definitions())
         }
     }
 

@@ -59,6 +59,13 @@ enum class GuardKind {
      * computer's name, [RiskRequest.elementText] the task's title, [RiskRequest.app] the app.
      */
     SCHEDULED,
+    /**
+     * Temporarily switching the phone's keyboard to ADB Keyboard so the hands can type on the
+     * background screen. Answered on this phone only; no standing grant is offered.
+     */
+    IME,
+    /** Sending mail from the phone's own mailbox over SMTP. */
+    EMAIL,
 }
 
 /**

@@ -8,14 +8,15 @@ import android.app.RemoteInput
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.annotation.StringRes
 import com.openminis.app.R
 
 /** 配对通知此刻该显示什么。 */
 sealed interface PairingNotice {
-    data class EnterCode(val port: Int?, val error: String? = null) : PairingNotice
+    data class EnterCode(val port: Int?, @StringRes val error: Int? = null) : PairingNotice
     data object Working : PairingNotice
     data object Done : PairingNotice
-    data class Problem(val title: String) : PairingNotice
+    data class Problem(@StringRes val title: Int) : PairingNotice
 
     companion object {
         fun of(status: BuiltinShellStatus, discovery: PairingDiscovery): PairingNotice? {
@@ -24,26 +25,22 @@ sealed interface PairingNotice {
                 BuiltinShellStatus.Running -> Done
                 BuiltinShellStatus.Connecting -> Working
                 is BuiltinShellStatus.Failed -> when {
-                    status.reason.duringPairing -> EnterCode(port, "Pairing failed. Please enter the 6-digit code again.")
+                    status.reason.duringPairing -> EnterCode(port, R.string.nm_pair_notice_enter_code_again)
                     status.fix == BuiltinShellFix.RePair && port != null -> EnterCode(port)
-                    else -> Problem("Wireless Debugging Disconnected")
+                    else -> Problem(R.string.nm_pair_notice_problem_title)
                 }
                 BuiltinShellStatus.NotPaired, BuiltinShellStatus.WirelessDebuggingOff -> port?.let { EnterCode(it) }
             }
         }
 
-        const val AUTO_READ_GRACE_MS = 5_000L
         val REALERT_MS = listOf(8_000L, 20_000L, 40_000L)
-
-        fun delayBefore(notice: PairingNotice, autoRead: Boolean): Long =
-            if (notice is EnterCode && autoRead) AUTO_READ_GRACE_MS else 0L
 
         fun realertAfter(notice: PairingNotice, sent: Int): Long? =
             if (notice is EnterCode) REALERT_MS.getOrNull(sent) else null
 
         fun follow(status: BuiltinShellStatus, discovery: PairingDiscovery, repairing: Boolean, submitted: Boolean): Pair<PairingNotice?, Boolean> =
             if (submitted) Working to false
-            else of(PairingScreen.effectiveStatus(status, repairing), discovery) to (status == BuiltinShellStatus.Running && !repairing)
+            else of(PairingStatus.effective(status, repairing), discovery) to (status == BuiltinShellStatus.Running && !repairing)
     }
 }
 
@@ -53,16 +50,16 @@ object PairingNotifier {
     const val EXTRA_SESSION = "pairing_session"
     private const val ID = 4402
     private const val CHANNEL_ID = "nanomuse_adb_pairing"
-    private const val CHANNEL_NAME = "Wireless Debugging Pairing"
     private const val DONE_TIMEOUT_MS = 8_000L
     private const val INPUT_TIMEOUT_MS = 10 * 60_000L
 
     fun ensureChannel(context: Context): String {
         val nm = context.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+        val name = context.getString(R.string.nm_pair_notice_channel_name)
+        val channel = NotificationChannel(CHANNEL_ID, name, NotificationManager.IMPORTANCE_HIGH).apply {
             enableVibration(true)
             setShowBadge(false)
-            description = "Pairing code input for wireless debugging"
+            description = context.getString(R.string.nm_pair_notice_channel_desc)
         }
         nm.createNotificationChannel(channel)
         return CHANNEL_ID
@@ -87,7 +84,7 @@ object PairingNotifier {
         when (notice) {
             is PairingNotice.EnterCode -> {
                 val input = RemoteInput.Builder(KEY_CODE)
-                    .setLabel("6-digit pairing code")
+                    .setLabel(context.getString(R.string.nm_pair_notice_input_label))
                     .setAllowFreeFormInput(true)
                     .build()
                 val reply = PendingIntent.getBroadcast(
@@ -99,32 +96,35 @@ object PairingNotifier {
                     },
                     PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                 )
-                val action = Notification.Action.Builder(null, "Pair", reply)
+                val action = Notification.Action.Builder(null, context.getString(R.string.nm_pair_notice_pair_action), reply)
                     .addRemoteInput(input)
                     .setAllowGeneratedReplies(false)
                     .setSemanticAction(Notification.Action.SEMANTIC_ACTION_REPLY)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) action.setAuthenticationRequired(false)
-                val text = notice.error ?: "Enter the 6-digit wireless pairing code shown on screen."
-                b.setContentTitle("Pair Wireless Debugging")
+                val text = notice.error?.let { context.getString(it) }
+                    ?: context.getString(R.string.nm_pair_notice_enter_code)
+                b.setContentTitle(context.getString(R.string.nm_pair_notice_title))
                     .setContentText(text)
                     .setStyle(Notification.BigTextStyle().bigText(text))
                     .setOngoing(true)
                     .setOnlyAlertOnce(false)
                     .setTimeoutAfter(INPUT_TIMEOUT_MS)
                     .addAction(action.build())
-                if (notice.port != null) b.setSubText("Pairing port: ${notice.port}")
+                if (notice.port != null) {
+                    b.setSubText(context.getString(R.string.nm_pair_notice_port, notice.port))
+                }
             }
-            PairingNotice.Working -> b.setContentTitle("Pairing Wireless Debugging...")
+            PairingNotice.Working -> b.setContentTitle(context.getString(R.string.nm_pair_notice_working))
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setProgress(0, 0, true)
-            PairingNotice.Done -> b.setContentTitle("Paired Successfully")
-                .setContentText("Privileged helper is now running in background.")
+            PairingNotice.Done -> b.setContentTitle(context.getString(R.string.nm_pair_notice_done_title))
+                .setContentText(context.getString(R.string.nm_pair_notice_done_text))
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
                 .setTimeoutAfter(DONE_TIMEOUT_MS)
-            is PairingNotice.Problem -> b.setContentTitle(notice.title)
-                .setContentText("Please reopen nanoMuse to repair wireless connection.")
+            is PairingNotice.Problem -> b.setContentTitle(context.getString(notice.title))
+                .setContentText(context.getString(R.string.nm_pair_notice_problem_text))
                 .setAutoCancel(true)
         }
         runCatching { nm.notify(ID, b.build()) }

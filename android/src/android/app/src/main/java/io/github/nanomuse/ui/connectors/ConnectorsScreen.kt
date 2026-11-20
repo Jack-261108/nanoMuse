@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -78,6 +79,7 @@ import io.github.nanomuse.ui.muse.MuseCard
 import io.github.nanomuse.ui.muse.MuseGap
 import io.github.nanomuse.ui.muse.SecretEye
 import io.github.nanomuse.ui.muse.secretTransformation
+import io.github.nanomuse.ui.muse.MuseRow
 import io.github.nanomuse.ui.muse.MuseRowDivider
 import io.github.nanomuse.ui.muse.MuseSectionLabel
 import io.github.nanomuse.ui.muse.MuseTopAppBar
@@ -93,7 +95,7 @@ const val ROUTE_CONNECTORS = "nanomuse/connectors"
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConnectorsScreen(onBack: () -> Unit, onOpenMcp: () -> Unit) {
+fun ConnectorsScreen(onBack: () -> Unit, onOpenMcp: () -> Unit, onOpenEmail: () -> Unit = {}) {
     val context = LocalContext.current
     val (categories, connectors) = remember { ConnectorsCatalogue.load(context) }
     val repo = remember { Connectors.repo(context) }
@@ -101,6 +103,8 @@ fun ConnectorsScreen(onBack: () -> Unit, onOpenMcp: () -> Unit) {
     val servers by serversFlow.collectAsState()
     // what the account's other devices connected (contract C3): names and kinds, no credentials
     val others by SharedConnectors.others(context).collectAsState()
+    val emailVersion by io.github.nanomuse.email.EmailStore.version.collectAsState()
+    val emailConfigured = remember(emailVersion) { io.github.nanomuse.email.EmailStore.configured(context) }
     var open by remember { mutableStateOf<Connector?>(null) }
 
     // tokens near their end get refreshed on the way in; the entries written by the agent show too
@@ -146,6 +150,21 @@ fun ConnectorsScreen(onBack: () -> Unit, onOpenMcp: () -> Unit) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f), modifier = Modifier.size(20.dp))
                     }
                 }
+            }
+            // nanoMuse: built-in abilities that are not remote MCP servers.
+            MuseSectionLabel(stringResource(R.string.nm_connectors_email_builtin))
+            MuseCard {
+                MuseRow(
+                    title = stringResource(R.string.nm_connectors_email_title),
+                    icon = Icons.Outlined.Email,
+                    value = if (emailConfigured) {
+                        stringResource(R.string.nm_connectors_connected)
+                    } else {
+                        stringResource(R.string.nm_connectors_email_off)
+                    },
+                    chevron = true,
+                    onClick = onOpenEmail,
+                )
             }
             val order = (categories + connectors.map { it.category }).distinct()
             for (category in order) {

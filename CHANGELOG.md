@@ -11,6 +11,9 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Kept the person's request in view during long turns with the default settings, so a task with many tool calls no longer forgets what it was asked, and the wrap-up at the step limit sees the turn's work.
 
 - Kept the previous request and the newest work in view in the turn after a long one, so "carry on" or "send that report" no longer arrives with no context.
+- Added built-in mailboxes to the Android app: Settings → Connectors → Email connects one or more IMAP/SMTP accounts with per-mailbox switches, presets and address auto-fill (QQ, QQ Exmail, 163, 126, Aliyun, Feishu, Sina, Gmail, Outlook, iCloud, Yahoo, Fastmail), encrypted authorization codes, and Microsoft OAuth2 sign-in with loopback callback error and proxy-paste handling; the phone's agent reads and sends mail with `read_emails` (folder listing and alias matching, UTF-8 search fallback, attachment summaries, full-message `uid` reads) and `send_email` (`cc`, `bcc`, `reply_to_uid` threading, `Message-ID`, recipient-bound approval cards), and a chat's MCP sheet can switch the mailboxes off for that conversation.
+
+- Removed automatic pairing-code reading on Android; the 6-digit code is entered from the nanoMuse notification during wireless debugging pairing, and the notification now follows the app language.
 
 - Prevented failed coding runs from retrying in a new conversation after a tool had already started or returned a result.
 
@@ -21,6 +24,7 @@ All notable changes to nanoMuse. The format follows [Keep a Changelog](https://k
 - Added a local prototype for independent Android and desktop device conversations with saved context and result recovery after reconnecting. For #815.
 - Preserved cancelled remote turns as cancelled, and let a first device conversation start after correcting a refusal that happened before acceptance.
 - Matched Android persistent task replies and stop requests to their original turn, and rejected blocked, empty or errored runs instead of returning an older answer or stopping later work.
+- Asked once per background task before temporarily switching the phone's keyboard to ADB Keyboard for virtual-screen text on Android 14 and later; the original input method is restored after typing, and a refusal or failed switch keeps the existing accessibility and clipboard input.
 
 ### Documentation
 

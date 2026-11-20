@@ -33,6 +33,7 @@ Transitive packages (pinned in `Package.resolved`), all **Apache-2.0**, maintain
 |---|---|---|
 | AndroidX / Jetpack (Compose BOM 2025.09.00, core-ktx, lifecycle, activity, navigation, Room, DataStore, security-crypto, browser, webkit, exifinterface) | see `app/build.gradle.kts` | **Apache-2.0** (Google / AOSP) |
 | OkHttp + okhttp-sse | 4.12.0 | **Apache-2.0** |
+| Apache MIME4J (apache-mime4j-core, apache-mime4j-dom) | 0.8.11 | **Apache-2.0** |
 | kotlinx-serialization-json | 1.7.3 | **Apache-2.0** |
 | kotlinx-coroutines-android | 1.9.0 | **Apache-2.0** |
 | Coil (coil-compose) | 2.7.0 | **Apache-2.0** |

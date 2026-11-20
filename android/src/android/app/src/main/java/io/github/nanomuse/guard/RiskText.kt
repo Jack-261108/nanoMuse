@@ -35,6 +35,7 @@ object RiskText {
         if (request.kind == GuardKind.DEVICE) return context.getString(R.string.nm_risk_title_device, request.pageUrl ?: target ?: "")
         if (request.kind == GuardKind.SCHEDULED) return context.getString(R.string.nm_risk_title_scheduled, agentName, request.pageUrl ?: "")
         if (a.warnings.isNotEmpty()) return context.getString(R.string.nm_risk_title_warning, agentName)
+        if (request.kind == GuardKind.IME) return context.getString(R.string.nm_risk_title_ime, agentName)
         return when (a.riskClass) {
             RiskClass.DESTRUCTIVE -> if (target != null) context.getString(R.string.nm_risk_title_destructive, agentName, target)
             else context.getString(R.string.nm_risk_title_destructive_generic, agentName)
@@ -49,6 +50,9 @@ object RiskText {
         val a = request.assessment
         if (a.warnings.isNotEmpty()) {
             return context.getString(R.string.nm_risk_desc_warning, a.warnings.joinToString(", ") { warningLabel(context, it) })
+        }
+        if (request.kind == GuardKind.IME) {
+            return context.getString(R.string.nm_risk_desc_ime, agentName)
         }
         if (request.kind == GuardKind.BROWSER) {
             val host = a.target ?: request.pageUrl ?: ""
@@ -66,6 +70,14 @@ object RiskText {
             val computer = request.pageUrl.orEmpty()
             return if (request.app.isNullOrBlank()) context.getString(R.string.nm_risk_desc_scheduled, task, computer)
             else context.getString(R.string.nm_risk_desc_scheduled_app, task, computer, request.app)
+        }
+        if (request.kind == GuardKind.EMAIL) {
+            val recipients = targetLabel(context, a.target)
+            return if (recipients != null) {
+                context.getString(R.string.nm_risk_desc_email, agentName, recipients)
+            } else {
+                context.getString(R.string.nm_risk_desc_email_generic, agentName)
+            }
         }
         val target = targetLabel(context, a.target)
         val shell = when (a.riskClass) {
