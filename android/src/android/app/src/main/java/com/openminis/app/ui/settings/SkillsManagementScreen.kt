@@ -90,6 +90,8 @@ import androidx.compose.ui.res.stringResource
 import com.openminis.app.data.repository.SkillRepository
 import com.openminis.app.ui.markdown.MarkdownText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -124,6 +126,9 @@ fun SkillsManagementScreen(
     var showAddMenu by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
+    val scope = rememberCoroutineScope() // nanoMuse: offload repository mutations from main thread.
+    // nanoMuse: optimistic toggle state per skill so rapid taps keep the latest direction without flicker.
+    val pendingToggles = remember { androidx.compose.runtime.mutableStateMapOf<String, io.github.nanomuse.skills.PendingSkillToggle>() }
 
     // Sort preference — persisted like the file browser's (SharedPreferences,
     // default name ascending). Mirrors iOS skillsList.sortKey/sortAscending.
@@ -151,7 +156,9 @@ fun SkillsManagementScreen(
     // bypasses the SKILL.md file_write hook) is picked up the moment the
     // user opens this list, instead of requiring a process restart.
     LaunchedEffect(Unit) {
-        skillRepository.reloadFromDisk()
+        withContext(Dispatchers.IO) { // nanoMuse: keep disk/SQLite rescan off the main thread.
+            skillRepository.reloadFromDisk()
+        }
     }
 
     SettingsScaffold(
@@ -300,9 +307,39 @@ fun SkillsManagementScreen(
                                     modifier = Modifier.size(14.dp),
                                 )
                                 Spacer(Modifier.width(8.dp))
+                                val displayChecked = io.github.nanomuse.skills.PendingSkillToggles.displayEnabled(
+                                    pendingToggles,
+                                    skill.id,
+                                    skill.isEnabled,
+                                )
                                 SettingsSwitch(
-                                    checked = skill.isEnabled,
-                                    onCheckedChange = { skillRepository.setEnabled(skill.id, it) },
+                                    checked = displayChecked,
+                                    onCheckedChange = { enabled ->
+                                        // nanoMuse: apply optimistic switch state immediately and serialize writes on repo scope.
+                                        val nextSeq = io.github.nanomuse.skills.PendingSkillToggles.beginToggle(
+                                            pendingToggles,
+                                            skill.id,
+                                            enabled,
+                                        )
+                                        val pending = skillRepository.setEnabledAsync(skill.id, enabled)
+                                        scope.launch {
+                                            val outcome = io.github.nanomuse.skills.PendingSkillToggles.awaitToggleOutcome(
+                                                pendingToggles,
+                                                skill.id,
+                                                nextSeq,
+                                            ) { pending.await() }
+                                            if (io.github.nanomuse.skills.PendingSkillToggles.shouldNotifyToggleFailure(outcome, isActive)) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(
+                                                        R.string.nm_coding_failed,
+                                                        outcome.error?.message ?: context.getString(R.string.skill_detail_error_update_failed),
+                                                    ),
+                                                    Toast.LENGTH_LONG,
+                                                ).show()
+                                            }
+                                        }
+                                    },
                                 )
                             }
                         },
@@ -367,7 +404,29 @@ fun SkillsManagementScreen(
             text = { Text(stringResource(R.string.skill_delete_confirm_text)) },
             confirmButton = {
                 MinisTextButton(onClick = {
-                    deleteSkillId?.let { skillRepository.delete(it) }
+                    // nanoMuse: enqueue delete on repository scope before clearing dialog so leaving screen cannot cancel it.
+                    deleteSkillId?.let { id ->
+                        val pending = skillRepository.deleteAsync(id)
+                        scope.launch {
+                            val err = io.github.nanomuse.skills.PendingSkillToggles.awaitDeleteError {
+                                pending.await()
+                            }
+                            val ui = io.github.nanomuse.skills.PendingSkillToggles.resolveDeleteUiOutcome(
+                                error = err,
+                                isScopeActive = isActive,
+                            )
+                            if (ui.shouldNotifyFailure) {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        R.string.nm_coding_failed,
+                                        ui.error?.message ?: context.getString(R.string.skill_detail_error_update_failed),
+                                    ),
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            }
+                        }
+                    }
                     deleteSkillId = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
@@ -400,43 +459,54 @@ private fun SkillImportSheet(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        try {
-            // [T-android-skill-import-zip] Read raw bytes so we can branch on
-            // file magic. The previous code piped the InputStream straight
-            // through `bufferedReader().readText()`, which corrupted any
-            // .zip / .skill bundle into garbage UTF-8 and surfaced as
-            // "Invalid SKILL.md content". Skills shared as bundles
-            // (scripts/, references/, assets/) are the common case on iOS;
-            // matching here aligns Android with iOS
-            // `SkillsManagementView.documentPicker` + `SkillStore.importFromArchive`.
-            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            if (bytes == null) {
-                errorText = "Failed to read file"
-                return@rememberLauncherForActivityResult
+        isLoading = true
+        scope.launch { // nanoMuse: run file read and skill import off the main thread.
+            try {
+                // [T-android-skill-import-zip] Read raw bytes so we can branch on
+                // file magic. The previous code piped the InputStream straight
+                // through `bufferedReader().readText()`, which corrupted any
+                // .zip / .skill bundle into garbage UTF-8 and surfaced as
+                // "Invalid SKILL.md content". Skills shared as bundles
+                // (scripts/, references/, assets/) are the common case on iOS;
+                // matching here aligns Android with iOS
+                // `SkillsManagementView.documentPicker` + `SkillStore.importFromArchive`.
+                val bytes = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                }
+                if (bytes == null) {
+                    errorText = "Failed to read file"
+                    return@launch
+                }
+                // PK\x03\x04 = standard ZIP local file header; PK\x05\x06 is the
+                // empty-archive EOCD; PK\x07\x08 is a spanned/split archive. Accept
+                // all three so split exports from less-common zip tools don't fall
+                // into the text path. URI may not preserve the filename extension
+                // (some DocumentsProviders / share targets strip it), so magic-byte
+                // sniffing is more reliable than `.zip` / `.skill` checks.
+                val isZip = bytes.size >= 4 &&
+                    bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
+                    (bytes[2] == 0x03.toByte() || bytes[2] == 0x05.toByte() || bytes[2] == 0x07.toByte())
+                if (isZip) {
+                    val result = withContext(Dispatchers.IO) {
+                        skillRepository.importFromArchive(java.io.ByteArrayInputStream(bytes))
+                    }
+                    if (result != null) onDismiss()
+                    else errorText = "Invalid skill archive — no SKILL.md found at the root or one directory deep"
+                } else {
+                    val content = String(bytes, Charsets.UTF_8)
+                    val result = withContext(Dispatchers.IO) {
+                        skillRepository.importFromContent(content, SkillRepository.ImportSource.FILE)
+                    }
+                    if (result != null) onDismiss()
+                    else errorText = "Invalid SKILL.md content"
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                errorText = "Failed to read file: ${e.message}"
+            } finally {
+                isLoading = false
             }
-            // PK\x03\x04 = standard ZIP local file header; PK\x05\x06 is the
-            // empty-archive EOCD; PK\x07\x08 is a spanned/split archive. Accept
-            // all three so split exports from less-common zip tools don't fall
-            // into the text path. URI may not preserve the filename extension
-            // (some DocumentsProviders / share targets strip it), so magic-byte
-            // sniffing is more reliable than `.zip` / `.skill` checks.
-            val isZip = bytes.size >= 4 &&
-                bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() &&
-                (bytes[2] == 0x03.toByte() || bytes[2] == 0x05.toByte() || bytes[2] == 0x07.toByte())
-            if (isZip) {
-                val result = skillRepository.importFromArchive(
-                    java.io.ByteArrayInputStream(bytes),
-                )
-                if (result != null) onDismiss()
-                else errorText = "Invalid skill archive — no SKILL.md found at the root or one directory deep"
-            } else {
-                val content = String(bytes, Charsets.UTF_8)
-                val result = skillRepository.importFromContent(content, SkillRepository.ImportSource.FILE)
-                if (result != null) onDismiss()
-                else errorText = "Invalid SKILL.md content"
-            }
-        } catch (e: Exception) {
-            errorText = "Failed to read file: ${e.message}"
         }
     }
 
@@ -488,6 +558,7 @@ private fun SkillImportSheet(
                     DialogTextField(
                         value = pasteContent,
                         onValueChange = { pasteContent = it; errorText = null },
+                        enabled = !isLoading, // nanoMuse: lock input while import is in flight.
                         modifier = Modifier.height(200.dp),
                         singleLine = false,
                         textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -502,6 +573,7 @@ private fun SkillImportSheet(
                     )
                     MinisTextButton(
                         onClick = { fileLauncher.launch("*/*") },
+                        enabled = !isLoading, // nanoMuse: prevent overlapping file-import launches while loading.
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text(stringResource(R.string.skill_import_file_button)) }
                 }
@@ -530,18 +602,34 @@ private fun SkillImportSheet(
                                             // sibling python scripts never made it to local storage.
                                             val result = skillRepository.importFromGitHub(urlText.trim())
                                             if (result != null) onDismiss() else errorText = context.getString(R.string.skill_import_error_invalid)
+                                        } catch (c: kotlinx.coroutines.CancellationException) {
+                                            throw c
                                         } catch (e: Exception) { errorText = "Error: ${e.message}" }
                                         finally { isLoading = false }
                                     }
                                 }
                                 1 -> {
-                                    val result = skillRepository.importFromContent(pasteContent)
-                                    if (result != null) onDismiss()
-                                    else errorText = context.getString(R.string.skill_import_error_format)
+                                    isLoading = true
+                                    val contentSnapshot = pasteContent // nanoMuse: snapshot Compose state on main thread before IO.
+                                    scope.launch { // nanoMuse: run paste import off the main thread.
+                                        try {
+                                            val result = withContext(Dispatchers.IO) {
+                                                skillRepository.importFromContent(contentSnapshot)
+                                            }
+                                            if (result != null) onDismiss()
+                                            else errorText = context.getString(R.string.skill_import_error_format)
+                                        } catch (c: kotlinx.coroutines.CancellationException) {
+                                            throw c
+                                        } catch (e: Exception) {
+                                            errorText = "Error: ${e.message ?: "unknown"}"
+                                        } finally {
+                                            isLoading = false
+                                        }
+                                    }
                                 }
                             }
                         },
-                        enabled = when (selectedTab) { 0 -> urlText.isNotBlank() && !isLoading; 1 -> pasteContent.isNotBlank(); else -> false },
+                        enabled = when (selectedTab) { 0 -> urlText.isNotBlank() && !isLoading; 1 -> pasteContent.isNotBlank() && !isLoading; else -> false },
                     ) { Text(if (isLoading) stringResource(R.string.skill_import_in_progress) else stringResource(R.string.skill_import_submit)) }
                 }
             }
@@ -573,15 +661,46 @@ private fun downloadSkillFromUrl(url: String): String? {
 fun SkillDetailScreen(
     skillId: String,
     skillRepository: SkillRepository,
-    onBack: () -> Unit,
+    onBack: () -> Boolean,
     onFileClick: (String, String) -> Unit = { _, _ -> },
 ) {
+    // nanoMuse: keep scope/context above early returns so deleting the skill never cancels its own pop coroutine.
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val skills by skillRepository.skills.collectAsState()
     val skill = skills.find { it.id == skillId }
     var deleted by remember { mutableStateOf(false) }
+    // nanoMuse: guard against duplicate onBack() pops across manual/system back and async delete completion.
+    var navigatedBack by remember { mutableStateOf(false) }
+    val navigateBackOnce: () -> Unit = {
+        if (!navigatedBack && onBack()) {
+            navigatedBack = true
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = !navigatedBack) { // nanoMuse: mark system back synchronously before 200ms popExitTransition.
+        navigateBackOnce()
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { navigatedBack = true }
+    }
+    // nanoMuse: defer missing-skill pop out of composition and wait until lifecycle is STARTED so safePopBackStack succeeds.
+    LaunchedEffect(skill == null, deleted, lifecycleOwner) {
+        if (skill == null && !deleted) {
+            lifecycleOwner.lifecycle.currentStateFlow.first {
+                it.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            }
+            navigateBackOnce()
+        }
+    }
 
-    if (skill == null && !deleted) { onBack(); return }
-    if (skill == null) return // Already deleted, just stop rendering
+    if (skill == null) {
+        // nanoMuse: avoid a blank frame between repository deletion and pop completion.
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     // T155: name editing now happens in a modal dialog instead of an inline
@@ -590,6 +709,7 @@ fun SkillDetailScreen(
     // caused on a row that's otherwise quiet.
     var showEditNameDialog by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf(skill.name) }
+    var isRenaming by remember { mutableStateOf(false) }
 
     // T154: replace stub state. Each update action drives `updateStatus` which
     // surfaces inline feedback ("Updating…" / stringResource(R.string.skill_detail_updated) / "Failed: …") next to
@@ -599,8 +719,6 @@ fun SkillDetailScreen(
     // [T-android-skill-export] Guards the share button while the zip is being
     // built off the main thread, so a double-tap can't spawn two exports.
     var isExporting by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     LaunchedEffect(updateStatus) {
         if (updateStatus is UpdateStatus.Done || updateStatus is UpdateStatus.Failed) {
             kotlinx.coroutines.delay(3000)
@@ -612,26 +730,34 @@ fun SkillDetailScreen(
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_reading))
-        try {
-            val content = context.contentResolver.openInputStream(uri)
-                ?.bufferedReader()?.use { it.readText() }
-            if (content.isNullOrBlank()) {
-                updateStatus = UpdateStatus.Failed(context.getString(R.string.skill_detail_error_empty))
-            } else {
-                // Re-parse the supplied SKILL.md so we can push name +
-                // description + body into the existing skill record without
-                // creating a new entry.
-                val parsed = skillRepository.parseSkillMdPublic(content)
-                if (parsed == null) {
-                    updateStatus = UpdateStatus.Failed(context.getString(R.string.skill_detail_error_invalid))
-                } else {
-                    // nanoMuse: retain full source and keep the existing skill's stable ID.
-                    val ok = skillRepository.updateFromContent(skill.id, content)
-                    updateStatus = if (ok) UpdateStatus.Done else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_update_failed))
+        scope.launch { // nanoMuse: read file and update skill off the main thread.
+            updateStatus = try {
+                val content = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)
+                        ?.bufferedReader()?.use { it.readText() }
                 }
+                if (content.isNullOrBlank()) {
+                    UpdateStatus.Failed(context.getString(R.string.skill_detail_error_empty))
+                } else {
+                    // Re-parse the supplied SKILL.md so we can push name +
+                    // description + body into the existing skill record without
+                    // creating a new entry.
+                    val parsed = skillRepository.parseSkillMdPublic(content)
+                    if (parsed == null) {
+                        UpdateStatus.Failed(context.getString(R.string.skill_detail_error_invalid))
+                    } else {
+                        // nanoMuse: retain full source and keep the existing skill's stable ID.
+                        val ok = withContext(Dispatchers.IO) {
+                            skillRepository.updateFromContent(skill.id, content)
+                        }
+                        if (ok) UpdateStatus.Done else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_update_failed))
+                    }
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                UpdateStatus.Failed("Failed to read file: ${e.message ?: "unknown"}")
             }
-        } catch (e: Exception) {
-            updateStatus = UpdateStatus.Failed("Failed to read file: ${e.message ?: "unknown"}")
         }
     }
 
@@ -647,7 +773,7 @@ fun SkillDetailScreen(
             io.github.nanomuse.ui.muse.MuseTopAppBar( // nanoMuse: Muse's bar (drop-in for TopAppBar)
                 title = { Text(skill.name) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = navigateBackOnce) { // nanoMuse: mark manual back so pending delete won't double-pop.
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
@@ -783,9 +909,19 @@ fun SkillDetailScreen(
                     DetailRow(clickable = !isBusy, onClick = {
                         if (isBusy) return@DetailRow
                         updateStatus = UpdateStatus.InProgress(context.getString(R.string.skill_detail_status_rescanning))
-                        val refreshed = skillRepository.rescanFromDisk(skill.id)
-                        updateStatus = if (refreshed != null) UpdateStatus.Done
-                            else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_missing))
+                        scope.launch { // nanoMuse: run disk rescan off the main thread with failure handling.
+                            updateStatus = try {
+                                val refreshed = withContext(Dispatchers.IO) {
+                                    skillRepository.rescanFromDisk(skill.id)
+                                }
+                                if (refreshed != null) UpdateStatus.Done
+                                else UpdateStatus.Failed(context.getString(R.string.skill_detail_error_missing))
+                            } catch (c: kotlinx.coroutines.CancellationException) {
+                                throw c
+                            } catch (e: Exception) {
+                                UpdateStatus.Failed(e.message ?: context.getString(R.string.skill_detail_error_update_failed))
+                            }
+                        }
                     }) {
                         SettingsActionIcon(Icons.Default.Refresh, SettingsIconGreen)
                         Spacer(Modifier.width(14.dp))
@@ -900,9 +1036,31 @@ fun SkillDetailScreen(
             confirmButton = {
                 MinisTextButton(onClick = {
                     deleted = true
-                    skillRepository.delete(skill.id)
                     showDeleteDialog = false
-                    onBack()
+                    // nanoMuse: enqueue delete on repository scope, await result for error reporting, then pop.
+                    val pending = skillRepository.deleteAsync(skill.id)
+                    scope.launch {
+                        val err = io.github.nanomuse.skills.PendingSkillToggles.awaitDeleteError {
+                            pending.await()
+                        }
+                        val ui = io.github.nanomuse.skills.PendingSkillToggles.resolveDeleteUiOutcome(
+                            error = err,
+                            isScopeActive = isActive,
+                            alreadyNavigatedBack = navigatedBack,
+                        )
+                        if (ui.restoreDeletedFlag) deleted = false
+                        if (ui.shouldNotifyFailure) {
+                            Toast.makeText(
+                                context,
+                                context.getString(
+                                    R.string.nm_coding_failed,
+                                    ui.error?.message ?: context.getString(R.string.skill_detail_error_update_failed),
+                                ),
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
+                        if (ui.shouldNavigateBack) navigateBackOnce()
+                    }
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
@@ -931,10 +1089,38 @@ fun SkillDetailScreen(
                 val canSave = trimmed.isNotEmpty() && trimmed != skill.name
                 MinisTextButton(
                     onClick = {
-                        if (canSave) skillRepository.update(skill.id, name = trimmed)
-                        showEditNameDialog = false
+                        if (canSave && !isRenaming) {
+                            isRenaming = true
+                            scope.launch { // nanoMuse: run rename DB/file update off the main thread with reentrancy and error handling.
+                                try {
+                                    val ok = withContext(Dispatchers.IO) { skillRepository.update(skill.id, name = trimmed) }
+                                    if (ok) {
+                                        showEditNameDialog = false
+                                    } else if (isActive) {
+                                        Toast.makeText(context, R.string.skill_detail_error_update_failed, Toast.LENGTH_LONG).show()
+                                    }
+                                } catch (c: kotlinx.coroutines.CancellationException) {
+                                    throw c
+                                } catch (e: Exception) {
+                                    if (isActive) {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(
+                                                R.string.nm_coding_failed,
+                                                e.message ?: context.getString(R.string.skill_detail_error_update_failed),
+                                            ),
+                                            Toast.LENGTH_LONG,
+                                        ).show()
+                                    }
+                                } finally {
+                                    isRenaming = false
+                                }
+                            }
+                        } else if (!canSave) {
+                            showEditNameDialog = false
+                        }
                     },
-                    enabled = canSave,
+                    enabled = canSave && !isRenaming,
                 ) { Text(stringResource(R.string.skill_file_save)) }
             },
             dismissButton = {
@@ -1125,48 +1311,114 @@ fun SkillFileViewerScreen(
     skillId: String,
     relativePath: String = "SKILL.md",
     skillRepository: SkillRepository,
-    onBack: () -> Unit,
+    onBack: () -> Boolean,
 ) {
+    val context = LocalContext.current // nanoMuse: report invalid edited skill source.
+    val scope = rememberCoroutineScope() // nanoMuse: run file/DB saves off the main thread.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val skills by skillRepository.skills.collectAsState()
     val skill = skills.find { it.id == skillId }
-    if (skill == null) { onBack(); return }
+    // nanoMuse: guard against duplicate onBack() pops across missing skill, manual back, system back and save completion.
+    var navigatedBack by remember { mutableStateOf(false) }
+    val navigateBackOnce: () -> Unit = {
+        if (!navigatedBack && onBack()) {
+            navigatedBack = true
+        }
+    }
+    androidx.activity.compose.BackHandler(enabled = !navigatedBack) {
+        navigateBackOnce()
+    }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        onDispose { navigatedBack = true }
+    }
+    LaunchedEffect(skill == null, lifecycleOwner) {
+        if (skill == null) {
+            lifecycleOwner.lifecycle.currentStateFlow.first {
+                it.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            }
+            navigateBackOnce()
+        }
+    }
+    if (skill == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
 
-    val context = LocalContext.current // nanoMuse: report invalid edited skill source.
     val isSkillMd = relativePath.equals("SKILL.md", ignoreCase = true)
     val fileName = relativePath.substringAfterLast('/')
 
-    // nanoMuse: show the actual file, including license, tools and nested metadata.
-    val initialContent = remember(skillId, relativePath, skill.updatedAt) {
-        skillRepository.readSkillFile(skillId, relativePath) ?: ""
-    }
+    // nanoMuse: load the actual file off the main thread without overwriting in-progress edits.
+    var initialContent by remember(skillId, relativePath) { mutableStateOf("") }
+    var isLoadingFile by remember(skillId, relativePath) { mutableStateOf(true) }
+    var isEditing by remember(skillId, relativePath) { mutableStateOf(false) }
+    var isSaving by remember { mutableStateOf(false) }
+    var editContent by remember(skillId, relativePath) { mutableStateOf("") }
 
-    var isEditing by remember { mutableStateOf(false) }
-    var editContent by remember(skillId, relativePath) { mutableStateOf(initialContent) }
+    LaunchedEffect(skillId, relativePath, skill.updatedAt) {
+        val loaded = withContext(Dispatchers.IO) {
+            skillRepository.readSkillFile(skillId, relativePath) ?: ""
+        }
+        if (!isEditing && !isSaving) {
+            initialContent = loaded
+        }
+        isLoadingFile = false
+    }
 
     Scaffold(
         topBar = {
             io.github.nanomuse.ui.muse.MuseTopAppBar( // nanoMuse: Muse's bar (drop-in for TopAppBar)
                 title = { Text(fileName) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = navigateBackOnce) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
                     if (isEditing) {
-                        MinisTextButton(onClick = {
-                            // nanoMuse: invalid source keeps the editor open instead of losing the edit.
-                            val saved = if (isSkillMd) {
-                                skillRepository.updateFromContent(skillId, editContent)
-                            } else {
-                                skillRepository.writeSkillFile(skillId, relativePath, editContent)
-                            }
-                            if (saved) {
-                                isEditing = false
-                                onBack()
-                            } else Toast.makeText(context, R.string.skill_detail_error_invalid, Toast.LENGTH_LONG).show()
-                        }) { Text(stringResource(R.string.skill_file_save)) }
-                    } else if (!skill.isReadOnly) { // nanoMuse: bundled source files are read-only.
+                        MinisTextButton(
+                            enabled = !isSaving,
+                            onClick = {
+                                isSaving = true
+                                val contentSnapshot = editContent // nanoMuse: snapshot Compose state on main thread before IO.
+                                scope.launch { // nanoMuse: run skill file/DB save off the main thread.
+                                    try {
+                                        // nanoMuse: invalid source keeps the editor open instead of losing the edit.
+                                        val saved = withContext(Dispatchers.IO) {
+                                            if (isSkillMd) {
+                                                skillRepository.updateFromContent(skillId, contentSnapshot)
+                                            } else {
+                                                skillRepository.writeSkillFile(skillId, relativePath, contentSnapshot)
+                                            }
+                                        }
+                                        if (saved) {
+                                            initialContent = contentSnapshot
+                                            isEditing = false
+                                            if (isActive) navigateBackOnce()
+                                        } else if (isActive) {
+                                            Toast.makeText(context, R.string.skill_detail_error_invalid, Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (c: kotlinx.coroutines.CancellationException) {
+                                        throw c
+                                    } catch (e: Exception) {
+                                        if (isActive) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(
+                                                    R.string.nm_coding_failed,
+                                                    e.message ?: context.getString(R.string.skill_detail_error_update_failed),
+                                                ),
+                                                Toast.LENGTH_LONG,
+                                            ).show()
+                                        }
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                        ) { Text(stringResource(R.string.skill_file_save)) }
+                    } else if (!isLoadingFile && !skill.isReadOnly) { // nanoMuse: bundled source files are read-only; wait for async load before editing.
                         MinisTextButton(onClick = {
                             editContent = initialContent
                             isEditing = true
@@ -1176,10 +1428,20 @@ fun SkillFileViewerScreen(
             )
         },
     ) { padding ->
-        if (isEditing) {
+        if (isLoadingFile) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (isEditing) {
             DialogTextField(
                 value = editContent,
                 onValueChange = { editContent = it },
+                enabled = !isSaving, // nanoMuse: lock input while save is in flight.
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)

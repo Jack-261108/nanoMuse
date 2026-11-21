@@ -5593,13 +5593,6 @@ class ChatViewModel(
             }
         }
 
-        val baseSystemPrompt = buildSystemPrompt()
-        val systemPrompt = if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
-            val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
-            if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
-            else "$prefix\n\n${baseSystemPrompt ?: ""}"
-        } else baseSystemPrompt
-
         // _isStreaming was already set synchronously by the caller.
         val launchedProvider = provider
         streamJob = viewModelScope.launch(Dispatchers.IO) {
@@ -5608,13 +5601,14 @@ class ChatViewModel(
                 SessionConcurrencyManager.acquireSlot(activeSessionId)
                 AppLogger.debug(TAG_STREAM, "$label streamJob slot acquired")
                 SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                val activeFallbackStrategy = run {
-                    val groupId = _selectedGroupId.value
-                    groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                        ?: com.openminis.app.data.model.FallbackStrategy.default
-                }
-                val fallbackProviders = buildFallbackProviders(launchedProvider)
                 try {
+                    val systemPrompt = buildAgentSystemPrompt(launchedProvider) // nanoMuse: keep disk/DB prompt assembly off Dispatchers.Main and inside try/finally so errors release the slot.
+                    val activeFallbackStrategy = run {
+                        val groupId = _selectedGroupId.value
+                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
+                            ?: com.openminis.app.data.model.FallbackStrategy.default
+                    }
+                    val fallbackProviders = buildFallbackProviders(launchedProvider)
                     AppLogger.info(TAG_STREAM, "$label runAgentLoop CALL")
                     runAgentLoop(
                         provider = launchedProvider,
@@ -6999,15 +6993,6 @@ class ChatViewModel(
                 }
             }
 
-            // Build system prompt
-            // Anthropic OAuth requires the Claude Code prefix in the system prompt
-            val baseSystemPrompt = buildSystemPrompt()
-            val systemPrompt = if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
-                val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
-                if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
-                else "$prefix\n\n${baseSystemPrompt ?: ""}"
-            } else baseSystemPrompt
-
             // Start agent loop with fallback. _isStreaming was set synchronously at top.
             streamLaunched = true
             streamJob = launch(Dispatchers.IO) {
@@ -7027,17 +7012,19 @@ class ChatViewModel(
                     AppLogger.debug(TAG_STREAM, "send streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
 
-                    // Resolve the active group's fallback strategy
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
-
-                    // Build full fallback provider list upfront (mirrors iOS triedEntries approach)
-                    val fallbackProviders = buildFallbackProviders(provider)
-
                     try {
+                        val systemPrompt = buildAgentSystemPrompt(provider) // nanoMuse: keep disk/DB prompt assembly off Dispatchers.Main and inside try/finally so errors release the slot.
+
+                        // Resolve the active group's fallback strategy
+                        val activeFallbackStrategy = run {
+                            val groupId = _selectedGroupId.value
+                            groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
+                                ?: com.openminis.app.data.model.FallbackStrategy.default
+                        }
+
+                        // Build full fallback provider list upfront (mirrors iOS triedEntries approach)
+                        val fallbackProviders = buildFallbackProviders(provider)
+
                         AppLogger.info(TAG_STREAM, "send runAgentLoop CALL")
                         runAgentLoop(
                             provider = provider,
@@ -7398,13 +7385,6 @@ class ChatViewModel(
                 }
             }
 
-            val baseSystemPrompt = buildSystemPrompt()
-            val systemPrompt = if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
-                val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
-                if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
-                else "$prefix\n\n${baseSystemPrompt ?: ""}"
-            } else baseSystemPrompt
-
             // _isStreaming was already set synchronously at the top.
             streamLaunched = true
             streamJob = launch(Dispatchers.IO) {
@@ -7413,13 +7393,14 @@ class ChatViewModel(
                     SessionConcurrencyManager.acquireSlot(activeSessionId)
                     AppLogger.debug(TAG_STREAM, "retryLast streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
-                    val fallbackProviders = buildFallbackProviders(provider)
                     try {
+                        val systemPrompt = buildAgentSystemPrompt(provider) // nanoMuse: keep disk/DB prompt assembly off Dispatchers.Main and inside try/finally so errors release the slot.
+                        val activeFallbackStrategy = run {
+                            val groupId = _selectedGroupId.value
+                            groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
+                                ?: com.openminis.app.data.model.FallbackStrategy.default
+                        }
+                        val fallbackProviders = buildFallbackProviders(provider)
                         AppLogger.info(TAG_STREAM, "retryLast runAgentLoop CALL")
                         runAgentLoop(
                             provider = provider,
@@ -7726,18 +7707,46 @@ class ChatViewModel(
 
         // Fallback state — mirrors iOS streamWithGroupFallback
         var currentProvider = provider
-        // nanoMuse: prepare one outbound view and use it for both measurement and sending.
-        // Original messages remain intact. Rebuilding the view on Continue reuses hashed files.
+        // nanoMuse: prepare one outbound view and reuse cached fixed/prepared request estimates per turn.
+        val estimateCache = io.github.nanomuse.chat.RequestEstimateCache(BPETokenizer::countImageTokens)
         var contextEstimate = ContextEstimate.Calibration()
         val usageMeter = ContextUsageMeter()
         var calibrationKey: String? = null
         var calibratedModel: String? = null
+        var alignedKey: String? = null
+        var alignedModel: String? = null
+        var alignedCalibration: ContextEstimate.Snapshot? = null
+        var alignedTools: List<AgentToolDefinition> = emptyList()
+        var alignedWindow = -1
+        var alignedMaxOutput = -1
         var preparedMessages: List<LLMMessage>? = null
+        var preparedTools: List<AgentToolDefinition> = emptyList()
+        var preparedRawTokens = -1
+        var measuredSnapshot: ContextUsageMeter.Request? = null
+        var measuredMessages: List<LLMMessage>? = null
+        var measuredTools: List<AgentToolDefinition> = emptyList()
+        var measuredVariant: String? = null
+        var measuredCalibration: ContextEstimate.Snapshot? = null
+        var measuredKey: String? = null
+        var measuredModel: String? = null
+        var measuredContextTokens = -1
+        var turnTools: List<AgentToolDefinition> = agentTools
         var requestBudget = ContextBudget.forModel(0, 0)
         var contextOverflowRetried = false
         val contextMaintenance = ContextMaintenance()
         val trimStore = ContextTrimStore(java.io.File(context.filesDir,
             "minis-sessions/${realSessionId.ifEmpty { sessionId }}/offloads/tools"))
+
+        // nanoMuse: key prepared-request memoization on provider class + thinking level and clear on state changes.
+        fun currentRequestVariant() = "${currentProvider.javaClass.name}|${_thinkingLevel.value}"
+
+        fun invalidatePreparedRequest() {
+            preparedMessages = null
+            preparedRawTokens = -1
+            measuredSnapshot = null
+            measuredMessages = null
+            measuredContextTokens = -1
+        }
 
         fun alignContextEstimate() {
             val config = providerRepository.config.value
@@ -7754,31 +7763,81 @@ class ChatViewModel(
                 usageMeter.clear()
                 calibrationKey = key
                 calibratedModel = currentProvider.model.id
-                preparedMessages = null
+                turnTools = agentTools // nanoMuse: refresh tools once when fallback switches model/vision capability.
+                invalidatePreparedRequest()
             }
             nmHistoryCalibration = contextEstimate
             val window = effectiveContextWindowTokens(currentProvider) ?: currentProvider.model.contextWindowTokens
-            val fixed = contextEstimate.estimate(ContextEstimate.request(
-                emptyList(), systemPrompt, agentTools,
-            ))
-            requestBudget = ContextBudget.forModel(window,
-                currentProvider.effectiveMaxOutputTokens(nmResolvedModel(currentProvider)), fixed)
-            nmHistoryBudget = requestBudget
+            // nanoMuse: recompute request budget only when provider, model, calibration, tools, or limits change.
+            val maxOutput = currentProvider.effectiveMaxOutputTokens(nmResolvedModel(currentProvider))
+            val calSnapshot = contextEstimate.snapshot()
+            if (key != alignedKey || currentProvider.model.id != alignedModel ||
+                calSnapshot != alignedCalibration || alignedTools != turnTools ||
+                window != alignedWindow || maxOutput != alignedMaxOutput
+            ) {
+                val fixed = contextEstimate.estimate(estimateCache.fixedTokens(systemPrompt, turnTools))
+                requestBudget = ContextBudget.forModel(window, maxOutput, fixed)
+                nmHistoryBudget = requestBudget
+                alignedKey = key
+                alignedModel = currentProvider.model.id
+                alignedCalibration = calSnapshot
+                alignedTools = turnTools
+                alignedWindow = window
+                alignedMaxOutput = maxOutput
+            }
         }
-        fun rawTokens(messages: List<LLMMessage>): Int = ContextEstimate.request(
-            messages, systemPrompt, agentTools, imageTokens = BPETokenizer::countImageTokens,
-        )
-        fun measureRawTokens(): Int = rawTokens(preparedMessages ?:
-            applyRequestImageBudget(effectiveAgentHistory(), preview = true))
-        fun usageSnapshot(messages: List<LLMMessage>) = usageMeter.snapshot(
-            calibrationKey.orEmpty(), currentProvider.model.id, messages, systemPrompt, agentTools,
-            requestVariant = "${currentProvider.javaClass.name}|${_thinkingLevel.value}",
-        )
+        fun rawTokens(
+            messages: List<LLMMessage>,
+            tools: List<AgentToolDefinition> = turnTools,
+            messageMemo: java.util.IdentityHashMap<LLMMessage, Int>? = null,
+        ): Int = estimateCache.request(messages, systemPrompt, tools, messageMemo)
+        fun measureRawTokens(): Int { // nanoMuse: reuse prepared raw estimate before falling back to preview scan.
+            val prepared = preparedMessages
+            if (prepared != null && preparedRawTokens >= 0 && preparedTools == turnTools) {
+                return preparedRawTokens
+            }
+            val messages = prepared ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+            return rawTokens(messages)
+        }
+        fun usageSnapshot(messages: List<LLMMessage>, tools: List<AgentToolDefinition> = turnTools) =
+            usageMeter.snapshot(
+                calibrationKey.orEmpty(), currentProvider.model.id, messages, systemPrompt, tools,
+                requestVariant = currentRequestVariant(),
+            )
+        // nanoMuse: memoize the last prepared measurement when messages, tools, variant, and calibration match.
         fun measureContextTokens(): Int {
             alignContextEstimate()
-            val messages = preparedMessages ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
-            return usageMeter.estimate(usageSnapshot(messages), rawTokens(messages), contextEstimate)
-                .also { lastContextTokens = it }
+            val prepared = preparedMessages
+            val messages = prepared ?: applyRequestImageBudget(effectiveAgentHistory(), preview = true)
+            val tools = if (prepared != null) preparedTools else turnTools
+            val calSnapshot = contextEstimate.snapshot()
+            val variant = currentRequestVariant()
+            if (prepared != null && measuredSnapshot != null && measuredMessages === prepared &&
+                measuredTools == tools && measuredVariant == variant &&
+                measuredCalibration == calSnapshot && measuredKey == calibrationKey &&
+                measuredModel == currentProvider.model.id
+            ) {
+                return measuredContextTokens.also { lastContextTokens = it }
+            }
+            val raw = if (prepared != null && preparedRawTokens >= 0 && preparedTools == tools) {
+                preparedRawTokens
+            } else {
+                rawTokens(messages, tools)
+            }
+            val snapshot = usageSnapshot(messages, tools)
+            val estimated = usageMeter.estimate(snapshot, raw, contextEstimate)
+            if (prepared != null) {
+                measuredSnapshot = snapshot
+                measuredMessages = prepared
+                measuredTools = tools
+                measuredVariant = variant
+                measuredCalibration = calSnapshot
+                measuredKey = calibrationKey
+                measuredModel = currentProvider.model.id
+                measuredContextTokens = estimated
+            }
+            lastContextTokens = estimated
+            return estimated
         }
         fun measureProbeTokens(): Int = if (usageMeter.lastEstimateUsedAnchor) {
             // A provider's measured prefix cannot be overruled by a lower raw heuristic.
@@ -7788,17 +7847,21 @@ class ChatViewModel(
             alignContextEstimate()
             val source = if (force) preparedMessages ?: effectiveAgentHistory() else effectiveAgentHistory()
             val messages = applyRequestImageBudget(source)
-            preparedMessages = messages
+            val tools = turnTools
+            val messageMemo = java.util.IdentityHashMap<LLMMessage, Int>()
             // nanoMuse: trial/pre-trim views must not invalidate known usage. Only the final
             // prepared request is fingerprint-checked by measureContextTokens before dispatch.
-            val before = contextEstimate.estimate(rawTokens(messages))
+            val beforeRaw = rawTokens(messages, tools, messageMemo)
+            var finalMessages = messages
+            var finalRaw = beforeRaw
+            val before = contextEstimate.estimate(beforeRaw)
             if (force || before >= requestBudget.offloadThreshold) {
                 val tight = force || before >= requestBudget.hardLimit
                 val result = ContextTrimming.trim(
                     messages,
                     targetTokens = if (force) minOf(requestBudget.targetTokens, (before.toLong() * 3 / 4).toInt())
                         else requestBudget.targetTokens,
-                    measure = { contextEstimate.estimate(rawTokens(it)) },
+                    measure = { contextEstimate.estimate(rawTokens(it, tools, messageMemo)) },
                     spill = { trimStore.write(it) },
                     options = ContextTrimming.Options(
                         keepRecentIterations = if (tight) 1 else 3,
@@ -7806,12 +7869,21 @@ class ChatViewModel(
                         allowOversizedLatestResult = tight,
                     ),
                 )
-                preparedMessages = result.messages
+                finalMessages = result.messages
+                if (result.messages !== messages) {
+                    finalRaw = rawTokens(result.messages, tools, messageMemo)
+                }
                 if (result.afterTokens < result.beforeTokens) {
                     AppLogger.info(TAG, "[ContextTrim] ${result.beforeTokens} -> ${result.afterTokens}; " +
                         "stages=${result.steps.joinToString()}")
                 }
             }
+            preparedMessages = finalMessages
+            preparedTools = tools
+            preparedRawTokens = finalRaw
+            measuredSnapshot = null
+            measuredMessages = null
+            measuredContextTokens = -1
         }
         val remainingFallbacks = fallbackProviders.toMutableList()
         val fallbackReasons = mutableListOf<String>()
@@ -7945,6 +8017,7 @@ class ChatViewModel(
         agentTurns@ for (turn in 0 until MAX_AGENT_TURNS) {
             // Sanitize history before each API call (mirrors iOS pre-API validation)
             sanitizeAgentHistory()
+            turnTools = agentTools // nanoMuse: resolve tool definitions once per turn instead of 10x.
 
             // nanoMuse: deterministic trimming runs first and never edits saved history.
             prepareContext()
@@ -8187,17 +8260,25 @@ class ChatViewModel(
                         }
                     }
                     val requestMessages = checkNotNull(preparedMessages)
-                    val requestTools = agentTools
+                    val requestTools = preparedTools
                     var requestUsage: LLMUsage? = null
-                    val requestSnapshot = usageSnapshot(requestMessages)
-                    val requestEstimate = io.github.nanomuse.chat.ContextEstimate.request(
-                        requestMessages, systemPrompt, requestTools,
-                        imageTokens = BPETokenizer::countImageTokens,
-                    )
-                    alignContextEstimate()
+                    // nanoMuse: reuse the prepared measurement/snapshot from measureContextTokens when still valid.
+                    val calSnapshot = contextEstimate.snapshot()
+                    val variant = currentRequestVariant()
+                    val canReuseMeasured = measuredSnapshot != null &&
+                        measuredMessages === requestMessages &&
+                        measuredTools == requestTools &&
+                        measuredVariant == variant &&
+                        measuredKey == calibrationKey &&
+                        measuredModel == currentProvider.model.id
+                    val requestSnapshot = if (canReuseMeasured) checkNotNull(measuredSnapshot)
+                        else usageSnapshot(requestMessages, requestTools)
+                    val requestEstimate = if (preparedRawTokens >= 0 && preparedTools == requestTools) preparedRawTokens
+                        else rawTokens(requestMessages, requestTools)
                     // nanoMuse: a calibration-only probe uses the raw input estimate so a
                     // false high ratio cannot squeeze the answer to a single output token.
                     lastContextTokens = if (contextMaintenance.calibrationProbeGranted) requestEstimate
+                        else if (canReuseMeasured && measuredCalibration == calSnapshot && measuredContextTokens >= 0) measuredContextTokens
                         else usageMeter.estimate(requestSnapshot, requestEstimate, contextEstimate)
                     currentProvider.streamMessage(
                         requestMessages,
@@ -10426,6 +10507,16 @@ class ChatViewModel(
         return entity.id
     }
 
+    // nanoMuse: shared system prompt assembly + Anthropic OAuth prefix wrapper run off Dispatchers.Main.
+    private fun buildAgentSystemPrompt(provider: LLMProvider): String? {
+        val baseSystemPrompt = buildSystemPrompt()
+        return if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
+            val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
+            if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
+            else "$prefix\n\n${baseSystemPrompt ?: ""}"
+        } else baseSystemPrompt
+    }
+
     private fun buildSystemPrompt(): String? {
         // Cache-friendly layout: keep `base` byte-stable by stripping out anything
         // that varies per request, then append a "Runtime context" suffix at the
@@ -11822,13 +11913,6 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                 }
             }
 
-            val baseSystemPrompt = buildSystemPrompt()
-            val systemPrompt = if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
-                val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
-                if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
-                else "$prefix\n\n${baseSystemPrompt ?: ""}"
-            } else baseSystemPrompt
-
             // T145: claim the streaming flag synchronously before launching
             // the streamJob so a concurrent send/retry tap is rejected by the
             // entry guard. Mirrors sendMessage discipline.
@@ -11844,14 +11928,16 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                     AppLogger.debug(TAG_STREAM, "resumeQueueAfterCancel streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
 
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
-                            ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
-                    val fallbackProviders = buildFallbackProviders(provider)
-
                     try {
+                        val systemPrompt = buildAgentSystemPrompt(provider) // nanoMuse: keep disk/DB prompt assembly off Dispatchers.Main and inside try/finally so errors release the slot.
+
+                        val activeFallbackStrategy = run {
+                            val groupId = _selectedGroupId.value
+                            groupId?.let { providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy }
+                                ?: com.openminis.app.data.model.FallbackStrategy.default
+                        }
+                        val fallbackProviders = buildFallbackProviders(provider)
+
                         AppLogger.info(TAG_STREAM, "resumeQueueAfterCancel drainQueuedPrompts CALL")
                         drainQueuedPrompts(
                             provider = provider,
@@ -12113,14 +12199,6 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
         }
 
         viewModelScope.launch {
-            val baseSystemPrompt = buildSystemPrompt()
-            val systemPrompt =
-                if ((provider as? com.openminis.app.provider.anthropic.AnthropicProvider)?.isOAuth == true) {
-                    val prefix = io.github.nanomuse.cloud.ClaudeSignIn.identifier // nanoMuse: empty on a build without it, never throws; the provider refuses the send (#373)
-                    if (baseSystemPrompt?.startsWith(prefix) == true) baseSystemPrompt
-                    else "$prefix\n\n${baseSystemPrompt ?: ""}"
-                } else baseSystemPrompt
-
             AppLogger.info(TAG_STREAM, "resume _isStreaming=true (sid=$activeSessionId)")
             nmStartStreaming() // nanoMuse: a live turn supersedes a disk reload.
             streamJob = launch(Dispatchers.IO) {
@@ -12129,14 +12207,15 @@ Scheduled tasks: crontab / at / nohup loops will stop when the app is suspended,
                     SessionConcurrencyManager.acquireSlot(activeSessionId)
                     AppLogger.debug(TAG_STREAM, "resume streamJob slot acquired")
                     SessionActivityTracker.setActive(activeSessionId, onStop = { cancelStream() })
-                    val activeFallbackStrategy = run {
-                        val groupId = _selectedGroupId.value
-                        groupId?.let {
-                            providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy
-                        } ?: com.openminis.app.data.model.FallbackStrategy.default
-                    }
-                    val fallbackProviders = buildFallbackProviders(provider)
                     try {
+                        val systemPrompt = buildAgentSystemPrompt(provider) // nanoMuse: keep disk/DB prompt assembly off Dispatchers.Main and inside try/finally so errors release the slot.
+                        val activeFallbackStrategy = run {
+                            val groupId = _selectedGroupId.value
+                            groupId?.let {
+                                providerRepository.config.value.modelGroups.find { g -> g.id == it }?.fallbackStrategy
+                            } ?: com.openminis.app.data.model.FallbackStrategy.default
+                        }
+                        val fallbackProviders = buildFallbackProviders(provider)
                         AppLogger.info(TAG_STREAM, "resume runAgentLoop CALL")
                         runAgentLoop(
                             provider = provider,

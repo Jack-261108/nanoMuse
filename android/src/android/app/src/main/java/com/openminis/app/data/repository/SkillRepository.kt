@@ -38,7 +38,11 @@ import java.util.zip.ZipOutputStream
  *   - Session overrides in `session_skill_overrides` table
  *   - Prompt fragment generation for system prompt injection
  */
-class SkillRepository(private val context: Context) {
+class SkillRepository internal constructor(
+    private val context: Context,
+    private val dbOverride: SQLiteDatabase?,
+) {
+    constructor(context: Context) : this(context, null)
 
     companion object {
         private const val TAG = "SkillRepository"
@@ -64,7 +68,41 @@ class SkillRepository(private val context: Context) {
      * download that runs after a SKILL.md import. SupervisorJob so a single
      * download failure doesn't poison the next one.
      */
-    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val backgroundExceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "Uncaught exception in SkillRepository backgroundScope: ${throwable.message}", throwable)
+    }
+
+    private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + backgroundExceptionHandler)
+
+    // nanoMuse: FIFO write queue on repository scope so rapid toggles and deletes survive screen dismissal.
+    private val writeQueue = kotlinx.coroutines.channels.Channel<Pair<() -> Unit, kotlinx.coroutines.CompletableDeferred<Unit>>>(
+        kotlinx.coroutines.channels.Channel.UNLIMITED,
+    ).also { channel ->
+        backgroundScope.launch {
+            try {
+                for ((action, done) in channel) {
+                    try {
+                        action()
+                        done.complete(Unit)
+                    } catch (t: kotlinx.coroutines.CancellationException) {
+                        done.completeExceptionally(t)
+                        throw t
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "Skill write action failed: ${t.message}", t)
+                        done.completeExceptionally(t)
+                    }
+                }
+            } finally {
+                // nanoMuse: close and drain queued callers with a non-cancellation error so UI distinguishes shutdown from caller cancel.
+                val shutdownCause = IllegalStateException("Skill write queue stopped")
+                channel.close(shutdownCause)
+                while (true) {
+                    val remaining = channel.tryReceive().getOrNull() ?: break
+                    remaining.second.completeExceptionally(shutdownCause)
+                }
+            }
+        }
+    }
 
     // -- Data Types --
 
@@ -106,8 +144,35 @@ class SkillRepository(private val context: Context) {
     private val _skills = MutableStateFlow<List<Skill>>(emptyList())
     val skills: StateFlow<List<Skill>> = _skills.asStateFlow()
 
+    // nanoMuse: avoid re-querying SQLite and re-parsing SKILL.md YAML on every turn when disk is unchanged.
+    private val reloadLock = Any()
+    private val loadIoLock = Any()
+    private var loadedDiskStamp: List<io.github.nanomuse.sysfiles.SkillDirEntryStamp>? = null
+    private var stateGeneration: Long = 0L
+    internal var loadAllRunsForTest: Int = 0 // nanoMuse: test-visible cache-miss counter.
+    internal var onBeforeLoadCommitForTest: (() -> Unit)? = null // nanoMuse: test hook for mid-scan race checks.
+
+    private fun refreshDiskStampForId(
+        id: String,
+        knownSkillMdStamp: io.github.nanomuse.sysfiles.FileStamp? = null,
+    ) {
+        synchronized(reloadLock) {
+            val current = loadedDiskStamp ?: return
+            val without = current.filterNot { it.id == id }
+            val dir = File(skillsDir, id)
+            loadedDiskStamp = if (dir.isDirectory) {
+                val stamp = knownSkillMdStamp
+                    ?: io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(File(dir, "SKILL.md"))
+                (without + io.github.nanomuse.sysfiles.SkillDirEntryStamp(id = id, skillMd = stamp))
+                    .sortedBy { it.id }
+            } else {
+                without
+            }
+        }
+    }
+
     private val db: SQLiteDatabase by lazy {
-        SkillDbHelper(context).writableDatabase
+        dbOverride ?: SkillDbHelper(context).writableDatabase
     }
 
     private val skillsDir: File
@@ -144,46 +209,53 @@ class SkillRepository(private val context: Context) {
     fun add(name: String, description: String, body: String, version: String = "1.0.0", source: ImportSource = ImportSource.FILE, sourceURL: String? = null, sourceContent: String? = null): Skill? {
         val id = slugify(name)
         if (id.isBlank()) return null
-        if (_skills.value.any { it.id == id }) return null
+        val skill = synchronized(reloadLock) { // nanoMuse: serialize DB, _skills, and stamp updates with loadAll.
+            if (_skills.value.any { it.id == id }) return null
 
-        val skill = Skill(
-            id = id,
-            name = name,
-            description = description,
-            version = version,
-            importSource = source,
-            body = body,
-            sourceURL = sourceURL,
-        )
+            val created = Skill(
+                id = id,
+                name = name,
+                description = description,
+                version = version,
+                importSource = source,
+                body = body,
+                sourceURL = sourceURL,
+            )
 
-        insertDb(skill)
-        writeSkillMd(skill, sourceContent) // nanoMuse: retain full imported source.
-        _skills.value = _skills.value + skill
+            insertDb(created)
+            writeSkillMd(created, sourceContent) // nanoMuse: retain full imported source.
+            _skills.value = _skills.value + created
+            stateGeneration++
+            created
+        }
         Log.i(TAG, "Added skill: ${skill.id}")
         return skill
     }
 
     // nanoMuse: full-content updates keep unknown YAML fields and update the stored version.
     fun update(id: String, name: String? = null, description: String? = null, body: String? = null, version: String? = null, sourceContent: String? = null): Boolean {
-        val current = _skills.value.find { it.id == id } ?: return false
-        if (current.isReadOnly) return false // nanoMuse: protect bundled metadata and content.
-        val updated = current.copy(
-            name = name ?: current.name,
-            description = description ?: current.description,
-            version = version ?: current.version, // nanoMuse: file and URL updates carry their version.
-            body = body ?: current.body,
-            updatedAt = System.currentTimeMillis(),
-        )
+        synchronized(reloadLock) { // nanoMuse: serialize DB, _skills, and stamp updates with loadAll.
+            val current = _skills.value.find { it.id == id } ?: return false
+            if (current.isReadOnly) return false // nanoMuse: protect bundled metadata and content.
+            val updated = current.copy(
+                name = name ?: current.name,
+                description = description ?: current.description,
+                version = version ?: current.version, // nanoMuse: file and URL updates carry their version.
+                body = body ?: current.body,
+                updatedAt = System.currentTimeMillis(),
+            )
 
-        // nanoMuse: malformed legacy frontmatter must fail before changing saved metadata.
-        val prepared = prepareSkillMd(updated, sourceContent, preserveBody = body == null) ?: return false
-        db.execSQL(
-            "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
-            arrayOf<Any>(updated.name, updated.description, updated.version, updated.updatedAt, id)
-        )
-        writeSkillMd(updated, sourceContent, prepared) // nanoMuse: render errors were checked before the DB update.
-        _skills.value = _skills.value.map { if (it.id == id) updated else it }
-        return true
+            // nanoMuse: malformed legacy frontmatter must fail before changing saved metadata.
+            val prepared = prepareSkillMd(updated, sourceContent, preserveBody = body == null) ?: return false
+            db.execSQL(
+                "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
+                arrayOf<Any>(updated.name, updated.description, updated.version, updated.updatedAt, id)
+            )
+            writeSkillMd(updated, sourceContent, prepared) // nanoMuse: render errors were checked before the DB update.
+            _skills.value = _skills.value.map { if (it.id == id) updated else it }
+            stateGeneration++
+            return true
+        }
     }
 
     // nanoMuse: replacing source keeps the existing ID, enablement and session overrides.
@@ -193,20 +265,52 @@ class SkillRepository(private val context: Context) {
     }
 
     fun delete(id: String) {
-        if (_skills.value.find { it.id == id }?.isReadOnly == true) return // nanoMuse: keep app-managed skills.
-        db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
-        db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
-        val dir = File(skillsDir, id)
-        dir.deleteRecursively()
-        _skills.value = _skills.value.filter { it.id != id }
+        synchronized(reloadLock) { // nanoMuse: serialize DB, _skills, and stamp updates with loadAll.
+            if (_skills.value.find { it.id == id }?.isReadOnly == true) return // nanoMuse: keep app-managed skills.
+            db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
+            db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
+            val dir = File(skillsDir, id)
+            dir.deleteRecursively()
+            refreshDiskStampForId(id) // nanoMuse: update only this id's stamp so external disk changes stay pending.
+            _skills.value = _skills.value.filter { it.id != id }
+            stateGeneration++
+        }
         Log.i(TAG, "Deleted skill: $id")
     }
 
     fun setEnabled(id: String, enabled: Boolean) {
-        db.execSQL("UPDATE skills SET is_enabled=? WHERE id=?", arrayOf<Any>(if (enabled) 1 else 0, id))
-        _skills.value = _skills.value.map {
-            if (it.id == id) it.copy(isEnabled = enabled) else it
+        synchronized(reloadLock) { // nanoMuse: serialize enablement updates with loadAll.
+            db.execSQL("UPDATE skills SET is_enabled=? WHERE id=?", arrayOf<Any>(if (enabled) 1 else 0, id))
+            _skills.value = _skills.value.map {
+                if (it.id == id) it.copy(isEnabled = enabled) else it
+            }
+            stateGeneration++
         }
+    }
+
+    // nanoMuse: submit a repository write to the FIFO queue and fail the Deferred if the channel rejects it.
+    internal fun enqueueWrite(action: () -> Unit): kotlinx.coroutines.Deferred<Unit> {
+        val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val result = writeQueue.trySend(action to done)
+        if (result.isFailure) {
+            val cause = result.exceptionOrNull()
+                ?: IllegalStateException("Skill write queue unavailable")
+            Log.e(TAG, "Failed to enqueue skill write: ${cause.message}", cause)
+            done.completeExceptionally(cause)
+        }
+        return done
+    }
+
+    // nanoMuse: enqueue toggle off the main thread in strict FIFO order on repository scope.
+    fun setEnabledAsync(id: String, enabled: Boolean): kotlinx.coroutines.Deferred<Unit> =
+        enqueueWrite { setEnabled(id, enabled) }
+
+    // nanoMuse: enqueue delete off the main thread on repository scope so leaving the UI never cancels it.
+    fun deleteAsync(id: String): kotlinx.coroutines.Deferred<Unit> =
+        enqueueWrite { delete(id) }
+
+    internal fun closeWriteQueueForTest() {
+        writeQueue.close()
     }
 
     // -- Session Overrides --
@@ -270,17 +374,20 @@ class SkillRepository(private val context: Context) {
      * so long-lived installs don't drift into multi-thousand-read territory.
      */
     fun recordSkillUse(skillId: String) {
-        val current = _skills.value.find { it.id == skillId } ?: return
-        val bumped = current.copy(useCount = current.useCount + 1.0)
-        db.execSQL(
-            "UPDATE skills SET use_count = use_count + 1 WHERE id=?",
-            arrayOf<Any>(skillId)
-        )
-        var next = _skills.value.map { if (it.id == skillId) bumped else it }
-        if (bumped.useCount > NORMALIZE_THRESHOLD) {
-            next = normalizeUseCounts(next)
+        synchronized(reloadLock) { // nanoMuse: serialize use_count updates with loadAll.
+            val current = _skills.value.find { it.id == skillId } ?: return
+            val bumped = current.copy(useCount = current.useCount + 1.0)
+            db.execSQL(
+                "UPDATE skills SET use_count = use_count + 1 WHERE id=?",
+                arrayOf<Any>(skillId)
+            )
+            var next = _skills.value.map { if (it.id == skillId) bumped else it }
+            if (bumped.useCount > NORMALIZE_THRESHOLD) {
+                next = normalizeUseCounts(next)
+            }
+            _skills.value = next
+            stateGeneration++
         }
-        _skills.value = next
     }
 
     private fun normalizeUseCounts(list: List<Skill>): List<Skill> {
@@ -341,40 +448,43 @@ class SkillRepository(private val context: Context) {
     fun importFromContent(content: String, source: ImportSource = ImportSource.FILE, sourceURL: String? = null): Skill? {
         val parsed = parseSkillMd(content) ?: return null
         val id = slugify(parsed.name)
-        if (id.isNotBlank() && _skills.value.any { it.id == id }) {
-            // Replace existing: update in place so URL updates refresh contents.
-            val current = _skills.value.first { it.id == id }
-            if (current.isReadOnly) return null // nanoMuse: imports must not replace an app-managed skill.
-            val replaced = current.copy(
+        synchronized(reloadLock) { // nanoMuse: serialize import DB, _skills, and stamp updates with loadAll.
+            if (id.isNotBlank() && _skills.value.any { it.id == id }) {
+                // Replace existing: update in place so URL updates refresh contents.
+                val current = _skills.value.first { it.id == id }
+                if (current.isReadOnly) return null // nanoMuse: imports must not replace an app-managed skill.
+                val replaced = current.copy(
+                    name = parsed.name,
+                    description = parsed.description,
+                    version = parsed.version,
+                    importSource = source,
+                    body = parsed.body,
+                    updatedAt = System.currentTimeMillis(),
+                    sourceURL = sourceURL ?: current.sourceURL,
+                )
+                db.execSQL(
+                    "UPDATE skills SET name=?, description=?, version=?, import_source=?, source_url=?, updated_at=? WHERE id=?",
+                    arrayOf<Any?>(
+                        replaced.name, replaced.description, replaced.version,
+                        replaced.importSource.value, replaced.sourceURL,
+                        replaced.updatedAt, id
+                    )
+                )
+                writeSkillMd(replaced, content) // nanoMuse: preserve unknown frontmatter and original formatting.
+                _skills.value = _skills.value.map { if (it.id == id) replaced else it }
+                stateGeneration++
+                return replaced
+            }
+            return add(
                 name = parsed.name,
                 description = parsed.description,
-                version = parsed.version,
-                importSource = source,
                 body = parsed.body,
-                updatedAt = System.currentTimeMillis(),
-                sourceURL = sourceURL ?: current.sourceURL,
+                version = parsed.version,
+                source = source,
+                sourceURL = sourceURL,
+                sourceContent = content, // nanoMuse: a new import preserves the same source as a replacement.
             )
-            db.execSQL(
-                "UPDATE skills SET name=?, description=?, version=?, import_source=?, source_url=?, updated_at=? WHERE id=?",
-                arrayOf<Any?>(
-                    replaced.name, replaced.description, replaced.version,
-                    replaced.importSource.value, replaced.sourceURL,
-                    replaced.updatedAt, id
-                )
-            )
-            writeSkillMd(replaced, content) // nanoMuse: preserve unknown frontmatter and original formatting.
-            _skills.value = _skills.value.map { if (it.id == id) replaced else it }
-            return replaced
         }
-        return add(
-            name = parsed.name,
-            description = parsed.description,
-            body = parsed.body,
-            version = parsed.version,
-            source = source,
-            sourceURL = sourceURL,
-            sourceContent = content, // nanoMuse: a new import preserves the same source as a replacement.
-        )
     }
 
     /**
@@ -485,12 +595,16 @@ class SkillRepository(private val context: Context) {
         // skill with only SKILL.md (T152 root cause).
         backgroundScope.launch {
             val outcome = downloadSiblingFiles(ghInfo, skillDir, skill)
-            val bumped = skill.copy(updatedAt = System.currentTimeMillis())
-            db.execSQL(
-                "UPDATE skills SET updated_at=? WHERE id=?",
-                arrayOf<Any>(bumped.updatedAt, skill.id)
-            )
-            _skills.value = _skills.value.map { if (it.id == skill.id) bumped else it }
+            synchronized(reloadLock) { // nanoMuse: serialize updated_at/_skills bump with loadAll.
+                val current = _skills.value.find { it.id == skill.id } ?: skill
+                val bumped = current.copy(updatedAt = System.currentTimeMillis())
+                db.execSQL(
+                    "UPDATE skills SET updated_at=? WHERE id=?",
+                    arrayOf<Any>(bumped.updatedAt, skill.id)
+                )
+                _skills.value = _skills.value.map { if (it.id == skill.id) bumped else it }
+                stateGeneration++
+            }
             if (!outcome.isComplete) {
                 Log.w(TAG, "importFromGitHub partial for ${skill.id}: ${outcome.reason ?: "${outcome.filesFailed} file(s) failed"}")
             }
@@ -720,36 +834,46 @@ class SkillRepository(private val context: Context) {
      * Returns the refreshed skill or null if the file is gone or malformed.
      */
     fun rescanFromDisk(skillId: String): Skill? {
-        val current = _skills.value.find { it.id == skillId } ?: return null
-        if (current.isReadOnly) return current // nanoMuse: only the bundled updater refreshes app-managed content.
-        val file = File(File(skillsDir, skillId), "SKILL.md")
-        if (!file.exists()) {
-            // [T-android-skill-orphan-db-row] A rescan that finds nothing on
-            // disk used to only paint "SKILL.md missing or invalid" and leave
-            // the record in place, so the one action explicitly meant to
-            // reconcile with disk detected the orphan and still refused to act
-            // on it. Drop it here too — same BUNDLED exemption as loadAll(),
-            // since a bundled skill's file is restored by installBundledSkills.
-            if (current.importSource != ImportSource.BUNDLED) {
-                delete(skillId)
-                Log.i(TAG, "Rescan found no SKILL.md — removed orphan skill: $skillId")
+        synchronized(reloadLock) { // nanoMuse: serialize rescan DB, _skills, and stamp updates with loadAll.
+            val current = _skills.value.find { it.id == skillId } ?: return null
+            if (current.isReadOnly) return current // nanoMuse: only the bundled updater refreshes app-managed content.
+            val file = File(File(skillsDir, skillId), "SKILL.md")
+            val stampBeforeRead = io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(file) // nanoMuse: capture stamp before reading.
+            if (!stampBeforeRead.exists) {
+                // [T-android-skill-orphan-db-row] A rescan that finds nothing on
+                // disk used to only paint "SKILL.md missing or invalid" and leave
+                // the record in place, so the one action explicitly meant to
+                // reconcile with disk detected the orphan and still refused to act
+                // on it. Drop it here too — same BUNDLED exemption as loadAll(),
+                // since a bundled skill's file is restored by installBundledSkills.
+                if (current.importSource != ImportSource.BUNDLED) {
+                    delete(skillId)
+                    Log.i(TAG, "Rescan found no SKILL.md — removed orphan skill: $skillId")
+                }
+                return null
             }
-            return null
+            val content = try {
+                file.readText()
+            } catch (_: Exception) {
+                return null
+            }
+            val parsed = parseSkillMd(content) ?: return null
+            val refreshed = current.copy(
+                name = parsed.name,
+                description = parsed.description,
+                version = parsed.version,
+                body = parsed.body,
+                updatedAt = System.currentTimeMillis(),
+            )
+            db.execSQL(
+                "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
+                arrayOf<Any>(refreshed.name, refreshed.description, refreshed.version, refreshed.updatedAt, skillId)
+            )
+            _skills.value = _skills.value.map { if (it.id == skillId) refreshed else it }
+            refreshDiskStampForId(skillId, stampBeforeRead) // nanoMuse: update only this id's stamp with the pre-read snapshot.
+            stateGeneration++
+            return refreshed
         }
-        val parsed = parseSkillMd(file.readText()) ?: return null
-        val refreshed = current.copy(
-            name = parsed.name,
-            description = parsed.description,
-            version = parsed.version,
-            body = parsed.body,
-            updatedAt = System.currentTimeMillis(),
-        )
-        db.execSQL(
-            "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
-            arrayOf<Any>(refreshed.name, refreshed.description, refreshed.version, refreshed.updatedAt, skillId)
-        )
-        _skills.value = _skills.value.map { if (it.id == skillId) refreshed else it }
-        return refreshed
     }
 
     /**
@@ -758,19 +882,22 @@ class SkillRepository(private val context: Context) {
      * from existing sessions don't break.
      */
     fun renameSkill(skillId: String, newName: String): Boolean {
-        val current = _skills.value.find { it.id == skillId } ?: return false
-        if (current.isReadOnly) return false // nanoMuse: all rename entry points keep bundled names intact.
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return false
-        // nanoMuse: quote a renamed value and retain the rest of the imported frontmatter.
-        if (!writeSkillMd(current.copy(name = trimmed), preserveBody = true)) return false
-        val refreshed = current.copy(name = trimmed, updatedAt = System.currentTimeMillis())
-        db.execSQL(
-            "UPDATE skills SET name=?, updated_at=? WHERE id=?",
-            arrayOf<Any>(refreshed.name, refreshed.updatedAt, skillId)
-        )
-        _skills.value = _skills.value.map { if (it.id == skillId) refreshed else it }
-        return true
+        synchronized(reloadLock) { // nanoMuse: serialize rename DB, _skills, and stamp updates with loadAll.
+            val current = _skills.value.find { it.id == skillId } ?: return false
+            if (current.isReadOnly) return false // nanoMuse: all rename entry points keep bundled names intact.
+            // nanoMuse: quote a renamed value and retain the rest of the imported frontmatter.
+            if (!writeSkillMd(current.copy(name = trimmed), preserveBody = true)) return false
+            val refreshed = current.copy(name = trimmed, updatedAt = System.currentTimeMillis())
+            db.execSQL(
+                "UPDATE skills SET name=?, updated_at=? WHERE id=?",
+                arrayOf<Any>(refreshed.name, refreshed.updatedAt, skillId)
+            )
+            _skills.value = _skills.value.map { if (it.id == skillId) refreshed else it }
+            stateGeneration++
+            return true
+        }
     }
 
     /** Read an arbitrary file inside a skill's directory (e.g. scripts/foo.py). */
@@ -1084,37 +1211,40 @@ class SkillRepository(private val context: Context) {
     private fun installBundledSkills() {
         val bundledId = "skill-creator"
         val bundledVersion = io.github.nanomuse.skills.BundledSkills.CREATOR_VERSION // nanoMuse: content revision.
-        val existing = _skills.value.find { it.id == bundledId }
+        synchronized(reloadLock) { // nanoMuse: serialize bundled install/upgrade with loadAll.
+            val existing = _skills.value.find { it.id == bundledId }
 
-        // Skip if local version is same or newer
-        if (existing != null && existing.version >= bundledVersion) return
-        if (existing != null && !existing.isReadOnly) return // nanoMuse: preserve a user's same-name skill.
+            // Skip if local version is same or newer
+            if (existing != null && existing.version >= bundledVersion) return
+            if (existing != null && !existing.isReadOnly) return // nanoMuse: preserve a user's same-name skill.
 
-        // nanoMuse: the packaged guide is generated from the runtime's shared skill.
-        val parsed = parseSkillMd(io.github.nanomuse.skills.BundledSkills.creator(context)) ?: return
-        if (existing != null) {
-            // Upgrade existing
-            // nanoMuse: update only app-owned text while preserving enablement and usage state.
-            val updated = io.github.nanomuse.skills.BundledSkills.creatorUpdate(
-                existing, parsed.description, parsed.body, System.currentTimeMillis(),
-            ) ?: return
-            db.execSQL(
-                "UPDATE skills SET description=?, version=?, updated_at=? WHERE id=?",
-                arrayOf<Any>(updated.description, bundledVersion, updated.updatedAt, bundledId)
-            )
-            writeSkillMd(updated)
-            _skills.value = _skills.value.map { if (it.id == bundledId) updated else it }
-            Log.i(TAG, "Upgraded bundled skill: $bundledId → v$bundledVersion")
-        } else {
-            // Fresh install
-            add(
-                name = parsed.name,
-                description = parsed.description,
-                body = parsed.body,
-                source = ImportSource.BUNDLED,
-                version = bundledVersion, // nanoMuse: persist the installed content revision on first install.
-            )
-            Log.i(TAG, "Installed bundled skill: $bundledId (v$bundledVersion)")
+            // nanoMuse: the packaged guide is generated from the runtime's shared skill.
+            val parsed = parseSkillMd(io.github.nanomuse.skills.BundledSkills.creator(context)) ?: return
+            if (existing != null) {
+                // Upgrade existing
+                // nanoMuse: update only app-owned text while preserving enablement and usage state.
+                val updated = io.github.nanomuse.skills.BundledSkills.creatorUpdate(
+                    existing, parsed.description, parsed.body, System.currentTimeMillis(),
+                ) ?: return
+                db.execSQL(
+                    "UPDATE skills SET description=?, version=?, updated_at=? WHERE id=?",
+                    arrayOf<Any>(updated.description, bundledVersion, updated.updatedAt, bundledId)
+                )
+                writeSkillMd(updated)
+                _skills.value = _skills.value.map { if (it.id == bundledId) updated else it }
+                stateGeneration++
+                Log.i(TAG, "Upgraded bundled skill: $bundledId → v$bundledVersion")
+            } else {
+                // Fresh install
+                add(
+                    name = parsed.name,
+                    description = parsed.description,
+                    body = parsed.body,
+                    source = ImportSource.BUNDLED,
+                    version = bundledVersion, // nanoMuse: persist the installed content revision on first install.
+                )
+                Log.i(TAG, "Installed bundled skill: $bundledId (v$bundledVersion)")
+            }
         }
     }
 
@@ -1134,187 +1264,262 @@ class SkillRepository(private val context: Context) {
      * path), not overwriting any preserved DB toggle.
      */
     fun reloadFromDisk() {
-        loadAll()
+        synchronized(loadIoLock) { // nanoMuse: serialize disk scans without holding reloadLock across parsing.
+            val unchanged = synchronized(reloadLock) { // nanoMuse: skip SQLite/YAML reload unless skillsDir entries changed.
+                val currentStamp = io.github.nanomuse.sysfiles.DiskFreshness.skillsDirStamp(skillsDir)
+                loadedDiskStamp == currentStamp
+            }
+            if (unchanged) return
+            loadAll()
+        }
     }
 
     // -- Internal --
 
+    private data class HealedSkillRow(
+        val id: String,
+        val name: String,
+        val description: String,
+        val version: String,
+        val updatedAt: Long,
+    )
+
     private fun loadAll() {
-        // Load from DB
-        val dbSkills = mutableListOf<Skill>()
-        // [T-android-safemode-lateinit-crash-147] `use` so the cursor is closed
-        // even when a row throws — the old code only reached close() on the
-        // success path and leaked on any failure.
-        db.rawQuery("SELECT * FROM skills ORDER BY installed_at DESC", null).use { cursor ->
-        while (cursor.moveToNext()) {
-            // [T-android-safemode-lateinit-crash-147] Per-row isolation: one
-            // malformed skill (a third-party import with a missing column or
-            // an unparseable SKILL.md) must not discard every OTHER skill, and
-            // must not escape into MinisApp.onCreate. Skip the bad row, keep
-            // the rest.
-            try {
-            val id = cursor.getString(cursor.getColumnIndexOrThrow("id"))
-            val importSource = ImportSource.from(cursor.getString(cursor.getColumnIndexOrThrow("import_source")))
-            // [T-android-skill-orphan-db-row] Prune rows whose skill directory
-            // is gone. The agent deletes skills with `rm -rf` from the shell,
-            // which never reaches delete() — so the DB row survived and this
-            // merge, which only ever ADDED disk-only skills (the auto-discover
-            // pass below), read the orphan straight back into _skills on every
-            // load. The entry stayed in the settings list through screen
-            // re-entry AND cold start, was still navigable, and — worse than
-            // cosmetic — skillPromptFragment() kept advertising it to the model
-            // with a dead /var/minis/skills/<id>/SKILL.md path. Mirrors iOS
-            // SkillStore.loadSkills(), which does dbDeleteSkill(id:)+continue
-            // when SKILL.md is missing.
-            //
-            // BUNDLED is exempt on purpose: init{} runs loadAll() BEFORE
-            // installBundledSkills(), so on the first load after a fresh
-            // install the skill-creator row legitimately exists with nothing on
-            // disk yet. Pruning it here would discard its use_count moments
-            // before the installer re-materializes the file.
-            //
-            // Only one location to check, unlike iOS's Library+rootfs pair:
-            // PRootKernel.registerGlobalBindMounts binds /var/minis/skills
-            // straight to this same filesDir/minis-global/skills.
-            if (importSource != ImportSource.BUNDLED &&
-                !File(skillsDir, "$id/SKILL.md").exists()
-            ) {
-                db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
-                db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
-                Log.i(TAG, "Pruned orphan skill row (no SKILL.md on disk): $id")
-                continue
-            }
-            val body = readSkillMdBody(id)
-            val sourceUrlIdx = cursor.getColumnIndex("source_url")
-            val useCountIdx = cursor.getColumnIndex("use_count")
-            var description = cursor.getString(cursor.getColumnIndexOrThrow("description"))
-            var name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
-            var version = cursor.getString(cursor.getColumnIndexOrThrow("version"))
-            // Self-heal rows persisted by an earlier parser that treated YAML
-            // block scalars (`|` and `>`) as literal one-character description
-            // values. Re-parse the on-disk SKILL.md whenever the stored
-            // description is stale and update the row in place so the skills
-            // list shows the real frontmatter description.
-            //
-            // [T-android-skill-empty-description-never-refreshes] GH#215
-            // (iOS 7d0cc49a7): an EMPTY description is stale too, not just the
-            // literal "|" / ">" leftovers the original check knew about.
-            //
-            // How a skill gets stuck: the agent writes SKILL.md from the shell,
-            // and the skill can be registered while that file is still being
-            // written and has no `description:` line yet. "" is persisted, and
-            // because the stale test only matched "|" / ">", every later load
-            // trusted that "" forever. Since the DB row is keyed by directory
-            // name it survives delete-and-recreate, so touching the file,
-            // rewriting the frontmatter and even `rm -rf` + recreate all fail
-            // to heal it — only renaming the skill works, because that mints a
-            // new row id.
-            // [T-android-skill-stale-name] The NAME is stale-checked too, and
-            // independently of the description.
-            //
-            // Before, healing was gated entirely on the description: a row
-            // whose description was fine but whose name was empty never
-            // entered this block at all, and even when it did, the name was
-            // only filled in `if (name.isBlank())` — inside a branch that
-            // additionally required a non-blank re-parsed description. A skill
-            // could therefore sit with a good description and a blank name
-            // forever, showing as an empty row in the skills list while the
-            // real name sat in SKILL.md one directory away.
-            //
-            // Note on scope: the iOS report (e4af3ad81) described names stuck
-            // at the literal "Untitled Skill". That constant is iOS-only —
-            // grep finds no such string in this codebase, and Android's
-            // parseSkillMd `return null`s on a missing name rather than
-            // substituting a placeholder, so a row can only ever be stuck
-            // BLANK here, never at that literal. The check below is written
-            // against blankness for that reason; adding the iOS literal would
-            // be matching a value this platform cannot produce.
-            val nameStale = name.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(name) // nanoMuse: heal legacy quoted scalars.
-            val descStale = description == ">" || description == "|" || description.isBlank() ||
-                io.github.nanomuse.skills.SkillDocuments.isQuoted(description) // nanoMuse: heal legacy quoted scalars.
-            val versionStale = version.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(version) // nanoMuse
-            if (descStale || nameStale || versionStale) {
-                val skillMd = File(skillsDir, "$id/SKILL.md")
-                if (skillMd.exists()) {
-                    val reparsed = parseSkillMd(runCatching { skillMd.readText() }.getOrNull() ?: "")
-                    // Only ever REPLACE an empty/placeholder value with a real
-                    // one, never the reverse. A mid-edit or malformed SKILL.md
-                    // parses to null or yields an empty description, and
-                    // writing that back would wipe good metadata — the exact
-                    // hazard that kept this check narrow in the first place.
-                    // Combined with the guards above (the stored value must be
-                    // blank or a block-scalar leftover to get here), a name or
-                    // description the user deliberately set can never be
-                    // overwritten.
-                    if (reparsed != null) {
-                        var changed = false
-                        if (descStale && reparsed.description.isNotBlank() && reparsed.description != description) {
-                            description = reparsed.description
-                            changed = true
-                        }
-                        // parseSkillMd returns null unless it found a non-blank
-                        // name, so reparsed.name is always real here — but the
-                        // isNotBlank() guard is kept so this stays correct if
-                        // that parser contract ever loosens.
-                        if (nameStale && reparsed.name.isNotBlank() && reparsed.name != name) {
-                            name = reparsed.name
-                            changed = true
-                        }
-                        if (versionStale && reparsed.version != version) { // nanoMuse
-                            version = reparsed.version
-                            changed = true
-                        }
-                        if (changed) {
-                            db.execSQL(
-                                "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
-                                arrayOf<Any>(name, description, version, System.currentTimeMillis(), id),
-                            )
-                            Log.i(TAG, "Self-healed skill name/description for $id")
+        synchronized(loadIoLock) { // nanoMuse: serialize full disk+DB scan while keeping reloadLock narrow.
+            loadAllRunsForTest++
+            repeat(3) { attempt ->
+                val (genBefore, stampBefore) = synchronized(reloadLock) {
+                    stateGeneration to io.github.nanomuse.sysfiles.DiskFreshness.skillsDirStamp(skillsDir)
+                }
+
+                // Load from DB
+                val dbSkills = mutableListOf<Skill>()
+                val orphanIds = mutableListOf<String>()
+                val healedRows = mutableListOf<HealedSkillRow>()
+                val autoDiscovered = mutableListOf<Skill>()
+                var readFailed = false // nanoMuse: avoid caching a disk stamp when any row/file read fails.
+
+                // [T-android-safemode-lateinit-crash-147] `use` so the cursor is closed
+                // even when a row throws — the old code only reached close() on the
+                // success path and leaked on any failure.
+                db.rawQuery("SELECT * FROM skills ORDER BY installed_at DESC", null).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        // [T-android-safemode-lateinit-crash-147] Per-row isolation: one
+                        // malformed skill (a third-party import with a missing column or
+                        // an unparseable SKILL.md) must not discard every OTHER skill, and
+                        // must not escape into MinisApp.onCreate. Skip the bad row, keep
+                        // the rest.
+                        try {
+                            val id = cursor.getString(cursor.getColumnIndexOrThrow("id"))
+                            val importSource = ImportSource.from(cursor.getString(cursor.getColumnIndexOrThrow("import_source")))
+                            // [T-android-skill-orphan-db-row] Prune rows whose skill directory
+                            // is gone. The agent deletes skills with `rm -rf` from the shell,
+                            // which never reaches delete() — so the DB row survived and this
+                            // merge, which only ever ADDED disk-only skills (the auto-discover
+                            // pass below), read the orphan straight back into _skills on every
+                            // load. The entry stayed in the settings list through screen
+                            // re-entry AND cold start, was still navigable, and — worse than
+                            // cosmetic — skillPromptFragment() kept advertising it to the model
+                            // with a dead /var/minis/skills/<id>/SKILL.md path. Mirrors iOS
+                            // SkillStore.loadSkills(), which does dbDeleteSkill(id:)+continue
+                            // when SKILL.md is missing.
+                            //
+                            // BUNDLED is exempt on purpose: init{} runs loadAll() BEFORE
+                            // installBundledSkills(), so on the first load after a fresh
+                            // install the skill-creator row legitimately exists with nothing on
+                            // disk yet. Pruning it here would discard its use_count moments
+                            // before the installer re-materializes the file.
+                            //
+                            // Only one location to check, unlike iOS's Library+rootfs pair:
+                            // PRootKernel.registerGlobalBindMounts binds /var/minis/skills
+                            // straight to this same filesDir/minis-global/skills.
+                            if (importSource != ImportSource.BUNDLED &&
+                                !File(skillsDir, "$id/SKILL.md").exists()
+                            ) {
+                                orphanIds.add(id)
+                                continue
+                            }
+                            val bodyOrNull = readSkillMdBody(id)
+                            if (bodyOrNull == null) readFailed = true
+                            val body = bodyOrNull ?: ""
+                            val sourceUrlIdx = cursor.getColumnIndex("source_url")
+                            val useCountIdx = cursor.getColumnIndex("use_count")
+                            var description = cursor.getString(cursor.getColumnIndexOrThrow("description"))
+                            var name = cursor.getString(cursor.getColumnIndexOrThrow("name"))
+                            var version = cursor.getString(cursor.getColumnIndexOrThrow("version"))
+                            // Self-heal rows persisted by an earlier parser that treated YAML
+                            // block scalars (`|` and `>`) as literal one-character description
+                            // values. Re-parse the on-disk SKILL.md whenever the stored
+                            // description is stale and update the row in place so the skills
+                            // list shows the real frontmatter description.
+                            //
+                            // [T-android-skill-empty-description-never-refreshes] GH#215
+                            // (iOS 7d0cc49a7): an EMPTY description is stale too, not just the
+                            // literal "|" / ">" leftovers the original check knew about.
+                            //
+                            // How a skill gets stuck: the agent writes SKILL.md from the shell,
+                            // and the skill can be registered while that file is still being
+                            // written and has no `description:` line yet. "" is persisted, and
+                            // because the stale test only matched "|" / ">", every later load
+                            // trusted that "" forever. Since the DB row is keyed by directory
+                            // name it survives delete-and-recreate, so touching the file,
+                            // rewriting the frontmatter and even `rm -rf` + recreate all fail
+                            // to heal it — only renaming the skill works, because that mints a
+                            // new row id.
+                            // [T-android-skill-stale-name] The NAME is stale-checked too, and
+                            // independently of the description.
+                            //
+                            // Before, healing was gated entirely on the description: a row
+                            // whose description was fine but whose name was empty never
+                            // entered this block at all, and even when it did, the name was
+                            // only filled in `if (name.isBlank())` — inside a branch that
+                            // additionally required a non-blank re-parsed description. A skill
+                            // could therefore sit with a good description and a blank name
+                            // forever, showing as an empty row in the skills list while the
+                            // real name sat in SKILL.md one directory away.
+                            //
+                            // Note on scope: the iOS report (e4af3ad81) described names stuck
+                            // at the literal "Untitled Skill". That constant is iOS-only —
+                            // grep finds no such string in this codebase, and Android's
+                            // parseSkillMd `return null`s on a missing name rather than
+                            // substituting a placeholder, so a row can only ever be stuck
+                            // BLANK here, never at that literal. The check below is written
+                            // against blankness for that reason; adding the iOS literal would
+                            // be matching a value this platform cannot produce.
+                            val nameStale = name.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(name) // nanoMuse: heal legacy quoted scalars.
+                            val descStale = description == ">" || description == "|" || description.isBlank() ||
+                                io.github.nanomuse.skills.SkillDocuments.isQuoted(description) // nanoMuse: heal legacy quoted scalars.
+                            val versionStale = version.isBlank() || io.github.nanomuse.skills.SkillDocuments.isQuoted(version) // nanoMuse
+                            if (descStale || nameStale || versionStale) {
+                                val skillMd = File(skillsDir, "$id/SKILL.md")
+                                if (skillMd.exists()) {
+                                    val reparsedContent = try {
+                                        skillMd.readText()
+                                    } catch (_: Exception) {
+                                        readFailed = true // nanoMuse: avoid caching when self-heal read fails.
+                                        null
+                                    }
+                                    val reparsed = reparsedContent?.let { parseSkillMd(it) }
+                                    // Only ever REPLACE an empty/placeholder value with a real
+                                    // one, never the reverse. A mid-edit or malformed SKILL.md
+                                    // parses to null or yields an empty description, and
+                                    // writing that back would wipe good metadata — the exact
+                                    // hazard that kept this check narrow in the first place.
+                                    // Combined with the guards above (the stored value must be
+                                    // blank or a block-scalar leftover to get here), a name or
+                                    // description the user deliberately set can never be
+                                    // overwritten.
+                                    if (reparsed != null) {
+                                        var changed = false
+                                        if (descStale && reparsed.description.isNotBlank() && reparsed.description != description) {
+                                            description = reparsed.description
+                                            changed = true
+                                        }
+                                        // parseSkillMd returns null unless it found a non-blank
+                                        // name, so reparsed.name is always real here — but the
+                                        // isNotBlank() guard is kept so this stays correct if
+                                        // that parser contract ever loosens.
+                                        if (nameStale && reparsed.name.isNotBlank() && reparsed.name != name) {
+                                            name = reparsed.name
+                                            changed = true
+                                        }
+                                        if (versionStale && reparsed.version != version) { // nanoMuse
+                                            version = reparsed.version
+                                            changed = true
+                                        }
+                                        if (changed) {
+                                            healedRows.add(
+                                                HealedSkillRow(
+                                                    id = id,
+                                                    name = name,
+                                                    description = description,
+                                                    version = version,
+                                                    updatedAt = System.currentTimeMillis(),
+                                                ),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            dbSkills.add(Skill(
+                                id = id,
+                                name = name,
+                                description = description,
+                                version = version,
+                                importSource = importSource,
+                                isEnabled = cursor.getInt(cursor.getColumnIndexOrThrow("is_enabled")) == 1,
+                                installedAt = cursor.getLong(cursor.getColumnIndexOrThrow("installed_at")),
+                                updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow("updated_at")),
+                                body = body,
+                                sourceURL = if (sourceUrlIdx >= 0 && !cursor.isNull(sourceUrlIdx)) cursor.getString(sourceUrlIdx) else null,
+                                useCount = if (useCountIdx >= 0) cursor.getDouble(useCountIdx) else 0.0,
+                            ))
+                        } catch (t: Throwable) {
+                            readFailed = true // nanoMuse: avoid caching incomplete row snapshot.
+                            Log.e(TAG, "skipping unreadable skill row: ${t.message}", t)
                         }
                     }
                 }
-            }
-            dbSkills.add(Skill(
-                id = id,
-                name = name,
-                description = description,
-                version = version,
-                importSource = importSource,
-                isEnabled = cursor.getInt(cursor.getColumnIndexOrThrow("is_enabled")) == 1,
-                installedAt = cursor.getLong(cursor.getColumnIndexOrThrow("installed_at")),
-                updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow("updated_at")),
-                body = body,
-                sourceURL = if (sourceUrlIdx >= 0 && !cursor.isNull(sourceUrlIdx)) cursor.getString(sourceUrlIdx) else null,
-                useCount = if (useCountIdx >= 0) cursor.getDouble(useCountIdx) else 0.0,
-            ))
-            } catch (t: Throwable) {
-                Log.e(TAG, "skipping unreadable skill row: ${t.message}", t)
-            }
-        }
-        }
 
-        // Auto-discover skills on disk without DB entries
-        val onDisk = skillsDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
-        for (dir in onDisk) {
-            val skillMd = File(dir, "SKILL.md")
-            if (skillMd.exists() && dbSkills.none { it.id == dir.name }) {
-                val parsed = parseSkillMd(skillMd.readText())
-                if (parsed != null) {
-                    val skill = Skill(
-                        id = dir.name,
-                        name = parsed.name,
-                        description = parsed.description,
-                        importSource = ImportSource.SESSION,
-                        body = parsed.body,
-                    )
-                    insertDb(skill)
-                    dbSkills.add(skill)
-                    Log.i(TAG, "Auto-discovered skill: ${dir.name}")
+                // Auto-discover skills on disk without DB entries
+                val onDisk = skillsDir.listFiles()?.filter { it.isDirectory } ?: emptyList()
+                for (dir in onDisk) {
+                    val skillMd = File(dir, "SKILL.md")
+                    if (skillMd.exists() && dbSkills.none { it.id == dir.name }) {
+                        val content = try {
+                            skillMd.readText()
+                        } catch (e: Exception) {
+                            readFailed = true // nanoMuse: avoid caching when disk SKILL.md read fails.
+                            Log.w(TAG, "Skipping unreadable SKILL.md in ${dir.name}: ${e.message}")
+                            continue
+                        }
+                        val parsed = parseSkillMd(content)
+                        if (parsed != null) {
+                            val skill = Skill(
+                                id = dir.name,
+                                name = parsed.name,
+                                description = parsed.description,
+                                importSource = ImportSource.SESSION,
+                                body = parsed.body,
+                            )
+                            autoDiscovered.add(skill)
+                            dbSkills.add(skill)
+                        }
+                    }
                 }
+
+                onBeforeLoadCommitForTest?.invoke()
+                val committed = synchronized(reloadLock) { // nanoMuse: publish and reconcile only if no mutation raced.
+                    if (stateGeneration != genBefore) {
+                        if (attempt == 2) {
+                            loadedDiskStamp = null // nanoMuse: mutation kept racing; ensure next reload retries.
+                        }
+                        false
+                    } else {
+                        for (id in orphanIds) {
+                            db.execSQL("DELETE FROM skills WHERE id=?", arrayOf(id))
+                            db.execSQL("DELETE FROM session_skill_overrides WHERE skill_id=?", arrayOf(id))
+                            Log.i(TAG, "Pruned orphan skill row (no SKILL.md on disk): $id")
+                        }
+                        for (row in healedRows) {
+                            db.execSQL(
+                                "UPDATE skills SET name=?, description=?, version=?, updated_at=? WHERE id=?",
+                                arrayOf<Any>(row.name, row.description, row.version, row.updatedAt, row.id),
+                            )
+                            Log.i(TAG, "Self-healed skill name/description for ${row.id}")
+                        }
+                        for (skill in autoDiscovered) {
+                            insertDb(skill)
+                            Log.i(TAG, "Auto-discovered skill: ${skill.id}")
+                        }
+                        _skills.value = dbSkills
+                        loadedDiskStamp = if (readFailed) null else stampBefore // nanoMuse: keep pre-read stamp unless a read failed.
+                        true
+                    }
+                }
+                if (committed) return
             }
         }
-
-        _skills.value = dbSkills
     }
 
     private fun insertDb(skill: Skill) {
@@ -1347,13 +1552,20 @@ class SkillRepository(private val context: Context) {
         val dir = File(skillsDir, skill.id)
         dir.mkdirs()
         File(dir, "SKILL.md").writeText(content)
+        refreshDiskStampForId(skill.id) // nanoMuse: update only this id's stamp so external disk changes stay pending.
         return true
     }
 
-    private fun readSkillMdBody(id: String): String {
+    // nanoMuse: return null on disk read failure so loadAll avoids caching an incomplete snapshot.
+    private fun readSkillMdBody(id: String): String? {
         val file = File(skillsDir, "$id/SKILL.md")
-        if (!file.exists()) return ""
-        val parsed = parseSkillMd(file.readText())
+        val content = try {
+            if (!file.isFile) return ""
+            file.readText()
+        } catch (_: Exception) {
+            return null
+        }
+        val parsed = parseSkillMd(content)
         return parsed?.body ?: ""
     }
 

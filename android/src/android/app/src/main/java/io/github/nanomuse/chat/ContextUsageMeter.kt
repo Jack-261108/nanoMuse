@@ -12,8 +12,18 @@ class ContextUsageMeter {
         internal val messages: List<String>,
     )
 
+    private data class ConfigurationKey(
+        val routeKey: String,
+        val modelId: String,
+        val requestVariant: String,
+        val systemPrompt: String?,
+        val tools: List<AgentToolDefinition>,
+    )
+
     private data class Observation(val request: Request, val usage: ContextEstimate.UsageAnchor)
     private var observation: Observation? = null
+    private var cachedConfigurationKey: ConfigurationKey? = null
+    private var cachedConfigurationDigest: String? = null
 
     /** A known server input count must not be overruled by a calibration-only overflow probe. */
     @Volatile
@@ -33,7 +43,31 @@ class ContextUsageMeter {
         tools: List<AgentToolDefinition> = emptyList(),
         requestVariant: String = "",
     ): Request {
-        val configuration = Fingerprint().apply {
+        val configuration = configurationDigest(routeKey, modelId, requestVariant, systemPrompt, tools)
+        return Request(configuration, messages.map(::messageFingerprint))
+    }
+
+    @Synchronized
+    private fun configurationDigest(
+        routeKey: String,
+        modelId: String,
+        requestVariant: String,
+        systemPrompt: String?,
+        tools: List<AgentToolDefinition>,
+    ): String {
+        val prev = cachedConfigurationKey
+        val cached = cachedConfigurationDigest
+        if (prev != null && cached != null &&
+            prev.routeKey == routeKey &&
+            prev.modelId == modelId &&
+            prev.requestVariant == requestVariant &&
+            prev.systemPrompt == systemPrompt &&
+            prev.tools == tools
+        ) {
+            return cached
+        }
+        val key = ConfigurationKey(routeKey, modelId, requestVariant, systemPrompt, tools.toList())
+        val digest = Fingerprint().apply {
             field(routeKey)
             field(modelId)
             field(requestVariant)
@@ -41,7 +75,9 @@ class ContextUsageMeter {
             field(tools.size.toString())
             tools.forEach { field(it.toOpenAIJson().toString()) }
         }.finish()
-        return Request(configuration, messages.map(::messageFingerprint))
+        cachedConfigurationKey = key
+        cachedConfigurationDigest = digest
+        return digest
     }
 
     @Synchronized

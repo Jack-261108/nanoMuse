@@ -95,6 +95,11 @@ class MCPRepository(private val context: Context) {
     private val _servers = MutableStateFlow<List<MCPServerConfig>>(emptyList())
     val servers: StateFlow<List<MCPServerConfig>> = _servers.asStateFlow()
 
+    // nanoMuse: avoid re-reading and re-parsing servers.json when disk metadata is unchanged.
+    private val reloadLock = Any()
+    private var loadedServersStamp: io.github.nanomuse.sysfiles.FileStamp? = null
+    internal var diskLoadsForTest: Int = 0 // nanoMuse: test-visible cache-miss counter.
+
     private val db: SQLiteDatabase by lazy {
         McpDbHelper(context).writableDatabase
     }
@@ -112,27 +117,52 @@ class MCPRepository(private val context: Context) {
 
     // -- Load / Save (servers.json is the source of truth) --
 
+    private data class ReadServersResult(
+        val servers: List<MCPServerConfig>,
+        val needsPersist: Boolean,
+        val cacheable: Boolean,
+    )
+
     /** Re-read `servers.json` from disk and re-publish [servers]. */
     fun load() {
-        _servers.value = readServersFile()
+        synchronized(reloadLock) { // nanoMuse: capture disk stamp before reading so concurrent writes aren't skipped.
+            diskLoadsForTest++
+            val stampBefore = io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(serversFile)
+            val result = readServersFile()
+            _servers.value = result.servers
+            if (result.needsPersist) {
+                save(result.servers)
+            } else if (result.cacheable) {
+                loadedServersStamp = stampBefore
+            } else {
+                loadedServersStamp = null // nanoMuse: do not cache stamp after transient read/parse failure.
+            }
+        }
     }
 
     /** Alias matching SkillRepository.reloadFromDisk() so callers read symmetrically. */
-    fun reloadFromDisk() = load()
+    fun reloadFromDisk() {
+        synchronized(reloadLock) { // nanoMuse: skip unchanged servers.json before sending a chat turn.
+            val currentStamp = io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(serversFile)
+            if (loadedServersStamp == currentStamp) return
+            load()
+        }
+    }
 
-    private fun readServersFile(): List<MCPServerConfig> {
+    private fun readServersFile(): ReadServersResult {
         val file = serversFile
-        if (!file.exists()) return emptyList()
+        if (!file.exists()) return ReadServersResult(emptyList(), needsPersist = false, cacheable = true)
         val text = try { file.readText() } catch (e: Exception) {
             Log.w(TAG, "Failed to read servers.json: ${e.message}")
-            return emptyList()
+            return ReadServersResult(emptyList(), needsPersist = false, cacheable = false)
         }
-        if (text.isBlank()) return emptyList()
+        if (text.isBlank()) return ReadServersResult(emptyList(), needsPersist = false, cacheable = false)
         val root = try { JSONObject(text) } catch (e: Exception) {
             Log.w(TAG, "servers.json is not valid JSON: ${e.message}")
-            return emptyList()
+            return ReadServersResult(emptyList(), needsPersist = false, cacheable = false)
         }
-        val obj = root.optJSONObject("mcpServers") ?: return emptyList()
+        val obj = root.optJSONObject("mcpServers")
+            ?: return ReadServersResult(emptyList(), needsPersist = false, cacheable = false)
         val out = mutableListOf<MCPServerConfig>()
         // [T-mcp-review-fixes-android] FIX 2: createdAt must be a STABLE recency
         // signal. Entries written by the CLI / JSON-import have no createdAt; we
@@ -158,25 +188,25 @@ class MCPRepository(private val context: Context) {
             idx++
         }
         val sorted = out.sortedByDescending { it.createdAt }
-        // Persist the freshly-assigned createdAt values once so subsequent reads
-        // are stable. Pass the list explicitly — _servers.value isn't updated
-        // until load() returns this.
-        if (needsPersist) save(sorted)
-        return sorted
+        return ReadServersResult(sorted, needsPersist = needsPersist, cacheable = true)
     }
 
-    /** Write [list] (defaults to current [servers]) to servers.json in mcpServers format. */
-    private fun save(list: List<MCPServerConfig> = _servers.value) {
-        mcpDir.mkdirs()
-        val mcpServers = JSONObject()
-        for (s in list) {
-            mcpServers.put(s.id, entryToJson(s))
-        }
-        val root = JSONObject().put("mcpServers", mcpServers)
-        try {
-            serversFile.writeText(root.toString(2))
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to write servers.json: ${e.message}")
+    /** Write [list] to servers.json in mcpServers format. */
+    private fun save(list: List<MCPServerConfig>) {
+        synchronized(reloadLock) { // nanoMuse: keep disk stamp in sync after internal saves.
+            mcpDir.mkdirs()
+            val mcpServers = JSONObject()
+            for (s in list) {
+                mcpServers.put(s.id, entryToJson(s))
+            }
+            val root = JSONObject().put("mcpServers", mcpServers)
+            try {
+                serversFile.writeText(root.toString(2))
+                loadedServersStamp = io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(serversFile)
+            } catch (e: Exception) {
+                loadedServersStamp = null // nanoMuse: force next reloadFromDisk to reconcile after failed write.
+                Log.e(TAG, "Failed to write servers.json: ${e.message}")
+            }
         }
     }
 
@@ -277,36 +307,50 @@ class MCPRepository(private val context: Context) {
     /** Add or overwrite a server (rename/overwrite is last-write-wins by id). */
     fun add(server: MCPServerConfig): Boolean {
         if (server.id.isBlank()) return false
-        _servers.value = _servers.value.filter { it.id != server.id } + server
-        save()
+        synchronized(reloadLock) { // nanoMuse: serialize read-modify-save with load/reloadFromDisk.
+            val next = _servers.value.filter { it.id != server.id } + server
+            _servers.value = next
+            save(next)
+        }
         Log.i(TAG, "Added MCP server: ${server.id}")
         return true
     }
 
     fun update(server: MCPServerConfig): Boolean {
-        if (_servers.value.none { it.id == server.id }) return false
-        _servers.value = _servers.value.map { if (it.id == server.id) server else it }
-        save()
-        return true
+        synchronized(reloadLock) { // nanoMuse: serialize read-modify-save with load/reloadFromDisk.
+            if (_servers.value.none { it.id == server.id }) return false
+            val next = _servers.value.map { if (it.id == server.id) server else it }
+            _servers.value = next
+            save(next)
+            return true
+        }
     }
 
     fun delete(id: String) {
-        db.execSQL("DELETE FROM mcp_session_overrides WHERE mcp_id=?", arrayOf(id))
-        _servers.value = _servers.value.filter { it.id != id }
-        save()
+        synchronized(reloadLock) { // nanoMuse: serialize read-modify-save with load/reloadFromDisk.
+            db.execSQL("DELETE FROM mcp_session_overrides WHERE mcp_id=?", arrayOf(id))
+            val next = _servers.value.filter { it.id != id }
+            _servers.value = next
+            save(next)
+        }
         Log.i(TAG, "Deleted MCP server: $id")
     }
 
     fun setEnabled(id: String, enabled: Boolean) {
-        _servers.value = _servers.value.map {
-            if (it.id == id) it.copy(enabled = enabled) else it
+        synchronized(reloadLock) { // nanoMuse: serialize read-modify-save with load/reloadFromDisk.
+            val next = _servers.value.map {
+                if (it.id == id) it.copy(enabled = enabled) else it
+            }
+            _servers.value = next
+            save(next)
         }
-        save()
     }
 
     fun toggle(id: String) {
-        val current = _servers.value.find { it.id == id } ?: return
-        setEnabled(id, !current.enabled)
+        synchronized(reloadLock) { // nanoMuse: read current enabled state and save atomically.
+            val current = _servers.value.find { it.id == id } ?: return
+            setEnabled(id, !current.enabled)
+        }
     }
 
     // -- Session Overrides (mirror SkillRepository) --
@@ -390,9 +434,12 @@ class MCPRepository(private val context: Context) {
         if (parsed.isEmpty()) return emptyList()
         // Merge: overwrite same-name entries, keep the rest.
         val incomingIds = parsed.mapTo(HashSet()) { it.id }
-        _servers.value = _servers.value.filter { it.id !in incomingIds } + parsed
-        _servers.value = _servers.value.sortedByDescending { it.createdAt }
-        save()
+        synchronized(reloadLock) { // nanoMuse: serialize read-modify-save with load/reloadFromDisk.
+            val next = (_servers.value.filter { it.id !in incomingIds } + parsed)
+                .sortedByDescending { it.createdAt }
+            _servers.value = next
+            save(next)
+        }
         Log.i(TAG, "Imported ${parsed.size} MCP server(s)")
         return parsed
     }

@@ -54,6 +54,22 @@ class MemoryRepository(private val memoryDir: File) {
         private const val MAX_OUTPUT_BYTES = 30 * 1024  // 30 KB
     }
 
+    // nanoMuse: skip reading GLOBAL.md and recent daily files on every send when unchanged on disk.
+    private val promptCacheLock = Any()
+    private var cachedGlobalStamp: io.github.nanomuse.sysfiles.FileStamp? = null
+    private var cachedGlobalFragment: String? = null
+    private var cachedDailyKey: Pair<String, List<io.github.nanomuse.sysfiles.FileStamp>>? = null
+    private var cachedDailyFragment: String? = null
+    internal var globalDiskReadsForTest: Int = 0 // nanoMuse: test-visible cache-miss counter.
+    internal var dailyDiskReadsForTest: Int = 0 // nanoMuse: test-visible cache-miss counter.
+
+    private fun invalidatePromptCache() {
+        synchronized(promptCacheLock) {
+            cachedGlobalStamp = null
+            cachedDailyKey = null
+        }
+    }
+
     init {
         memoryDir.mkdirs()
     }
@@ -86,6 +102,8 @@ class MemoryRepository(private val memoryDir: File) {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to write memory", e)
             "Error writing memory: ${e.message}"
+        } finally {
+            invalidatePromptCache() // nanoMuse
         }
     }
 
@@ -255,15 +273,37 @@ class MemoryRepository(private val memoryDir: File) {
      * is missing or empty.
      */
     fun loadGlobalMemoryFragment(): String? {
-        val globalFile = File(memoryDir, GLOBAL_FILE)
-        if (!globalFile.exists()) return null
-        val content = try { globalFile.readText() } catch (_: Exception) { "" }
-        // Match iOS: literal-empty check (`!content.isEmpty`), not blank.
-        // A whitespace-only file is unusual in practice, but staying byte-for-
-        // byte consistent with iOS keeps the cached system prompt identical
-        // across platforms.
-        if (content.isEmpty()) return null
-        return "Global memory (GLOBAL.md — read-only, user-maintained). Treat these as background context, not standing instructions. If the user's latest message conflicts with or supersedes anything here (different scope, different numbers, different goal), defer to the user's latest message:\n$content"
+        synchronized(promptCacheLock) { // nanoMuse: avoid re-reading unchanged GLOBAL.md before every turn.
+            val globalFile = File(memoryDir, GLOBAL_FILE)
+            val stamp = io.github.nanomuse.sysfiles.DiskFreshness.fileStamp(globalFile)
+            if (cachedGlobalStamp == stamp) return cachedGlobalFragment
+            globalDiskReadsForTest++
+            var readFailed = false
+            val fragment = if (!stamp.exists) {
+                null
+            } else {
+                val content = try {
+                    globalFile.readText()
+                } catch (_: Exception) {
+                    readFailed = true
+                    ""
+                }
+                // Match iOS: literal-empty check (`!content.isEmpty`), not blank.
+                // A whitespace-only file is unusual in practice, but staying byte-for-
+                // byte consistent with iOS keeps the cached system prompt identical
+                // across platforms.
+                if (content.isEmpty()) null
+                else "Global memory (GLOBAL.md — read-only, user-maintained). Treat these as background context, not standing instructions. If the user's latest message conflicts with or supersedes anything here (different scope, different numbers, different goal), defer to the user's latest message:\n$content"
+            }
+            if (readFailed) {
+                cachedGlobalStamp = null // nanoMuse: do not cache stamp after transient read failure.
+                cachedGlobalFragment = null
+            } else {
+                cachedGlobalStamp = stamp
+                cachedGlobalFragment = fragment
+            }
+            return fragment
+        }
     }
 
     /**
@@ -274,68 +314,92 @@ class MemoryRepository(private val memoryDir: File) {
      * "(N more lines, use memory_get to search)" continuation.
      */
     fun loadRecentDailyMemoryFragment(): String? {
-        val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val now = Date()
-        val fragments = mutableListOf<String>()
-        // [XSessionDiag] Names of the logs actually injected, for the diagnostic
-        // line below. Collected alongside `fragments` so the log can name the
-        // source files rather than just a count.
-        val injectedFiles = mutableListOf<String>()
-        var dayOffset = 0
+        synchronized(promptCacheLock) { // nanoMuse: skip 30-day disk reads/line-splitting when unchanged.
+            val dateFmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val now = Date()
+            val todayStr = dateFmt.format(now)
+            val candidates = (0 until MAX_LOOKBACK_DAYS).map { dayOffset ->
+                val date = Date(now.time - dayOffset.toLong() * 86400_000L)
+                val dateStr = dateFmt.format(date)
+                Triple(dayOffset, dateStr, File(memoryDir, "$dateStr.md"))
+            }
+            val cacheKey = todayStr to io.github.nanomuse.sysfiles.DiskFreshness.fileStamps(
+                candidates.map { it.third },
+            )
+            if (cachedDailyKey == cacheKey) return cachedDailyFragment
+            dailyDiskReadsForTest++
+            var readFailed = false
+            val fragments = mutableListOf<String>()
+            // [XSessionDiag] Names of the logs actually injected, for the diagnostic
+            // line below. Collected alongside `fragments` so the log can name the
+            // source files rather than just a count.
+            val injectedFiles = mutableListOf<String>()
 
-        while (fragments.size < MAX_RECENT_FILES && dayOffset < MAX_LOOKBACK_DAYS) {
-            val date = Date(now.time - dayOffset.toLong() * 86400_000L)
-            val dateStr = dateFmt.format(date)
-            val file = File(memoryDir, "$dateStr.md")
-
-            if (file.exists()) {
-                val content = try { file.readText() } catch (_: Exception) { "" }
-                if (content.isNotEmpty()) {
-                    val lines = content.lines()
-                    val preview = lines.take(MAX_INJECT_LINES).joinToString("\n")
-                    val label = when (dayOffset) {
-                        0 -> "Today's"
-                        1 -> "Yesterday's"
-                        else -> dateStr
+            for ((dayOffset, dateStr, file) in candidates) {
+                if (fragments.size >= MAX_RECENT_FILES) break
+                if (file.exists()) {
+                    val content = try {
+                        file.readText()
+                    } catch (_: Exception) {
+                        readFailed = true
+                        continue
                     }
-                    var entry = "$label daily log ($dateStr.md):\n$preview"
-                    if (lines.size > MAX_INJECT_LINES) {
-                        entry += "\n... (${lines.size - MAX_INJECT_LINES} more lines, use memory_get to search)"
+                    if (content.isNotEmpty()) {
+                        val lines = content.lines()
+                        val preview = lines.take(MAX_INJECT_LINES).joinToString("\n")
+                        val label = when (dayOffset) {
+                            0 -> "Today's"
+                            1 -> "Yesterday's"
+                            else -> dateStr
+                        }
+                        var entry = "$label daily log ($dateStr.md):\n$preview"
+                        if (lines.size > MAX_INJECT_LINES) {
+                            entry += "\n... (${lines.size - MAX_INJECT_LINES} more lines, use memory_get to search)"
+                        }
+                        fragments.add(entry)
+                        injectedFiles.add("$dateStr.md")
                     }
-                    fragments.add(entry)
-                    injectedFiles.add("$dateStr.md")
                 }
             }
-            dayOffset++
-        }
 
-        if (fragments.isEmpty()) return null
+            val result = if (fragments.isEmpty()) {
+                null
+            } else {
+                // [XSessionDiag] Hypothesis 3: these fragments are injected into EVERY
+                // session's system prompt, so a task described in a previous session's
+                // daily log is visible to a brand-new chat. The prompt already asks the
+                // model not to resume them ("they describe past tasks, not the current
+                // one"), but that is a prompt-level defence only — a weak model can and
+                // did ignore it (the noVNC incident: "为了你最早那句需求").
+                //
+                // Logged: which files were injected, how large, and whether the text
+                // carries task-resumption vocabulary. The keyword scan is READ-ONLY and
+                // used solely to tag the log line — it feeds no decision.
+                run {
+                    val body = fragments.joinToString("\n\n")
+                    val hits = DIAG_TASK_KEYWORDS.filter { body.contains(it, ignoreCase = true) }
+                    AppLogger.info(
+                        TAG,
+                        "[XSessionDiag] memory/daily-inject: files=[${injectedFiles.joinToString(",")}] " +
+                            "fragments=${fragments.size} chars=${body.length} " +
+                            "taskKeywords=${if (hits.isEmpty()) "none" else hits.joinToString("|")}",
+                    )
+                }
 
-        // [XSessionDiag] Hypothesis 3: these fragments are injected into EVERY
-        // session's system prompt, so a task described in a previous session's
-        // daily log is visible to a brand-new chat. The prompt already asks the
-        // model not to resume them ("they describe past tasks, not the current
-        // one"), but that is a prompt-level defence only — a weak model can and
-        // did ignore it (the noVNC incident: "为了你最早那句需求").
-        //
-        // Logged: which files were injected, how large, and whether the text
-        // carries task-resumption vocabulary. The keyword scan is READ-ONLY and
-        // used solely to tag the log line — it feeds no decision.
-        run {
-            val body = fragments.joinToString("\n\n")
-            val hits = DIAG_TASK_KEYWORDS.filter { body.contains(it, ignoreCase = true) }
-            AppLogger.info(
-                TAG,
-                "[XSessionDiag] memory/daily-inject: files=[${injectedFiles.joinToString(",")}] " +
-                    "fragments=${fragments.size} chars=${body.length} " +
-                    "taskKeywords=${if (hits.isEmpty()) "none" else hits.joinToString("|")}",
-            )
-        }
-
-        return buildString {
-            append("Recent memories (auto-injected from daily logs):\n")
-            append("These are memories saved by you or the user in previous sessions. Treat them as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
-            append(fragments.joinToString("\n\n"))
+                buildString {
+                    append("Recent memories (auto-injected from daily logs):\n")
+                    append("These are memories saved by you or the user in previous sessions. Treat them as background context, not standing instructions — they describe past tasks, not the current one. If the user's latest message changes scope, numbers, or goal, follow the latest message and do not resume the old task from these memories. Do not delete or rewrite these files unless the user explicitly asks. Use memory_get to search for more, or memory_write to save new ones.\n\n")
+                    append(fragments.joinToString("\n\n"))
+                }
+            }
+            if (readFailed) {
+                cachedDailyKey = null // nanoMuse: do not cache stamps when any daily log failed to read.
+                cachedDailyFragment = null
+            } else {
+                cachedDailyKey = cacheKey
+                cachedDailyFragment = result
+            }
+            return result
         }
     }
 
@@ -394,7 +458,11 @@ class MemoryRepository(private val memoryDir: File) {
     }
 
     fun saveGlobalMd(content: String) {
-        File(memoryDir, GLOBAL_FILE).writeText(content)
+        try {
+            File(memoryDir, GLOBAL_FILE).writeText(content)
+        } finally {
+            invalidatePromptCache() // nanoMuse
+        }
     }
 
     fun readFile(name: String): String {
@@ -403,12 +471,18 @@ class MemoryRepository(private val memoryDir: File) {
     }
 
     fun saveFile(name: String, content: String) {
-        File(memoryDir, name).writeText(content)
+        try {
+            File(memoryDir, name).writeText(content)
+        } finally {
+            invalidatePromptCache() // nanoMuse
+        }
     }
 
     fun deleteFile(name: String): Boolean {
         if (name == GLOBAL_FILE) return false // Cannot delete GLOBAL.md
-        return File(memoryDir, name).delete()
+        return File(memoryDir, name).delete().also { deleted ->
+            if (deleted) invalidatePromptCache() // nanoMuse
+        }
     }
 
     // -- Entry-level operations (used by Session Memory revoke/edit) --
@@ -470,6 +544,8 @@ class MemoryRepository(private val memoryDir: File) {
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to write $dateStr.md after revoke", e)
                     EntryMutationResult.IOError(e.message ?: "Unknown I/O error")
+                } finally {
+                    invalidatePromptCache() // nanoMuse
                 }
             }
         }
@@ -512,6 +588,8 @@ class MemoryRepository(private val memoryDir: File) {
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to write $dateStr.md after edit", e)
                     EntryMutationResult.IOError(e.message ?: "Unknown I/O error")
+                } finally {
+                    invalidatePromptCache() // nanoMuse
                 }
             }
         }

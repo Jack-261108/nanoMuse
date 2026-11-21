@@ -304,10 +304,12 @@ private suspend fun importSkillFromCurrentUrl(
 
         val parsed = parseSkillName(content)
         if (parsed != null) {
-            val updated = skillRepository.update(
-                id = slugify(parsed),
-                body = extractBody(content),
-            )
+            val updated = withContext(Dispatchers.IO) { // nanoMuse: keep SQLite/file skill update off the main thread.
+                skillRepository.update(
+                    id = slugify(parsed),
+                    body = extractBody(content),
+                )
+            }
             if (updated) {
                 onStateChange(HudState.SUCCESS, context.getString(R.string.skills_browser_success_updated, parsed))
                 delay(3000)

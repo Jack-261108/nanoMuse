@@ -15,8 +15,8 @@ import kotlin.math.ceil
  * Images use the caller's counter, independently of their byte size.
  */
 object ContextEstimate {
-    private const val MESSAGE_OVERHEAD = 3
-    private const val REPLY_OVERHEAD = 3
+    internal const val MESSAGE_OVERHEAD = 3
+    internal const val REPLY_OVERHEAD = 3
 
     /** Cached tokens still occupy context, even if the provider reports fresh input separately. */
     fun inputTokens(usage: LLMUsage): Int = maxOf(
@@ -65,29 +65,39 @@ object ContextEstimate {
         tools: List<AgentToolDefinition> = emptyList(),
         imageTokens: (ByteArray) -> Int = { 1000 },
     ): Int {
-        var total = REPLY_OVERHEAD
-        if (!systemPrompt.isNullOrEmpty()) total = add(total, MESSAGE_OVERHEAD, text(systemPrompt))
+        var total = add(REPLY_OVERHEAD, systemTokens(systemPrompt))
         for (message in messages) {
-            total = add(total, MESSAGE_OVERHEAD, text(message.reasoningContent.orEmpty()))
-            // Providers serialize structured parts instead of the aggregate content string.
-            // Counting both would charge the assistant's visible text twice.
-            if (message.contentParts.isEmpty()) {
-                total = add(total, text(message.content))
-            } else {
-                for (contentPart in message.contentParts) total = add(total, part(contentPart, imageTokens))
-            }
-            for (imagePart in message.imageParts) total = add(total, image(imagePart.data, imageTokens))
-            // Native audio is not tokenized as its base64 transport text. Keep the previous
-            // audio boundary: its model-dependent cost is known only from provider usage.
+            total = add(total, messageTokens(message, imageTokens))
         }
-        for (tool in tools) total = add(total, text(tool.toOpenAIJson().toString()))
+        for (tool in tools) total = add(total, toolTokens(tool))
+        return total
+    }
+
+    internal fun systemTokens(systemPrompt: String?): Int =
+        if (systemPrompt.isNullOrEmpty()) 0 else add(MESSAGE_OVERHEAD, text(systemPrompt))
+
+    internal fun toolTokens(tool: AgentToolDefinition): Int =
+        text(tool.toOpenAIJson().toString())
+
+    internal fun messageTokens(message: LLMMessage, imageTokens: (ByteArray) -> Int = { 1000 }): Int {
+        var total = add(MESSAGE_OVERHEAD, text(message.reasoningContent.orEmpty()))
+        // Providers serialize structured parts instead of the aggregate content string.
+        // Counting both would charge the assistant's visible text twice.
+        if (message.contentParts.isEmpty()) {
+            total = add(total, text(message.content))
+        } else {
+            for (contentPart in message.contentParts) total = add(total, part(contentPart, imageTokens))
+        }
+        for (imagePart in message.imageParts) total = add(total, image(imagePart.data, imageTokens))
+        // Native audio is not tokenized as its base64 transport text. Keep the previous
+        // audio boundary: its model-dependent cost is known only from provider usage.
         return total
     }
 
     private fun image(bytes: ByteArray?, imageTokens: (ByteArray) -> Int): Int =
         if (bytes == null || bytes.isEmpty()) 0 else imageTokens(bytes).coerceAtLeast(0)
 
-    private fun add(vararg counts: Int): Int {
+    internal fun add(vararg counts: Int): Int {
         var total = 0L
         for (count in counts) {
             total += count.coerceAtLeast(0)
