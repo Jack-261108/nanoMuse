@@ -614,9 +614,11 @@
     <string name="nm_hands_preview_screen">Screen</string>
     <string name="nm_hands_preview_live">LIVE</string>
     <string name="nm_hands_preview_collapse">Collapse</string>
-    <string name="nm_hands_preview_zoom_hint">Tap to shrink</string>
     <string name="nm_hands_pip_input">Operate the small view</string>
-    <string name="nm_hands_pip_input_sub">Taps and swipes on the expanded preview go to the background screen. Leave it off while the agent is working, or a stray touch lands in its app.</string>
+    <string name="nm_hands_pip_input_sub">The first tap pauses the agent and hands you the background screen. When you hand it back, the agent looks again before acting.</string>
+    <string name="nm_hands_pip_control_take">Take over</string>
+    <string name="nm_hands_pip_control_wait">Waiting…</string>
+    <string name="nm_hands_pip_control_manual">Hand back</string>
     <string name="nm_hands_pip_back">Back on the background screen</string>
     <string name="nm_hands_section_rules">How it behaves</string>
     <string name="nm_hands_rule_ladder">The screen comes last: a skill, a command or the browser first.</string>

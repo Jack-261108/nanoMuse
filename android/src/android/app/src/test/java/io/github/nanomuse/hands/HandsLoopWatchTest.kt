@@ -79,4 +79,17 @@ class HandsLoopWatchTest {
     @Test fun `the reason names the action`() {
         assertTrue(HandsLoopWatch.stopReason(tap(1, 1, "Next")).contains("tap “Next”"))
     }
+
+    @Test fun `reset clears streak and previous screen after user handover`() {
+        val w = HandsLoopWatch()
+        val s = screen(0)
+        repeat(5) { w.step(s, tap(500, 500)) }
+        assertEquals(5, w.streak)
+
+        w.reset()
+
+        assertEquals(0, w.streak)
+        assertEquals(Verdict.FINE, w.step(s, tap(500, 500)))
+        assertEquals(1, w.streak)
+    }
 }

@@ -617,9 +617,11 @@
     <string name="nm_hands_preview_screen">Layar</string>
     <string name="nm_hands_preview_live">Layar langsung</string>
     <string name="nm_hands_preview_collapse">Ciutkan</string>
-    <string name="nm_hands_preview_zoom_hint">Ketuk untuk memperkecil</string>
     <string name="nm_hands_pip_input">Operasikan tampilan kecil secara langsung</string>
-    <string name="nm_hands_pip_input_sub">Ketukan dan geseran pada pratinjau yang diperbesar dikirim ke layar latar. Biarkan mati saat agen bekerja, atau sentuhan tak sengaja akan masuk ke aplikasinya.</string>
+    <string name="nm_hands_pip_input_sub">Ketukan pertama menjeda agen dan menyerahkan layar latar kepada Anda. Saat dikembalikan, agen melihat lagi sebelum bertindak.</string>
+    <string name="nm_hands_pip_control_take">Ambil alih</string>
+    <string name="nm_hands_pip_control_wait">Menunggu…</string>
+    <string name="nm_hands_pip_control_manual">Kembalikan</string>
     <string name="nm_hands_pip_back">Kembali di layar latar</string>
     <string name="nm_hands_section_rules">Cara kerjanya</string>
     <string name="nm_hands_rule_ladder">Layar paling akhir: skill, perintah atau browser dulu.</string>

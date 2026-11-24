@@ -60,7 +60,7 @@ import kotlin.math.roundToInt
  * - 状态：工作时泛一圈深邃青蓝微光，需要用户时呼吸橙色光晕
  * - 手势：1:1 跟手拖拽，松手按速度投射落点并以临界阻尼弹簧平滑吸附到最近的角
  * - 缩放：点击在迷你悬浮窗与沉浸大窗之间丝滑切换，再次点击稳定缩回原样；
- *   开启「直接操作小画面」时在顶部展示不遮挡画面的紧凑操作条（← / 点击缩小 / ✕）
+ *   开启「直接操作小画面」时在顶部展示接管状态（← / 接管或交回 / ✕）
  */
 class HandsPipWindow(private val context: Context) {
 
@@ -88,6 +88,7 @@ class HandsPipWindow(private val context: Context) {
     private var pipInput: PipInput? = null
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var settingJob: Job? = null
+    private var controlJob: Job? = null
 
     private var currentCorner: Corner = Corner.BottomEnd
     private var currentOuterRadiusPx: Float = 0f
@@ -284,23 +285,32 @@ class HandsPipWindow(private val context: Context) {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dp(38), LinearLayout.LayoutParams.MATCH_PARENT)
+            layoutParams = LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.MATCH_PARENT)
             setOnClickListener {
                 pipInput?.back()
             }
         }
 
         val hintView = TextView(context).apply {
-            text = context.getString(R.string.nm_hands_preview_zoom_hint)
+            text = context.getString(R.string.nm_hands_pip_control_take)
             setTextColor(0xCCFFFFFF.toInt())
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             gravity = Gravity.CENTER
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
+            setPadding(dp(2), 0, dp(2), 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                setAutoSizeTextTypeUniformWithConfiguration(9, 11, 1, TypedValue.COMPLEX_UNIT_SP)
+            }
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             setOnClickListener {
-                setExpanded(false)
+                val input = pipInput ?: return@setOnClickListener
+                when (HandsPipLayout.controlHintTapAction(input.control.current)) {
+                    HandsPipLayout.ControlHintTapAction.REQUEST_CONTROL -> input.requestControl()
+                    HandsPipLayout.ControlHintTapAction.HAND_BACK -> input.handBack()
+                    HandsPipLayout.ControlHintTapAction.NONE -> Unit
+                }
             }
         }
 
@@ -310,7 +320,7 @@ class HandsPipWindow(private val context: Context) {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dp(38), LinearLayout.LayoutParams.MATCH_PARENT)
+            layoutParams = LinearLayout.LayoutParams(dp(32), LinearLayout.LayoutParams.MATCH_PARENT)
             setOnClickListener {
                 setExpanded(false)
             }
@@ -444,6 +454,7 @@ class HandsPipWindow(private val context: Context) {
             glowBorder = glow
 
             glow.setNeedsYou(isNeedsYou)
+            refreshChrome(syncRadii = false)
 
             if (!stillMotion()) {
                 rootLayout.alpha = 0f
@@ -491,8 +502,16 @@ class HandsPipWindow(private val context: Context) {
     }
 
     fun hide() {
+        val oldInput = pipInput
+        if (oldInput != null && HandsPipLayout.shouldHandBack(oldInput.control.current)) {
+            oldInput.handBack()
+        }
+        pipInput = null
+        currentFrame = null
         settingJob?.cancel()
         settingJob = null
+        controlJob?.cancel()
+        controlJob = null
         cancelSizeAnimator()
         cancelSettle()
         isDragging = false
@@ -531,16 +550,36 @@ class HandsPipWindow(private val context: Context) {
     }
 
     /** 这次运行能不能让小窗直接操作：有口子、已展开、有画面、设置里也开着。 */
-    private fun operateNow(): Boolean =
-        pipInput != null && isExpanded && currentFrame != null && Hands.pipInputEnabled(context)
+    private fun operateNow(): Boolean {
+        val input = pipInput ?: return false
+        return input.control.current != HandsControl.State.Closed &&
+            isExpanded && currentFrame != null && Hands.pipInputEnabled(context)
+    }
 
     /** 小窗的手势注入口；null 关掉直接操作，画面退回拖窗口与轻点缩放。 */
     fun setPipInput(input: PipInput?) {
+        val previous = pipInput
+        if (previous !== input && previous != null && HandsPipLayout.shouldHandBack(previous.control.current)) {
+            previous.handBack()
+        }
         pipInput = input
+        controlJob?.cancel()
+        controlJob = null
+        if (input != null) {
+            controlJob = scope.launch {
+                input.control.state.collect {
+                    refreshChrome()
+                    updateWindowSizeIfNecessary()
+                }
+            }
+        }
         // 设置页改开关时画面可能一直不动，所以订阅而不是等下一帧。
         settingJob?.cancel()
         settingJob = if (input == null) null else scope.launch {
             Hands.pipInputEnabledFlow(context).collect {
+                if (!it && HandsPipLayout.shouldHandBack(input.control.current)) {
+                    input.handBack()
+                }
                 refreshChrome()
                 updateWindowSizeIfNecessary()
             }
@@ -552,10 +591,23 @@ class HandsPipWindow(private val context: Context) {
     private fun refreshChrome(syncRadii: Boolean = sizeAnimator == null) {
         val operate = operateNow()
         val inset = insetPerSidePx(isExpanded)
+        val control = pipInput?.control?.current ?: HandsControl.State.Automatic
+        val chrome = HandsPipLayout.controlBarChrome(operate, control)
         cardView?.setPadding(inset, inset, inset, inset)
-        controlBar?.visibility = if (operate) View.VISIBLE else View.GONE
+        controlBar?.visibility = if (chrome.visible) View.VISIBLE else View.GONE
         closeWrap?.visibility = if (isExpanded && !operate) View.VISIBLE else View.GONE
         liveBadge?.visibility = if (operate) View.GONE else View.VISIBLE
+        barBackBtn?.isEnabled = chrome.backEnabled
+        barBackBtn?.alpha = if (chrome.backEnabled) 1f else 0.4f
+        barHintView?.text = context.getString(when (control) {
+            HandsControl.State.Automatic -> R.string.nm_hands_pip_control_take
+            HandsControl.State.Requesting -> R.string.nm_hands_pip_control_wait
+            HandsControl.State.Manual -> R.string.nm_hands_pip_control_manual
+            HandsControl.State.Closed -> R.string.nm_hands_pip_control_wait
+        })
+        barHintView?.isClickable = chrome.hintClickable
+        barHintView?.isEnabled = chrome.hintEnabled
+        barHintView?.alpha = if (chrome.hintEnabled) 1f else 0.6f
         if (syncRadii) {
             val (outerR, innerR) = targetRadii(isExpanded)
             applyRadii(outerR, innerR)
@@ -577,6 +629,7 @@ class HandsPipWindow(private val context: Context) {
 
     private fun setExpanded(expanded: Boolean) {
         if (isExpanded == expanded) return
+        if (!expanded) pipInput?.handBack()
         isExpanded = expanded
         cancelSizeAnimator()
         cancelSettle()
@@ -765,9 +818,26 @@ class HandsPipWindow(private val context: Context) {
         var lastAt = 0L
         var moved = false
         var operating = false
+        var requesting = false
 
         view.setOnTouchListener { v, event ->
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) operating = operateNow()
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                val input = pipInput
+                val canOperate = operateNow()
+                val action = HandsPipLayout.frameTouchAction(canOperate, input?.control?.current)
+                operating = action == HandsPipLayout.FrameTouchAction.DISPATCH_MANUAL
+                requesting = action == HandsPipLayout.FrameTouchAction.REQUEST_CONTROL_AND_CONSUME ||
+                    action == HandsPipLayout.FrameTouchAction.CONSUME_WAITING
+                if (action == HandsPipLayout.FrameTouchAction.REQUEST_CONTROL_AND_CONSUME) {
+                    input?.requestControl()
+                }
+            }
+            if (requesting) {
+                if (event.actionMasked == MotionEvent.ACTION_UP ||
+                    event.actionMasked == MotionEvent.ACTION_CANCEL
+                ) requesting = false
+                return@setOnTouchListener true
+            }
             if (!operating) return@setOnTouchListener false
             if (currentFrame == null) return@setOnTouchListener false
             when (event.actionMasked) {

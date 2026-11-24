@@ -607,9 +607,11 @@
     <string name="nm_hands_preview_screen">画面</string>
     <string name="nm_hands_preview_live">实时画面</string>
     <string name="nm_hands_preview_collapse">收起</string>
-    <string name="nm_hands_preview_zoom_hint">点击缩小</string>
     <string name="nm_hands_pip_input">直接操作小画面</string>
-    <string name="nm_hands_pip_input_sub">在展开的小画面上点按、滑动会真的送到后台屏幕。AI 正在操作时建议关着，免得误触到它正在用的 App。</string>
+    <string name="nm_hands_pip_input_sub">第一次触摸会暂停智能体，把后台屏幕交给你操作。交回后，智能体会重新观察画面再继续。</string>
+    <string name="nm_hands_pip_control_take">点击接管</string>
+    <string name="nm_hands_pip_control_wait">等待动作结束…</string>
+    <string name="nm_hands_pip_control_manual">点击交回</string>
     <string name="nm_hands_pip_back">在后台屏幕上返回</string>
     <string name="nm_hands_section_rules">它会怎么做</string>
     <string name="nm_hands_rule_ladder">屏幕排最后：先试技能、命令行、浏览器。</string>

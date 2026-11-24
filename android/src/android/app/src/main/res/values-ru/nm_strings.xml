@@ -626,9 +626,11 @@
     <string name="nm_hands_preview_screen">Экран</string>
     <string name="nm_hands_preview_live">Экран в реальном времени</string>
     <string name="nm_hands_preview_collapse">Свернуть</string>
-    <string name="nm_hands_preview_zoom_hint">Нажмите для уменьшения</string>
     <string name="nm_hands_pip_input">Управлять маленьким окном напрямую</string>
-    <string name="nm_hands_pip_input_sub">Нажатия и свайпы по увеличенному окну уходят на фоновый экран. Держите выключенным, пока работает агент, иначе случайное касание попадёт в его приложение.</string>
+    <string name="nm_hands_pip_input_sub">Первое касание приостанавливает агента и передаёт вам фоновый экран. После возврата агент снова смотрит на экран, прежде чем действовать.</string>
+    <string name="nm_hands_pip_control_take">Перехватить</string>
+    <string name="nm_hands_pip_control_wait">Ожидание…</string>
+    <string name="nm_hands_pip_control_manual">Вернуть</string>
     <string name="nm_hands_pip_back">Назад на фоновом экране</string>
     <string name="nm_hands_audio_unmuted_note">Может воспроизводиться звук (беззвучный режим недоступен)</string>
     <string name="nm_hands_section_rules">Как он себя ведёт</string>

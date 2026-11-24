@@ -617,9 +617,11 @@
     <string name="nm_hands_preview_screen">화면</string>
     <string name="nm_hands_preview_live">라이브 화면</string>
     <string name="nm_hands_preview_collapse">접기</string>
-    <string name="nm_hands_preview_zoom_hint">탭하여 축소</string>
     <string name="nm_hands_pip_input">작은 화면 직접 조작</string>
-    <string name="nm_hands_pip_input_sub">확대한 작은 화면의 탭과 밀기는 배경 화면으로 그대로 전달됩니다. 에이전트가 작업하는 동안에는 꺼 두세요. 잘못 건드리면 그 앱에 그대로 들어갑니다.</string>
+    <string name="nm_hands_pip_input_sub">첫 번째 탭은 에이전트를 잠시 멈추고 배경 화면을 넘겨받습니다. 돌려주면 에이전트가 화면을 다시 확인한 뒤 계속합니다.</string>
+    <string name="nm_hands_pip_control_take">넘겨받기</string>
+    <string name="nm_hands_pip_control_wait">대기 중…</string>
+    <string name="nm_hands_pip_control_manual">돌려주기</string>
     <string name="nm_hands_pip_back">배경 화면에서 뒤로</string>
     <string name="nm_hands_section_rules">동작 방식</string>
     <string name="nm_hands_rule_ladder">화면은 마지막입니다. 스킬, 명령, 브라우저가 먼저입니다.</string>

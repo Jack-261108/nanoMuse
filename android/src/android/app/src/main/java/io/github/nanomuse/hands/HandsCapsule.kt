@@ -245,6 +245,7 @@ class HandsCapsule(private val context: Context) {
 
     private fun togglePip() {
         if (!isVirtualScreen) return
+        if (pipVisible) pipInput?.handBack()
         pipVisible = !pipVisible
         pipWindow?.setVisible(pipVisible)
         previewToggleBtn?.text = context.getString(if (pipVisible) R.string.nm_hands_preview_collapse else R.string.nm_hands_preview_screen)

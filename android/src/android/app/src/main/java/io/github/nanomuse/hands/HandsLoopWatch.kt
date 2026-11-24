@@ -24,6 +24,13 @@ class HandsLoopWatch(private val noteAt: Int = NOTE_AT, private val stopAt: Int 
     var streak: Int = 0
         private set
 
+    /** Clears the streak and last seen screen/action, e.g. after the user took control. */
+    fun reset() {
+        lastPrint = null
+        lastAction = null
+        streak = 0
+    }
+
     /** [print] is the screen the model saw when it chose [action]; returns what to do about it. */
     fun step(print: IntArray, action: HandsAction): Verdict {
         val previous = lastAction

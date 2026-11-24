@@ -621,9 +621,11 @@
     <string name="nm_hands_preview_screen">Tela</string>
     <string name="nm_hands_preview_live">Tela ao vivo</string>
     <string name="nm_hands_preview_collapse">Recolher</string>
-    <string name="nm_hands_preview_zoom_hint">Toque para reduzir</string>
     <string name="nm_hands_pip_input">Usar a visualização pequena diretamente</string>
-    <string name="nm_hands_pip_input_sub">Toques e deslizes na visualização ampliada vão para a tela em segundo plano. Deixe desligado enquanto o agente trabalha, ou um toque perdido cai no app dele.</string>
+    <string name="nm_hands_pip_input_sub">O primeiro toque pausa o agente e entrega a tela em segundo plano a você. Ao devolver, o agente observa novamente antes de agir.</string>
+    <string name="nm_hands_pip_control_take">Assumir</string>
+    <string name="nm_hands_pip_control_wait">Aguardando…</string>
+    <string name="nm_hands_pip_control_manual">Devolver</string>
     <string name="nm_hands_pip_back">Voltar na tela em segundo plano</string>
     <string name="nm_hands_section_rules">Como ele se comporta</string>
     <string name="nm_hands_rule_ladder">A tela vem por último: primeiro uma skill, um comando ou o navegador.</string>

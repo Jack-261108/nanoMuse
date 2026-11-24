@@ -626,9 +626,11 @@
     <string name="nm_hands_preview_screen">Ekran</string>
     <string name="nm_hands_preview_live">Ekran na żywo</string>
     <string name="nm_hands_preview_collapse">Zwiń</string>
-    <string name="nm_hands_preview_zoom_hint">Dotknij, aby zmniejszyć</string>
     <string name="nm_hands_pip_input">Steruj małym podglądem bezpośrednio</string>
-    <string name="nm_hands_pip_input_sub">Dotknięcia i przesunięcia na powiększonym podglądzie trafiają do ekranu w tle. Zostaw to wyłączone, gdy agent pracuje, inaczej przypadkowe muśnięcie trafi do jego aplikacji.</string>
+    <string name="nm_hands_pip_input_sub">Pierwsze dotknięcie wstrzymuje agenta i przekazuje ci ekran w tle. Po oddaniu agent ponownie sprawdza ekran przed działaniem.</string>
+    <string name="nm_hands_pip_control_take">Przejmij</string>
+    <string name="nm_hands_pip_control_wait">Czekam…</string>
+    <string name="nm_hands_pip_control_manual">Oddaj</string>
     <string name="nm_hands_pip_back">Wstecz na ekranie w tle</string>
     <string name="nm_hands_audio_unmuted_note">Może wydawać dźwięk (wyciszenie niedostępne)</string>
     <string name="nm_hands_section_rules">Jak się zachowuje</string>

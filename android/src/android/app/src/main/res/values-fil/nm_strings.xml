@@ -620,9 +620,11 @@
     <string name="nm_hands_preview_screen">Screen</string>
     <string name="nm_hands_preview_live">Live screen</string>
     <string name="nm_hands_preview_collapse">I-collapse</string>
-    <string name="nm_hands_preview_zoom_hint">I-tap para lumiit</string>
     <string name="nm_hands_pip_input">Gamitin nang direkta ang maliit na view</string>
-    <string name="nm_hands_pip_input_sub">Ang mga tap at swipe sa pinalaking preview ay napupunta sa background screen. Iwang nakapatay habang nagtatrabaho ang agent, o may maling tap na mahuhulog sa app nito.</string>
+    <string name="nm_hands_pip_input_sub">Ang unang tap ay nagpapahinto sa agent at ibinibigay sa iyo ang background screen. Kapag ibinalik mo ito, titingnan muli ng agent bago kumilos.</string>
+    <string name="nm_hands_pip_control_take">Kunin ang kontrol</string>
+    <string name="nm_hands_pip_control_wait">Naghihintay…</string>
+    <string name="nm_hands_pip_control_manual">Ibalik</string>
     <string name="nm_hands_pip_back">Bumalik sa background screen</string>
     <string name="nm_hands_audio_unmuted_note">Maaaring tumunog (hindi ma-mute)</string>
     <string name="nm_hands_section_rules">Paano ito kumikilos</string>
