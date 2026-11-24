@@ -17,9 +17,11 @@ import io.github.nanomuse.shell.AppsAfterTask
 import io.github.nanomuse.shell.INanoMuseShell
 import io.github.nanomuse.shell.MainScreenSpill
 import io.github.nanomuse.shell.MainScreenWatch
+import io.github.nanomuse.shell.ShellService
 import io.github.nanomuse.shell.SystemPickers
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 屏幕操作目标抽象：支持主屏 (MainDisplayTarget) 与虚拟屏 (VirtualDisplayTarget)。
@@ -29,6 +31,8 @@ interface HandsDisplayTarget {
     val isVirtual: Boolean
     val width: Int
     val height: Int
+    /** Virtual screens have a handover; the main screen keeps its existing approval flow. */
+    val control: HandsControl? get() = null
 
     fun captureScreenshot(): Bitmap?
     fun tap(x: Int, y: Int): Boolean
@@ -156,21 +160,71 @@ class VirtualDisplayTarget(
     override val width: Int get() = display.width
     override val height: Int get() = display.height
     override val previewFrames: StateFlow<Bitmap?> get() = display.frames
+    override val control = HandsControl()
 
     private var takeoverTaskId: Int = -1
+    @Volatile private var mainScreenTakeover: Boolean = false
+    private val cancelGen = AtomicLong(0L)
+
+    /**
+     * 接管申请可能等待 Agent 当前动作结束（最长 10 秒），单独放在控制线程上，
+     * 避免排队堵住小窗输入或取消交回。
+     */
+    private val controlExecutorLazy = lazy {
+        Executors.newSingleThreadExecutor { r -> Thread(r, "nanomuse-pip-control").apply { isDaemon = true } }
+    }
+    private val controlExecutor by controlExecutorLazy
 
     /**
      * 注入会沿笔迹逐点等待，不能占界面线程，所以单开一条线程。
      * 小窗操作是用户的额外手段，失败只记日志：它不决定任务的成败。
      */
-    private val inputExecutor by lazy {
+    private val inputExecutorLazy = lazy {
         Executors.newSingleThreadExecutor { r -> Thread(r, "nanomuse-pip-input").apply { isDaemon = true } }
     }
+    private val inputExecutor by inputExecutorLazy
 
     override val pipInput: PipInput by lazy {
         object : PipInput {
-            override fun tap(fx: Float, fy: Float) = inject {
-                shell.injectTap(displayId, (fx * width).toInt(), (fy * height).toInt())
+            override val control: HandsControl get() = this@VirtualDisplayTarget.control
+
+            override fun requestControl() {
+                if (mainScreenTakeover) return
+                val cancelEpoch = cancelGen.get()
+                runControl {
+                    if (mainScreenTakeover || cancelGen.get() != cancelEpoch) return@runControl
+                    when (control.begin()) {
+                        HandsControl.BeginResult.Acquired -> {
+                            if (mainScreenTakeover || cancelGen.get() != cancelEpoch) {
+                                control.handBack()
+                            }
+                        }
+                        HandsControl.BeginResult.TimedOut -> {
+                            AppLogger.warning(tag, "preview control request timed out waiting for the current action")
+                        }
+                        HandsControl.BeginResult.Cancelled,
+                        HandsControl.BeginResult.BusyOrClosed -> Unit
+                    }
+                }
+            }
+
+            override fun handBack() {
+                cancelGen.incrementAndGet()
+                // Requesting 态直接非阻塞取消等待中的 begin()；仅 Manual 态经 inputExecutor 与已排队输入保序。
+                if (control.cancelRequest()) return
+                if (control.current == HandsControl.State.Manual) {
+                    runInput { control.handBack() }
+                }
+            }
+
+            override fun tap(fx: Float, fy: Float) {
+                if (control.current != HandsControl.State.Manual) return
+                val version = control.version
+                runInput {
+                    control.userInput(expectedVersion = version) {
+                        shell.injectTap(displayId, (fx * width).toInt(), (fy * height).toInt())
+                    }
+                }
             }
 
             override fun swipe(points: List<Pair<Float, Float>>, durationMs: Long) {
@@ -178,20 +232,36 @@ class VirtualDisplayTarget(
                     points.firstOrNull()?.let { tap(it.first, it.second) }
                     return
                 }
-                inject {
-                    val n = points.size
-                    shell.injectStroke(
-                        displayId,
-                        IntArray(n) { (points[it].first * width).toInt() },
-                        IntArray(n) { (points[it].second * height).toInt() },
-                        LongArray(n) { durationMs * it / (n - 1) },
-                    )
+                if (control.current != HandsControl.State.Manual) return
+                val version = control.version
+                runInput {
+                    control.userInput(expectedVersion = version) {
+                        val n = points.size
+                        shell.injectStroke(
+                            displayId,
+                            IntArray(n) { (points[it].first * width).toInt() },
+                            IntArray(n) { (points[it].second * height).toInt() },
+                            LongArray(n) { durationMs * it / (n - 1) },
+                        )
+                    }
                 }
             }
 
-            override fun back() = inject { shell.injectKey(displayId, KeyEvent.KEYCODE_BACK) }
+            override fun back() {
+                if (control.current != HandsControl.State.Manual) return
+                val version = control.version
+                runInput {
+                    control.userInput(expectedVersion = version) {
+                        shell.injectKey(displayId, KeyEvent.KEYCODE_BACK)
+                    }
+                }
+            }
 
-            private fun inject(block: () -> Boolean) {
+            private fun runControl(block: () -> Unit) {
+                runCatching { controlExecutor.execute { runCatching(block) } }
+            }
+
+            private fun runInput(block: () -> Unit) {
                 runCatching { inputExecutor.execute { runCatching(block) } }
             }
         }
@@ -201,33 +271,48 @@ class VirtualDisplayTarget(
 
     override fun hasTask(): Boolean = shell.topTaskId(displayId) >= 0
 
-    override fun captureScreenshot(): Bitmap? {
+    override fun captureScreenshot(): Bitmap? = control.automatic {
         // 等待一小会儿确保首帧到达
         repeat(5) {
+            if (control.current != HandsControl.State.Automatic) return@automatic null
             val bmp = display.latestFrameBitmap()
-            if (bmp != null) return bmp
-            Thread.sleep(100)
+            if (bmp != null) return@automatic bmp
+            try {
+                Thread.sleep(100)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return@automatic null
+            }
         }
-        return display.latestFrameBitmap()
+        if (control.current != HandsControl.State.Automatic) null else display.latestFrameBitmap()
     }
 
-    override fun tap(x: Int, y: Int): Boolean =
+    override fun tap(x: Int, y: Int): Boolean = control.automatic {
         shell.injectTap(displayId, x, y)
+    } ?: false
 
-    override fun doubleTap(x: Int, y: Int): Boolean {
-        if (!shell.injectTap(displayId, x, y)) return false
-        Thread.sleep(80)
-        return shell.injectTap(displayId, x, y)
-    }
+    override fun doubleTap(x: Int, y: Int): Boolean = control.automatic {
+        if (!shell.injectTap(displayId, x, y)) false
+        else {
+            try {
+                Thread.sleep(80)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return@automatic false
+            }
+            if (control.current == HandsControl.State.Closed) false
+            else shell.injectTap(displayId, x, y)
+        }
+    } ?: false
 
-    override fun longPress(x: Int, y: Int): Boolean {
+    override fun longPress(x: Int, y: Int): Boolean = control.automatic {
         val xs = intArrayOf(x, x)
         val ys = intArrayOf(y, y)
         val times = longArrayOf(0, 900)
-        return shell.injectStroke(displayId, xs, ys, times)
-    }
+        shell.injectStroke(displayId, xs, ys, times)
+    } ?: false
 
-    override fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean {
+    override fun swipe(fromX: Int, fromY: Int, toX: Int, toY: Int, durationMs: Long): Boolean = control.automatic {
         val steps = 10
         val xs = IntArray(steps)
         val ys = IntArray(steps)
@@ -238,13 +323,17 @@ class VirtualDisplayTarget(
             ys[i] = (fromY + (toY - fromY) * frac).toInt()
             times[i] = (durationMs * frac).toLong()
         }
-        return shell.injectStroke(displayId, xs, ys, times)
-    }
+        shell.injectStroke(displayId, xs, ys, times)
+    } ?: false
 
     // The operator checks for spills after settling, with the user's main-screen tap history.
-    override fun openApp(packageName: String): Int = shell.startApp(displayId, packageName)
+    override fun openApp(packageName: String): Int = control.automatic {
+        shell.startApp(displayId, packageName)
+    } ?: ShellService.START_ERROR
 
-    override fun restartApp(packageName: String): Int = shell.restartApp(displayId, packageName)
+    override fun restartApp(packageName: String): Int = control.automatic {
+        shell.restartApp(displayId, packageName)
+    } ?: ShellService.START_ERROR
 
     override fun armSpillWatch(windowMs: Int): HandsDisplayTarget.SpillWatch? {
         val since = SystemClock.uptimeMillis()
@@ -253,6 +342,14 @@ class VirtualDisplayTarget(
     }
 
     override fun checkSpill(
+        watch: HandsDisplayTarget.SpillWatch?,
+        excluded: Set<String>,
+        userTaps: List<MainScreenSpill.Tap>,
+    ): MainScreenSpill.Verdict? = control.automatic {
+        checkSpillNow(watch, excluded, userTaps)
+    }
+
+    private fun checkSpillNow(
         watch: HandsDisplayTarget.SpillWatch?,
         excluded: Set<String>,
         userTaps: List<MainScreenSpill.Tap>,
@@ -275,27 +372,34 @@ class VirtualDisplayTarget(
         return verdict
     }
 
-    override fun pressBack(): Boolean =
+    override fun pressBack(): Boolean = control.automatic {
         shell.injectKey(displayId, KeyEvent.KEYCODE_BACK)
+    } ?: false
 
-    override fun pressHome(): Boolean =
+    override fun pressHome(): Boolean = control.automatic {
         shell.injectKey(displayId, KeyEvent.KEYCODE_HOME)
+    } ?: false
 
-    override fun injectKey(keyCode: Int): Boolean =
+    override fun injectKey(keyCode: Int): Boolean = control.automatic {
         shell.injectKey(displayId, keyCode)
+    } ?: false
 
-    override fun injectText(text: String): Boolean =
+    override fun injectText(text: String): Boolean = control.automatic {
         shell.injectText(displayId, text)
+    } ?: false
 
-    override fun setClipText(text: String): Boolean =
+    override fun setClipText(text: String): Boolean = control.automatic {
         shell.setClipText(text) == 0
+    } ?: false
 
+    /** Restore is cleanup, not a screen action: it must run even if control changed meanwhile. */
     override fun restoreClip() {
         shell.restoreClip()
     }
 
-    override fun injectCtrlKey(keyCode: Int): Boolean =
+    override fun injectCtrlKey(keyCode: Int): Boolean = control.automatic {
         shell.injectCtrlKey(displayId, keyCode)
+    } ?: false
 
     override fun foregroundPackage(svc: MinisAccessibilityService): String? =
         ScreenWords.rootsOn(svc, displayId).firstNotNullOfOrNull { it.packageName?.toString() }
@@ -303,10 +407,19 @@ class VirtualDisplayTarget(
 
     override fun onTakeoverStart(): Boolean {
         if (takeoverTaskId >= 0) return false
+        mainScreenTakeover = true
+        cancelGen.incrementAndGet()
+        control.handBack()
         val top = shell.topTaskId(displayId)
-        if (top < 0) return false
+        if (top < 0) {
+            mainScreenTakeover = false
+            return false
+        }
         AppLogger.info(tag, "moving task $top to main screen for user takeover")
-        if (!shell.moveTask(top, Display.DEFAULT_DISPLAY)) return false
+        if (!shell.moveTask(top, Display.DEFAULT_DISPLAY)) {
+            mainScreenTakeover = false
+            return false
+        }
         takeoverTaskId = top
         return true
     }
@@ -314,15 +427,23 @@ class VirtualDisplayTarget(
     override fun onTakeoverEnd(): Boolean {
         val taskId = takeoverTaskId
         if (taskId < 0) return false
+        control.handBack()
         AppLogger.info(tag, "moving task $taskId back to virtual display $displayId")
-        if (!shell.moveTask(taskId, displayId)) return false
+        if (!shell.moveTask(taskId, displayId)) {
+            mainScreenTakeover = false
+            return false
+        }
         takeoverTaskId = -1
+        mainScreenTakeover = false
         Thread.sleep(500)
         return true
     }
 
     override fun release() {
-        runCatching { inputExecutor.shutdownNow() }
+        mainScreenTakeover = false
+        control.close()
+        if (controlExecutorLazy.isInitialized()) runCatching { controlExecutor.shutdownNow() }
+        if (inputExecutorLazy.isInitialized()) runCatching { inputExecutor.shutdownNow() }
         try {
             val bundle = shell.finishDisplay(displayId, emptyArray(), emptyArray())
             if (bundle != null) {

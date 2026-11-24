@@ -281,6 +281,99 @@ class HandsPipLayoutTest {
     }
 
     @Test
+    fun `frameTouchAction distinguishes first-touch takeover, waiting consume and manual dispatch`() {
+        // Direct operation off or closed always falls back to window gestures.
+        for (state in HandsControl.State.entries) {
+            assertEquals(
+                HandsPipLayout.FrameTouchAction.PASS_TO_WINDOW,
+                HandsPipLayout.frameTouchAction(operateNow = false, controlState = state),
+            )
+        }
+        assertEquals(
+            HandsPipLayout.FrameTouchAction.PASS_TO_WINDOW,
+            HandsPipLayout.frameTouchAction(operateNow = true, controlState = null),
+        )
+        assertEquals(
+            HandsPipLayout.FrameTouchAction.PASS_TO_WINDOW,
+            HandsPipLayout.frameTouchAction(operateNow = true, controlState = HandsControl.State.Closed),
+        )
+
+        // Direct operation on: Automatic requests control, Requesting consumes, Manual dispatches.
+        assertEquals(
+            HandsPipLayout.FrameTouchAction.REQUEST_CONTROL_AND_CONSUME,
+            HandsPipLayout.frameTouchAction(operateNow = true, controlState = HandsControl.State.Automatic),
+        )
+        assertEquals(
+            HandsPipLayout.FrameTouchAction.CONSUME_WAITING,
+            HandsPipLayout.frameTouchAction(operateNow = true, controlState = HandsControl.State.Requesting),
+        )
+        assertEquals(
+            HandsPipLayout.FrameTouchAction.DISPATCH_MANUAL,
+            HandsPipLayout.frameTouchAction(operateNow = true, controlState = HandsControl.State.Manual),
+        )
+    }
+
+    @Test
+    fun `controlBarChrome keeps hint clickable during Requesting so touches do not collapse the window`() {
+        val automatic = HandsPipLayout.controlBarChrome(operateNow = true, controlState = HandsControl.State.Automatic)
+        assertTrue(automatic.visible)
+        assertFalse(automatic.backEnabled)
+        assertTrue(automatic.hintClickable)
+        assertTrue(automatic.hintEnabled)
+
+        val requesting = HandsPipLayout.controlBarChrome(operateNow = true, controlState = HandsControl.State.Requesting)
+        assertTrue(requesting.visible)
+        assertFalse(requesting.backEnabled)
+        assertTrue(requesting.hintClickable)
+        assertFalse(requesting.hintEnabled)
+
+        val manual = HandsPipLayout.controlBarChrome(operateNow = true, controlState = HandsControl.State.Manual)
+        assertTrue(manual.visible)
+        assertTrue(manual.backEnabled)
+        assertTrue(manual.hintClickable)
+        assertTrue(manual.hintEnabled)
+
+        val off = HandsPipLayout.controlBarChrome(operateNow = false, controlState = HandsControl.State.Manual)
+        assertFalse(off.visible)
+        assertFalse(off.backEnabled)
+        assertTrue(off.hintClickable)
+        assertFalse(off.hintEnabled)
+    }
+
+    @Test
+    fun `controlHintTapAction requests on Automatic, hands back on Manual, and ignores waiting or closed`() {
+        assertEquals(
+            HandsPipLayout.ControlHintTapAction.REQUEST_CONTROL,
+            HandsPipLayout.controlHintTapAction(HandsControl.State.Automatic),
+        )
+        assertEquals(
+            HandsPipLayout.ControlHintTapAction.HAND_BACK,
+            HandsPipLayout.controlHintTapAction(HandsControl.State.Manual),
+        )
+        assertEquals(
+            HandsPipLayout.ControlHintTapAction.NONE,
+            HandsPipLayout.controlHintTapAction(HandsControl.State.Requesting),
+        )
+        assertEquals(
+            HandsPipLayout.ControlHintTapAction.NONE,
+            HandsPipLayout.controlHintTapAction(HandsControl.State.Closed),
+        )
+        assertEquals(
+            HandsPipLayout.ControlHintTapAction.NONE,
+            HandsPipLayout.controlHintTapAction(null),
+        )
+    }
+
+    @Test
+    fun `shouldHandBack returns true only while Requesting or Manual`() {
+        assertFalse(HandsPipLayout.shouldHandBack(null))
+        assertFalse(HandsPipLayout.shouldHandBack(HandsControl.State.Automatic))
+        assertTrue(HandsPipLayout.shouldHandBack(HandsControl.State.Requesting))
+        assertTrue(HandsPipLayout.shouldHandBack(HandsControl.State.Manual))
+        assertFalse(HandsPipLayout.shouldHandBack(HandsControl.State.Closed))
+    }
+
+    @Test
     fun `collapsed and expanded portrait sizes stay distinct when fitted`() {
         val area = ScreenArea(width = 1080, height = 2400, insetTop = 96, insetBottom = 48)
         val collapsed = HandsPipLayout.windowSize(

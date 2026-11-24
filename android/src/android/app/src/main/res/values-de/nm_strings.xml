@@ -620,9 +620,11 @@
     <string name="nm_hands_preview_screen">Bildschirm</string>
     <string name="nm_hands_preview_live">Live-Bildschirm</string>
     <string name="nm_hands_preview_collapse">Einklappen</string>
-    <string name="nm_hands_preview_zoom_hint">Tippen zum Verkleinern</string>
     <string name="nm_hands_pip_input">Kleinvorschau direkt bedienen</string>
-    <string name="nm_hands_pip_input_sub">Tippen und Wischen auf der vergrößerten Vorschau gehen an den Hintergrundbildschirm. Lass es aus, während der Agent arbeitet, sonst landet eine Berührung in seiner App.</string>
+    <string name="nm_hands_pip_input_sub">Der erste Tipp pausiert den Agenten und gibt dir den Hintergrundbildschirm. Nach der Rückgabe schaut der Agent erneut nach, bevor er handelt.</string>
+    <string name="nm_hands_pip_control_take">Übernehmen</string>
+    <string name="nm_hands_pip_control_wait">Warten…</string>
+    <string name="nm_hands_pip_control_manual">Zurückgeben</string>
     <string name="nm_hands_pip_back">Zurück auf dem Hintergrundbildschirm</string>
     <string name="nm_hands_audio_unmuted_note">Ton möglich (Stummschaltung nicht verfügbar)</string>
     <string name="nm_hands_section_rules">Wie er sich verhält</string>

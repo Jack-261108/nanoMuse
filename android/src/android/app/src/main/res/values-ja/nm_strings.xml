@@ -617,9 +617,11 @@
     <string name="nm_hands_preview_screen">画面</string>
     <string name="nm_hands_preview_live">ライブ画面</string>
     <string name="nm_hands_preview_collapse">閉じる</string>
-    <string name="nm_hands_preview_zoom_hint">タップで縮小</string>
     <string name="nm_hands_pip_input">小窓を直接操作する</string>
-    <string name="nm_hands_pip_input_sub">拡大した小窓へのタップとスワイプは、背景画面にそのまま送られます。エージェントが作業している間はオフにしておくと、誤って触れてもアプリに届きません。</string>
+    <string name="nm_hands_pip_input_sub">最初のタップでエージェントを一時停止し、背景画面をあなたに渡します。戻すと、エージェントは画面を見直してから続けます。</string>
+    <string name="nm_hands_pip_control_take">操作を引き継ぐ</string>
+    <string name="nm_hands_pip_control_wait">待機中…</string>
+    <string name="nm_hands_pip_control_manual">操作を戻す</string>
     <string name="nm_hands_pip_back">背景画面で戻る</string>
     <string name="nm_hands_section_rules">ふるまい</string>
     <string name="nm_hands_rule_ladder">画面は最後です: まずスキル、コマンド、ブラウザーを使います。</string>

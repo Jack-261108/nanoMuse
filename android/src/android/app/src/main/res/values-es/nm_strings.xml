@@ -620,9 +620,11 @@
     <string name="nm_hands_preview_screen">Pantalla</string>
     <string name="nm_hands_preview_live">Pantalla en vivo</string>
     <string name="nm_hands_preview_collapse">Contraer</string>
-    <string name="nm_hands_preview_zoom_hint">Tocar para reducir</string>
     <string name="nm_hands_pip_input">Usar la vista pequeña directamente</string>
-    <string name="nm_hands_pip_input_sub">Los toques y deslizamientos en la vista ampliada van a la pantalla en segundo plano. Déjalo apagado mientras el agente trabaja, o un toque perdido caerá en su app.</string>
+    <string name="nm_hands_pip_input_sub">El primer toque pausa al agente y te entrega la pantalla en segundo plano. Cuando la devuelves, el agente vuelve a mirar antes de actuar.</string>
+    <string name="nm_hands_pip_control_take">Tomar control</string>
+    <string name="nm_hands_pip_control_wait">Esperando…</string>
+    <string name="nm_hands_pip_control_manual">Devolver</string>
     <string name="nm_hands_pip_back">Atrás en la pantalla en segundo plano</string>
     <string name="nm_hands_audio_unmuted_note">Puede sonar (silencio no disponible)</string>
     <string name="nm_hands_section_rules">Cómo se comporta</string>

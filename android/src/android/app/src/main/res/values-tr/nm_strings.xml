@@ -620,9 +620,11 @@
     <string name="nm_hands_preview_screen">Ekran</string>
     <string name="nm_hands_preview_live">Canlı ekran</string>
     <string name="nm_hands_preview_collapse">Daralt</string>
-    <string name="nm_hands_preview_zoom_hint">Küçültmek için dokunun</string>
     <string name="nm_hands_pip_input">Küçük görünümü doğrudan kullan</string>
-    <string name="nm_hands_pip_input_sub">Büyütülmüş görünümdeki dokunuşlar ve kaydırmalar arka plan ekranına gider. Ajan çalışırken kapalı bırakın, yoksa yanlış bir dokunuş onun uygulamasına düşer.</string>
+    <string name="nm_hands_pip_input_sub">İlk dokunuş ajanı duraklatır ve arka plan ekranını size verir. Geri verdiğinizde ajan işlem yapmadan önce ekrana yeniden bakar.</string>
+    <string name="nm_hands_pip_control_take">Devral</string>
+    <string name="nm_hands_pip_control_wait">Bekleniyor…</string>
+    <string name="nm_hands_pip_control_manual">Geri ver</string>
     <string name="nm_hands_pip_back">Arka plan ekranında geri</string>
     <string name="nm_hands_section_rules">Nasıl davranır</string>
     <string name="nm_hands_rule_ladder">Ekran en sona kalır: önce bir beceri, bir komut ya da tarayıcı.</string>

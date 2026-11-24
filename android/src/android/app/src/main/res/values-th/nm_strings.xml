@@ -617,9 +617,11 @@
     <string name="nm_hands_preview_screen">หน้าจอ</string>
     <string name="nm_hands_preview_live">หน้าจอสด</string>
     <string name="nm_hands_preview_collapse">ยุบ</string>
-    <string name="nm_hands_preview_zoom_hint">แตะเพื่อย่อ</string>
     <string name="nm_hands_pip_input">ควบคุมหน้าต่างเล็กโดยตรง</string>
-    <string name="nm_hands_pip_input_sub">การแตะและการปัดบนหน้าต่างที่ขยายจะถูกส่งไปยังหน้าจอพื้นหลัง ปิดไว้ขณะที่เอเจนต์กำลังทำงาน ไม่อย่างนั้นการแตะพลาดจะไปโดนแอปของมัน</string>
+    <string name="nm_hands_pip_input_sub">การแตะครั้งแรกจะหยุดเอเจนต์ชั่วคราวและมอบหน้าจอพื้นหลังให้คุณ เมื่อคืนการควบคุม เอเจนต์จะดูหน้าจออีกครั้งก่อนดำเนินการ</string>
+    <string name="nm_hands_pip_control_take">เข้าควบคุม</string>
+    <string name="nm_hands_pip_control_wait">กำลังรอ…</string>
+    <string name="nm_hands_pip_control_manual">คืนการควบคุม</string>
     <string name="nm_hands_pip_back">ย้อนกลับบนหน้าจอพื้นหลัง</string>
     <string name="nm_hands_section_rules">มันทำงานอย่างไร</string>
     <string name="nm_hands_rule_ladder">หน้าจอมาเป็นลำดับสุดท้าย: ทักษะ คำสั่ง หรือเบราว์เซอร์มาก่อน</string>

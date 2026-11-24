@@ -57,9 +57,10 @@ object Hands {
     }
 
     /**
-     * Let the person tap, swipe and go back on the preview window itself, without moving the app
-     * to the main screen. Off by default: with it on, a stray touch lands in the app the hands
-     * are driving.
+     * Let the person tap, swipe and go back on the expanded preview window itself, without moving
+     * the app to the main screen. Off by default; when enabled, the first touch on the expanded
+     * preview asks to take over, waits for the current action to finish, and pauses the agent
+     * until control is handed back or the preview collapses.
      */
     fun pipInputEnabled(context: Context): Boolean = prefs(context).getBoolean(KEY_PIP_INPUT, false)
     fun setPipInputEnabled(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY_PIP_INPUT, on).apply() }

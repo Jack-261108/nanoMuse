@@ -617,9 +617,11 @@
     <string name="nm_hands_preview_screen">Skrin</string>
     <string name="nm_hands_preview_live">Skrin langsung</string>
     <string name="nm_hands_preview_collapse">Runtuhkan</string>
-    <string name="nm_hands_preview_zoom_hint">Ketik untuk mengecilkan</string>
     <string name="nm_hands_pip_input">Kendalikan paparan kecil secara terus</string>
-    <string name="nm_hands_pip_input_sub">Ketik dan leret pada pratonton yang dibesarkan dihantar ke skrin latar. Biarkan ia dimatikan semasa ejen bekerja, jika tidak sentuhan tersasar akan masuk ke aplikasinya.</string>
+    <string name="nm_hands_pip_input_sub">Ketik pertama menjeda ejen dan menyerahkan skrin latar kepada anda. Apabila dipulangkan, ejen melihat semula sebelum bertindak.</string>
+    <string name="nm_hands_pip_control_take">Ambil alih</string>
+    <string name="nm_hands_pip_control_wait">Menunggu…</string>
+    <string name="nm_hands_pip_control_manual">Pulangkan</string>
     <string name="nm_hands_pip_back">Kembali pada skrin latar</string>
     <string name="nm_hands_section_rules">Cara ia bertindak</string>
     <string name="nm_hands_rule_ladder">Skrin yang terakhir: kemahiran, perintah atau pelayar dahulu.</string>

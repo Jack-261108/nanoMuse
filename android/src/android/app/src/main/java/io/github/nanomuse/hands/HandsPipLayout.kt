@@ -179,4 +179,68 @@ internal object HandsPipLayout {
     /** 直接操作模式开启且按下点落在画框内部时，才把触摸序列交给虚拟屏注入口。 */
     fun shouldPassTouchToFrame(operateNow: Boolean, insideFrame: Boolean): Boolean =
         operateNow && insideFrame
+
+    enum class FrameTouchAction {
+        /** 未开启直接操作或已关闭：交回窗口处理拖拽与展开/收起。 */
+        PASS_TO_WINDOW,
+        /** 首次触摸画框：申请接管并吞掉本次触摸序列，不当成业务点击。 */
+        REQUEST_CONTROL_AND_CONSUME,
+        /** 正在等待当前动作结束：吞掉触摸，防止穿透到窗口或误触后台应用。 */
+        CONSUME_WAITING,
+        /** 已进入手动接管态：把点按与滑动派发到虚拟屏。 */
+        DISPATCH_MANUAL,
+    }
+
+    /** 根据当前直接操作开关与控制权状态，决定画框上一次触摸序列的流转。 */
+    fun frameTouchAction(operateNow: Boolean, controlState: HandsControl.State?): FrameTouchAction {
+        if (!operateNow || controlState == null) return FrameTouchAction.PASS_TO_WINDOW
+        return when (controlState) {
+            HandsControl.State.Automatic -> FrameTouchAction.REQUEST_CONTROL_AND_CONSUME
+            HandsControl.State.Requesting -> FrameTouchAction.CONSUME_WAITING
+            HandsControl.State.Manual -> FrameTouchAction.DISPATCH_MANUAL
+            HandsControl.State.Closed -> FrameTouchAction.PASS_TO_WINDOW
+        }
+    }
+
+    data class ControlBarChrome(
+        val visible: Boolean,
+        val backEnabled: Boolean,
+        val hintClickable: Boolean,
+        val hintEnabled: Boolean,
+    )
+
+    /**
+     * 顶部控制条的交互状态。
+     * 中间提示区始终保持可点击以吞掉触摸，避免等待态误点穿透到根容器触发收起窗口。
+     */
+    fun controlBarChrome(operateNow: Boolean, controlState: HandsControl.State): ControlBarChrome {
+        val hintEnabled = operateNow &&
+            (controlState == HandsControl.State.Automatic || controlState == HandsControl.State.Manual)
+        return ControlBarChrome(
+            visible = operateNow,
+            backEnabled = operateNow && controlState == HandsControl.State.Manual,
+            hintClickable = true,
+            hintEnabled = hintEnabled,
+        )
+    }
+
+    enum class ControlHintTapAction {
+        /** 自动态下点击提示条：申请接管。 */
+        REQUEST_CONTROL,
+        /** 手动态下点击提示条：交回给智能体。 */
+        HAND_BACK,
+        /** 等待或已关闭态下点击提示条：吞掉触摸但不改变状态。 */
+        NONE,
+    }
+
+    /** 根据当前控制权状态决定点击顶部控制条中间提示区时的动作。 */
+    fun controlHintTapAction(controlState: HandsControl.State?): ControlHintTapAction = when (controlState) {
+        HandsControl.State.Automatic -> ControlHintTapAction.REQUEST_CONTROL
+        HandsControl.State.Manual -> ControlHintTapAction.HAND_BACK
+        HandsControl.State.Requesting, HandsControl.State.Closed, null -> ControlHintTapAction.NONE
+    }
+
+    /** 窗口隐藏、切换注入口或关闭「直接操作小画面」开关时，若仍处于申请/手动接管态则必须交回。 */
+    fun shouldHandBack(controlState: HandsControl.State?): Boolean =
+        controlState == HandsControl.State.Requesting || controlState == HandsControl.State.Manual
 }

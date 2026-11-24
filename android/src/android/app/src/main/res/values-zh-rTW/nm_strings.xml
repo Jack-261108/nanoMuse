@@ -602,9 +602,11 @@
     <string name="nm_hands_preview_screen">畫面</string>
     <string name="nm_hands_preview_live">即時畫面</string>
     <string name="nm_hands_preview_collapse">收起</string>
-    <string name="nm_hands_preview_zoom_hint">點擊縮小</string>
     <string name="nm_hands_pip_input">直接操作小畫面</string>
-    <string name="nm_hands_pip_input_sub">在展開的小畫面上點按、滑動會真的送到背景螢幕。AI 正在操作時建議關著，免得誤觸到它正在用的 App。</string>
+    <string name="nm_hands_pip_input_sub">第一次觸摸會暫停智慧體，把背景螢幕交給你操作。交回後，智慧體會重新觀察畫面再繼續。</string>
+    <string name="nm_hands_pip_control_take">點擊接管</string>
+    <string name="nm_hands_pip_control_wait">等待動作結束…</string>
+    <string name="nm_hands_pip_control_manual">點擊交回</string>
     <string name="nm_hands_pip_back">在背景螢幕上返回</string>
     <string name="nm_hands_section_rules">它會怎麼做</string>
     <string name="nm_hands_rule_ladder">螢幕排最後：先試技能、命令列、瀏覽器。</string>

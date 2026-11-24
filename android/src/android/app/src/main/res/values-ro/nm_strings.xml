@@ -623,9 +623,11 @@
     <string name="nm_hands_preview_screen">Ecran</string>
     <string name="nm_hands_preview_live">Ecran în direct</string>
     <string name="nm_hands_preview_collapse">Restrânge</string>
-    <string name="nm_hands_preview_zoom_hint">Atingeți pentru micșorare</string>
     <string name="nm_hands_pip_input">Folosește direct vizualizarea mică</string>
-    <string name="nm_hands_pip_input_sub">Atingerile și glisările pe vizualizarea mărită ajung pe ecranul din fundal. Lasă opțiunea închisă cât timp agentul lucrează, altfel o atingere greșită ajunge în aplicația lui.</string>
+    <string name="nm_hands_pip_input_sub">Prima atingere suspendă agentul și îți dă ecranul din fundal. Când îl dai înapoi, agentul se uită din nou înainte să acționeze.</string>
+    <string name="nm_hands_pip_control_take">Preia controlul</string>
+    <string name="nm_hands_pip_control_wait">Se așteaptă…</string>
+    <string name="nm_hands_pip_control_manual">Dă înapoi</string>
     <string name="nm_hands_pip_back">Înapoi pe ecranul din fundal</string>
     <string name="nm_hands_audio_unmuted_note">Poate reda sunet (opțiunea fără sunet indisponibilă)</string>
     <string name="nm_hands_section_rules">Cum se comportă</string>
