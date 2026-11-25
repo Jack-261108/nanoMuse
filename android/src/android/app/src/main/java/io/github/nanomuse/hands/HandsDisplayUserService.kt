@@ -37,7 +37,11 @@ internal fun handsDisplayLauncher(context: Context, pkg: String): ComponentName 
 
 /** Runs under a device-owner authorized debugging identity. Only the originating app may operate its own screen. */
 @Keep
-class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub() {
+class HandsDisplayUserService(
+    private val context: Context,
+    private val onDestroy: (() -> Unit)? = null,
+) : IHandsDisplay.Stub() {
+    constructor(context: Context) : this(context, null)
     internal var wirelessAccess: HandsShellBridgeCalls? = null
     private val clientUid = context.applicationInfo.uid
     private var virtual: VirtualDisplay? = null
@@ -260,13 +264,19 @@ class HandsDisplayUserService(private val context: Context) : IHandsDisplay.Stub
         releaseDisplay()
     }
 
+    internal fun shutdown() {
+        child.getAndSet(null)?.destroyForcibly()
+        synchronized(this) { releaseDisplay() }
+    }
+
     override fun destroy() {
         val caller = Binder.getCallingUid()
         check(caller == clientUid || caller == Process.myUid() || caller == 0 || caller == 2000)
         // Revocation also interrupts a gesture in progress. Binder death destroys the owned
         // display even when another call is blocked in a platform input or launch operation.
         child.getAndSet(null)?.destroyForcibly()
-        exitProcess(0)
+        val stop = onDestroy
+        if (stop != null) stop() else exitProcess(0)
     }
 
     private fun releaseDisplay() {

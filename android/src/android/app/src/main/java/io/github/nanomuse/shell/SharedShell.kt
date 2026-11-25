@@ -5,68 +5,125 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import com.openminis.app.logging.AppLogger
-import io.github.nanomuse.shell.setup.BuiltinShellManager
+import io.github.nanomuse.hands.HandsDisplayBridge
+import io.github.nanomuse.hands.IHandsDisplay
 import io.github.nanomuse.shell.recovery.PermissionCommands
+import io.github.nanomuse.shell.setup.BuiltinShellManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** One live helper, with handoffs scoped to the start that requested them. */
+/** One live helper hosting both INanoMuseShell and (under uid 2000 on API 34+) IHandsDisplay. */
 object SharedShell {
     private const val TAG = "SharedShell"
     private val _shell = MutableStateFlow<INanoMuseShell?>(null)
     val shell: StateFlow<INanoMuseShell?> = _shell.asStateFlow()
-    private var deathRecipient: IBinder.DeathRecipient? = null
-    private val handoff = HelperHandoffState()
 
-    fun isReady(): Boolean = _shell.value?.asBinder()?.isBinderAlive == true
+    @Volatile internal var wirelessDebuggingProbe: (() -> Boolean)? = null
+    @Volatile internal var shizukuReadyProbe: (() -> Boolean)? = null
 
-    @Synchronized
-    fun prepareStart(nonce: String) { handoff.expect(nonce) }
+    private val store = HelperSessionStore<INanoMuseShell, IHandsDisplay>(
+        isShellAlive = { it.asBinder().isBinderAlive },
+        pingShell = { it.asBinder().pingBinder() },
+        shellIdentity = { runCatching { it.identity() }.getOrNull() },
+        destroyShell = { it.destroy() },
+        isDisplayAlive = { it.asBinder().isBinderAlive },
+        pingDisplay = { it.asBinder().pingBinder() },
+        displayIdentity = { runCatching { it.identity() }.getOrNull() },
+        destroyDisplay = { it.destroy() },
+        linkShellDeath = { s, onDead -> linkDeath(s.asBinder(), onDead) },
+        linkDisplayDeath = { d, onDead -> linkDeath(d.asBinder(), onDead) },
+        sameBinder = { s, d -> s.asBinder() === d.asBinder() },
+        wirelessEnabled = { wirelessDebuggingProbe?.invoke() != false },
+        shizukuReady = { shizukuReadyProbe?.invoke() != false },
+        onStateChanged = { session, displayReady ->
+            _shell.value = session?.shell
+            HandsDisplayBridge.updateReady(displayReady)
+        },
+    )
 
-    @Synchronized
-    fun cancelStart(nonce: String? = null) { handoff.cancel(nonce) }
-
-    @Synchronized
-    fun setShell(instance: INanoMuseShell?, pid: Int = -1, uid: Int = -1, nonce: String? = null): Boolean {
-        if (instance == null) {
-            detach()
-            return true
-        }
-        if (!handoff.accepts(nonce) || isReady()) return false
-        val binder = instance.asBinder()
-        if (!binder.isBinderAlive || !binder.pingBinder()) return false
+    private fun linkDeath(binder: IBinder, onDead: () -> Unit): (() -> Unit)? {
         val recipient = IBinder.DeathRecipient {
-            synchronized(this) {
-                if (_shell.value?.asBinder() === binder) {
-                    AppLogger.warning(TAG, "shell helper died")
-                    detach()
-                }
-            }
+            AppLogger.warning(TAG, "shell helper died")
+            onDead()
         }
-        try {
+        return try {
             binder.linkToDeath(recipient, 0)
+            if (!binder.isBinderAlive) {
+                runCatching { binder.unlinkToDeath(recipient, 0) }
+                null
+            } else {
+                { runCatching { binder.unlinkToDeath(recipient, 0) } }
+            }
         } catch (_: Exception) {
-            return false
+            null
         }
-        if (!binder.isBinderAlive) {
-            runCatching { binder.unlinkToDeath(recipient, 0) }
-            return false
-        }
-        detach()
-        deathRecipient = recipient
-        handoff.cancel()
-        _shell.value = instance
-        AppLogger.info(TAG, "accepted shell helper (pid=$pid, uid=$uid)")
-        return true
     }
 
-    private fun detach() {
-        val old = _shell.value
-        val recipient = deathRecipient
-        if (old != null && recipient != null) runCatching { old.asBinder().unlinkToDeath(recipient, 0) }
-        deathRecipient = null
-        _shell.value = null
+    fun isReady(): Boolean = store.isShellReady()
+
+    internal fun currentDisplay(): IHandsDisplay? = store.currentDisplay()
+
+    internal fun hasDisplayBinder(): Boolean = store.hasDisplayBinder()
+
+    internal fun refreshDisplayReadiness() {
+        store.refreshReadiness()
+    }
+
+    fun prepareStart(nonce: String) {
+        store.prepareStart(nonce, ttlMs = null, origin = HelperOrigin.MANUAL)
+    }
+
+    internal fun prepareStart(nonce: String, ttlMs: Long?, origin: HelperOrigin) {
+        store.prepareStart(nonce, ttlMs = ttlMs, origin = origin)
+    }
+
+    fun cancelStart(nonce: String? = null) {
+        store.cancelStart(nonce)
+    }
+
+    fun setShell(instance: INanoMuseShell?, pid: Int = -1, uid: Int = -1, nonce: String? = null): Boolean {
+        if (instance == null) {
+            store.detachOnly()
+            return true
+        }
+        val accepted = store.attach(
+            shell = instance,
+            display = null,
+            pid = pid,
+            uid = uid,
+            nonce = nonce,
+            wirelessReported = false,
+            verifyIdentity = false,
+        )
+        if (accepted) AppLogger.info(TAG, "accepted shell helper (pid=$pid, uid=$uid)")
+        return accepted
+    }
+
+    internal fun attach(
+        shell: INanoMuseShell,
+        display: IHandsDisplay?,
+        pid: Int,
+        uid: Int,
+        nonce: String?,
+        wireless: Boolean,
+    ): Boolean {
+        val accepted = store.attach(
+            shell = shell,
+            display = display,
+            pid = pid,
+            uid = uid,
+            nonce = nonce,
+            wirelessReported = wireless,
+            verifyIdentity = true,
+        )
+        if (accepted) {
+            AppLogger.info(
+                TAG,
+                "accepted shell helper (pid=$pid, uid=$uid, display=${display != null}, wireless=$wireless)",
+            )
+        }
+        return accepted
     }
 
     /** All backends share the manager's start, stop and retry state. */
@@ -77,7 +134,7 @@ object SharedShell {
     }
 
     fun getAdbCommand(context: Context): String {
-        val nonce = java.util.UUID.randomUUID().toString()
+        val nonce = HelperHandoff.generateNonce()
         check(BuiltinShellManager.instance(context).prepareManualStart(nonce)) { "helper startup is unavailable" }
         return command(context, nonce)
     }
@@ -91,11 +148,6 @@ object SharedShell {
     }
 
     fun release() {
-        val instance = synchronized(this) {
-            handoff.cancel()
-            _shell.value.also { detach() }
-        }
-        // destroy performs cleanup and exits the privileged process.
-        if (instance != null) runCatching { instance.destroy() }
+        store.release()
     }
 }

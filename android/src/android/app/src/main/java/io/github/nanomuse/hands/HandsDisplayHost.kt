@@ -1,33 +1,39 @@
 package io.github.nanomuse.hands
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.ServiceConnection
 import android.hardware.display.DisplayManager
 import android.os.Binder
 import android.os.Build
-import android.os.IBinder
 import android.os.Looper
 import android.view.Display
 import android.view.Surface
 import com.openminis.app.offload.ShizukuManager
+import io.github.nanomuse.shell.HelperHandoff
+import io.github.nanomuse.shell.setup.BuiltinShellManager
+import kotlinx.coroutines.runBlocking
 import rikka.shizuku.Shizuku
-import java.util.UUID
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /** A separate display that cannot become the destination for the user's undirected key events. */
 internal object HandsDisplayHost {
     private val inUse = AtomicBoolean()
 
-    private fun shizukuReady() = ShizukuManager.isReady() &&
-        runCatching { Shizuku.getVersion() >= Hands.BACKGROUND_MIN_SHIZUKU }.getOrDefault(false)
+    private fun shizukuReady(): Boolean {
+        if (!ShizukuManager.isReady()) return false
+        val snap = ShizukuManager.snapshot.value
+        val uid = if (snap.uid >= 0) snap.uid else runCatching { Shizuku.getUid() }.getOrDefault(-1)
+        val version = if (snap.version >= 0) snap.version else runCatching { Shizuku.getVersion() }.getOrDefault(-1)
+        return uid == HelperHandoff.SHELL_UID && version >= Hands.BACKGROUND_MIN_SHIZUKU
+    }
 
-    fun isReady() = HandsDisplayBridge.isReady() || shizukuReady()
+    fun isReady(): Boolean = HandsDisplayBridge.isReady() || shizukuReady()
 
-    class Handle internal constructor(val display: Display, private val service: IHandsDisplay,
-        private val authorized: () -> Boolean, private val release: () -> Unit) : AutoCloseable {
+    class Handle internal constructor(
+        val display: Display,
+        private val service: IHandsDisplay,
+        private val authorized: () -> Boolean,
+        private val release: () -> Unit,
+    ) : AutoCloseable {
         private val closed = AtomicBoolean()
         fun isReady() = !closed.get() && service.asBinder().isBinderAlive && authorized()
         fun launch(pkg: String) = isReady() && service.launchPackage(pkg)
@@ -47,56 +53,44 @@ internal object HandsDisplayHost {
         }
         check(Looper.myLooper() != Looper.getMainLooper()) { "Waiting for the background display would block the main thread." }
         check(inUse.compareAndSet(false, true)) { "A background display is already open." }
-        val local = HandsDisplayBridge.current()
-        if (local != null) {
-            val allocated = AtomicBoolean()
-            fun releaseLocal() {
-                try { if (allocated.get()) local.close() } finally { inUse.set(false) }
-            }
+        val allocated = AtomicBoolean()
+        var remote: IHandsDisplay? = null
+        fun releaseLocal() {
             try {
-                val display = allocate(context, local, surface, width, height, dpi, allocated)
-                return Handle(display, local, { HandsDisplayBridge.current()?.asBinder() == local.asBinder() }, ::releaseLocal)
-            } catch (failure: Throwable) {
-                runCatching { releaseLocal() }
-                throw failure
-            }
-        }
-        // A binder timeout from a previous run must never tear down the next run's screen.
-        val tag = "nanomuse-hands-display-" + UUID.randomUUID()
-        val args = Shizuku.UserServiceArgs(ComponentName(context, HandsDisplayUserService::class.java))
-            .tag(tag).version(4).daemon(false).processNameSuffix("hands_display")
-        val connected = CountDownLatch(1)
-        val connection = object : ServiceConnection {
-            @Volatile var remote: IHandsDisplay? = null
-            override fun onServiceConnected(name: ComponentName, binder: IBinder) {
-                remote = IHandsDisplay.Stub.asInterface(binder)
-                connected.countDown()
-            }
-            override fun onServiceDisconnected(name: ComponentName) {
-                remote = null
-                connected.countDown()
-            }
-        }
-        fun release() {
-            try {
-                connection.remote?.close()
+                if (allocated.get()) remote?.close()
             } finally {
-                try { Shizuku.unbindUserService(args, connection, true) } finally { inUse.set(false) }
+                inUse.set(false)
             }
         }
         try {
-            Shizuku.bindUserService(args, connection)
-            check(connected.await(10, TimeUnit.SECONDS)) { "The background display service did not connect." }
-            val remote = checkNotNull(connection.remote) { "The background display service disconnected." }
-            val display = allocate(context, remote, surface, width, height, dpi, AtomicBoolean())
-            return Handle(display, remote, ::shizukuReady, ::release)
+            val active = HandsDisplayBridge.current() ?: run {
+                check(shizukuReady()) { "The background display service did not connect." }
+                runBlocking { BuiltinShellManager.instance(context).ensureShellHelperForDisplay(10_000L) }
+                checkNotNull(HandsDisplayBridge.current()) { "The background display service did not connect." }
+            }
+            remote = active
+            val display = allocate(context, active, surface, width, height, dpi, allocated)
+            return Handle(
+                display = display,
+                service = active,
+                authorized = { HandsDisplayBridge.current()?.asBinder() === active.asBinder() },
+                release = ::releaseLocal,
+            )
         } catch (failure: Throwable) {
-            runCatching { release() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+            runCatching { releaseLocal() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure
         }
     }
-    private fun allocate(context: Context, remote: IHandsDisplay, surface: Surface, width: Int, height: Int,
-        dpi: Int, allocated: AtomicBoolean): Display {
+
+    private fun allocate(
+        context: Context,
+        remote: IHandsDisplay,
+        surface: Surface,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        allocated: AtomicBoolean,
+    ): Display {
         val session = remote.open(surface, width, height, dpi, Binder())
         allocated.set(true)
         check(session.size == 2 && session[1] >= 0 && session[0] > Display.DEFAULT_DISPLAY) {
@@ -106,5 +100,4 @@ internal object HandsDisplayHost {
             check(it.isValid) { "The background display was removed." }
         }
     }
-
 }

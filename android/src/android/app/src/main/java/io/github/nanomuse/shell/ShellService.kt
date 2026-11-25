@@ -11,8 +11,11 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
+import android.os.Binder
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
+import android.os.Parcel
 import android.os.PersistableBundle
 import android.os.Process
 import android.os.SystemClock
@@ -37,6 +40,7 @@ class ShellService(
     private val allowedUid: Int = Process.myUid(),
     stateDir: File = File("/data/local/tmp"),
     private val onDestroyed: () -> Unit = {},
+    private val extraCleanup: () -> Unit = {},
 ) : INanoMuseShell.Stub() {
 
     private val context: Context = ShellContext.create()
@@ -64,7 +68,26 @@ class ShellService(
     private val sessionTasks = HashMap<Int, MutableSet<Int>>()
     @Volatile private var stopping = false
     private var clientAttached = false
-    private val lifetime = HelperLifetime(::releaseAll, onDestroyed)
+    private val lifetime = HelperLifetime(
+        cleanup = {
+            runCatching { extraCleanup() }.onFailure { Log.w(TAG, "extra helper cleanup failed", it) }
+            releaseAll()
+        },
+        exit = onDestroyed,
+    )
+
+    override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+        if (code in IBinder.FIRST_CALL_TRANSACTION..IBinder.LAST_CALL_TRANSACTION) {
+            val allowed = HelperCallerAuth.acceptsShellTransaction(
+                callingUid = Binder.getCallingUid(),
+                allowedUid = allowedUid,
+                selfUid = Process.myUid(),
+                isDestroy = code == TRANSACTION_destroy,
+            )
+            if (!allowed) throw SecurityException("The shell helper belongs to a different caller.")
+        }
+        return super.onTransact(code, data, reply, flags)
+    }
 
     @SuppressLint("PrivateApi")
     private val displayManager: DisplayManager =
@@ -960,6 +983,10 @@ class ShellService(
             orientationWatch = null
             synchronized(requestedOrientations) { requestedOrientations.clear() }
         }
+    }
+
+    internal fun destroyInternal() {
+        lifetime.stop()
     }
 
     override fun destroy() {

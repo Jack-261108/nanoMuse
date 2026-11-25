@@ -25,11 +25,18 @@ internal class ShellContext private constructor(base: Context) : ContextWrapper(
         const val SHELL_UID = 2000
 
         @SuppressLint("PrivateApi", "DiscouragedPrivateApi")
-        fun create(): Context {
+        internal fun systemContext(): Context {
             check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { "background helper requires Android 12" }
             val at = Class.forName("android.app.ActivityThread")
             val thread = at.getMethod("currentActivityThread").invoke(null) ?: newActivityThread(at)
-            val system = at.getDeclaredMethod("getSystemContext").invoke(thread) as Context
+            return at.getDeclaredMethod("getSystemContext").invoke(thread) as Context
+        }
+
+        @SuppressLint("PrivateApi", "DiscouragedPrivateApi")
+        fun create(): Context {
+            val at = Class.forName("android.app.ActivityThread")
+            val system = systemContext()
+            val thread = at.getMethod("currentActivityThread").invoke(null)!!
             val ctx = ShellContext(system)
             if (at.getDeclaredField("mInitialApplication").apply { isAccessible = true }.get(thread) == null) {
                 runCatching {
