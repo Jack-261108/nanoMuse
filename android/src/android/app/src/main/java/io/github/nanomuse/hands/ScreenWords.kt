@@ -39,10 +39,13 @@ object ScreenWords {
         return out
     }
 
-    fun at(svc: MinisAccessibilityService, displayId: Int, x: Int, y: Int): String? {
+    fun at(svc: MinisAccessibilityService, displayId: Int, x: Int, y: Int): String? =
+        at(rootsOn(svc, displayId), x, y)
+
+    fun at(roots: List<AccessibilityNodeInfo>, x: Int, y: Int): String? {
         val words = LinkedHashSet<String>()
         try {
-            for (root in rootsOn(svc, displayId)) {
+            for (root in roots) {
                 val leaf = deepestAt(root, x, y, 0) ?: continue
                 var node: AccessibilityNodeInfo? = leaf
                 var up = 0

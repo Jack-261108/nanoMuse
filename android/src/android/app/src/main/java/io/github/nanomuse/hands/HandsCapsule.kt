@@ -23,6 +23,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
+import android.view.VelocityTracker
 import android.view.WindowManager
 import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
@@ -50,14 +51,12 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The capsule that sits over the operated app while the hands work: the face in a slowly
- * turning three-hue ring, four activity bars, what is being done, and **Stop**. When the hands
- * need the user it grows into a card — *Your turn* with **Continue** for a login or a code,
- * *Waiting for your approval* with **Open** for a tap that needs the card in the chat — and the
- * ring stands still. The same pill the desktop stage shows (desktop/app/src/renderer/stage):
- * dark and translucent with a hairline edge, sliding in from the top. Plain views on a
- * `TYPE_APPLICATION_OVERLAY` window, so it lives outside any Activity; every call is safe from
- * any thread.
+ * Foreground runs use the capsule over the operated app: the face in a slowly turning
+ * three-hue ring, activity bars, the current step and **Stop**. Background runs omit that top
+ * capsule and automatically open a secure, draggable, read-only screen window with Stop,
+ * pause and handover controls. When the hands need the user, either presentation becomes an
+ * approval or handover card. These are plain views in a `TYPE_APPLICATION_OVERLAY` window, so
+ * they live outside any Activity; every call is safe from any thread.
  *
  * The capsule hides itself for the instant a screenshot is taken ([hideForCapture]), so the
  * screen model never sees it and cannot tap its own Stop button. The model still cannot see
@@ -67,9 +66,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * The [stage] — the glow along the edges and the ring at the point about to be tapped — is a
  * second, full-screen window that never takes a touch, added first so the capsule stays on top.
  */
-class HandsCapsule(private val context: Context) {
+class HandsCapsule(private val context: Context, showStage: Boolean = true) {
     private val main by lazy { Handler(Looper.getMainLooper()) }
     private val wm by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
+    private val backgroundPreview = !showStage
     private var root: LinearLayout? = null
     private var params: WindowManager.LayoutParams? = null
     private var titleView: TextView? = null
@@ -97,8 +97,29 @@ class HandsCapsule(private val context: Context) {
     private var audioNotice: String? = null
     private var lastWorkingDetail: String? = null
 
+    // ── Background screen preview (upstream) ──
+    private var pane: HandsPreviewPanel? = null
+    private var togglePreview: TextView? = null
+    private var pauseButton: TextView? = null
+    private var phoneButton: TextView? = null
+    var canHandOff: () -> Boolean = { false }
+    var onPhone: (() -> Unit)? = null
+    private var controls: LinearLayout? = null
+    private var paused = false
+    private var workingTitle = ""
+    private var windowAnimator: ValueAnimator? = null
+    var previewAllowed: () -> Boolean = { false }
+    internal var capturePreview: () -> PreviewCapture<Bitmap> = { PreviewCapture.Pending }
+    var togglePause: () -> Boolean = { false }
+
+    private fun collapsePreview() {
+        pane?.expanded(false)
+        controls?.visibility = View.GONE
+        togglePreview?.setText(R.string.nm_hands_preview_show)
+    }
+
     /** What the hands draw on the screen while they work. */
-    val stage = HandsStage(context)
+    val stage = if (showStage) HandsStage(context) else null
 
     var onStop: (() -> Unit)? = null
     var onContinue: (() -> Unit)? = null
@@ -113,7 +134,7 @@ class HandsCapsule(private val context: Context) {
     fun stopping() {
         stopRequested.set(true)
         onMain {
-            stage.clear()
+            stage?.clear()
             ring?.turning(false)
             bars?.stop()
             bars?.visibility = View.GONE
@@ -129,22 +150,42 @@ class HandsCapsule(private val context: Context) {
         }
     }
 
+    /** A background task must expose Stop before it launches its app. */
+    fun showBeforeBackgroundRun(): Boolean {
+        val shown = java.util.concurrent.FutureTask {
+            working(0, context.getString(R.string.nm_hands_looking))
+            root?.parent != null
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) shown.run() else main.post(shown)
+        return runCatching { shown.get(3, TimeUnit.SECONDS) }.getOrDefault(false)
+    }
+
     /** Shows (or updates) the working state. */
     fun working(step: Int, detail: String) = onMain {
         if (stopRequested.get()) return@onMain
         ensure()
-        stage.mood(HandsStage.Mood.WORKING)
-        ring?.turning(true)
-        bars?.visibility = View.VISIBLE
+        stage?.mood(HandsStage.Mood.WORKING)
+        togglePreview?.visibility = View.VISIBLE
+        pauseButton?.isEnabled = true
+        pauseButton?.visibility = View.VISIBLE
+        phoneButton?.isEnabled = canHandOff()
+        ring?.turning(!paused)
+        bars?.visibility = if (paused) View.GONE else View.VISIBLE
         lastWorkingDetail = detail
-        val stepText = context.getString(R.string.nm_hands_step, step)
-        titleView?.text = stepText
+        workingTitle = if (step > 0) context.getString(R.string.nm_hands_step, step)
+        else if (backgroundPreview) context.getString(R.string.nm_hands_background_screen)
+        else context.getString(R.string.nm_hands_step, step)
+        titleView?.text = if (paused) context.getString(R.string.nm_goal_status_paused) else workingTitle
         detailView?.text = audioNotice?.let { "$detail\n$it" } ?: detail
         continueBtn?.visibility = View.GONE
         openBtn?.visibility = View.GONE
         allowBtn?.visibility = View.GONE
         denyBtn?.visibility = View.GONE
         pipWindow?.setNeedsYou(false)
+        if (backgroundPreview) {
+            pane?.expanded(true)
+            controls?.visibility = View.VISIBLE
+        }
     }
 
     /** 记录设备不支持静音时的提示，工作态胶囊第二行持续展示，直到本轮结束。 */
@@ -164,8 +205,8 @@ class HandsCapsule(private val context: Context) {
         if (stopRequested.get()) return@onMain
         ensure()
         lastWorkingDetail = null
-        stage.mood(HandsStage.Mood.WAITING)
-        stage.clear()
+        stage?.mood(HandsStage.Mood.WAITING)
+        stage?.clear()
         ring?.turning(false)
         bars?.visibility = View.GONE
         val turnTitle = context.getString(R.string.nm_hands_your_turn)
@@ -179,6 +220,18 @@ class HandsCapsule(private val context: Context) {
         pipWindow?.setNeedsYou(true)
     }
 
+    /** An explicit choice before the selected app can replace what the user is doing. */
+    fun offerPhone(reason: String) = onMain {
+        if (ended) return@onMain
+        collapsePreview()
+        takeOver(reason)
+        continueBtn?.visibility = View.GONE
+        togglePreview?.visibility = View.GONE
+        pauseButton?.visibility = View.GONE
+        controls?.visibility = View.VISIBLE
+        phoneButton?.isEnabled = canHandOff()
+    }
+
     /**
      * A tap waits for approval. [decidable]: Allow once / Deny right here on the capsule — the
      * person is in the operated app, not in nanoMuse. Money is confirmed with the screen lock,
@@ -188,7 +241,10 @@ class HandsCapsule(private val context: Context) {
         if (stopRequested.get()) return@onMain
         ensure()
         lastWorkingDetail = null
-        stage.mood(HandsStage.Mood.WAITING)
+        collapsePreview()
+        togglePreview?.visibility = View.GONE
+        pauseButton?.isEnabled = false
+        stage?.mood(HandsStage.Mood.WAITING)
         ring?.turning(false)
         bars?.visibility = View.GONE
         val appTitle = context.getString(R.string.nm_hands_approval_title)
@@ -252,6 +308,11 @@ class HandsCapsule(private val context: Context) {
     }
 
     fun hide() = onMain {
+        ended = true
+        windowAnimator?.cancel()
+        windowAnimator = null
+        collapsePreview()
+        pane = null; controls = null; togglePreview = null; pauseButton = null; phoneButton = null
         previewJob?.cancel()
         previewJob = null
         isVirtualScreen = false
@@ -266,12 +327,12 @@ class HandsCapsule(private val context: Context) {
         ring?.turning(false); ring = null
         bars?.stop(); bars = null
         if (v != null) {
-            // slide back up the way it came, then let go of the window
-            v.animate().alpha(0f).translationY(-dp(20).toFloat()).scaleX(0.96f).scaleY(0.96f)
+            val exitY = if (backgroundPreview) 0f else -dp(20).toFloat()
+            v.animate().alpha(0f).translationY(exitY).scaleX(0.96f).scaleY(0.96f)
                 .setDuration(200L).setInterpolator(DecelerateInterpolator())
                 .withEndAction { runCatching { wm.removeView(v) } }.start()
         }
-        stage.hide()
+        stage?.hide()
     }
 
     /** Hides the capsule and the stage for a screenshot and waits until the frame is gone; [restore] brings them back. */
@@ -280,7 +341,7 @@ class HandsCapsule(private val context: Context) {
         main.post {
             root?.visibility = View.INVISIBLE
             pipWindow?.setVisible(false)
-            stage.setVisible(false)
+            stage?.setVisible(false)
             latch.countDown()
         }
         latch.await(300, TimeUnit.MILLISECONDS)
@@ -293,7 +354,7 @@ class HandsCapsule(private val context: Context) {
         if (pipVisible && isVirtualScreen) {
             pipWindow?.setVisible(true)
         }
-        stage.setVisible(true)
+        stage?.setVisible(true)
     }
 
     /** Runs on the worker thread. An unsafe or unconfirmed placement rejects the gesture. */
@@ -412,18 +473,11 @@ class HandsCapsule(private val context: Context) {
         else main.post { runCatching(block).onFailure { AppLogger.warning(TAG, "capsule: ${it.message}") } }
     }
 
-    private fun ensure() {
-        if (root != null) return
-        stage.show() // first, so the capsule's window sits above it
-        val rootLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            alpha = 0f
-            translationY = -dp(28).toFloat()
-            scaleX = 0.96f
-            scaleY = 0.96f
-        }
+    @Volatile private var ended = false
 
+    private fun ensure() {
+        if (root != null || ended) return
+        stage?.show() // first, so the capsule's window sits above it
         val radius = dp(26).toFloat()
         val pill = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -522,38 +576,257 @@ class HandsCapsule(private val context: Context) {
             }
         }
         stopBtn = stop
-        pill.addView(faceBox); pill.addView(barsView); pill.addView(texts); pill.addView(previewBtn); pill.addView(cont); pill.addView(open); pill.addView(allow); pill.addView(deny); pill.addView(stop)
 
-        rootLayout.addView(pill)
+        val rootLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            alpha = 0f
+            translationY = -dp(28).toFloat()
+            scaleX = 0.96f
+            scaleY = 0.96f
+        }
 
         val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+        val dm = context.resources.displayMetrics
+        val backgroundWidth = minOf(dm.widthPixels - dp(24), dp(220))
+        val windowRoot: LinearLayout
+        if (backgroundPreview) {
+            val container = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(18).toFloat()
+                    setColor(INK)
+                    setStroke(dp(1), EDGE)
+                }
+                clipToOutline = true
+                elevation = dp(10).toFloat()
+            }
+            val preview = HandsPreviewPanel(context, java.util.concurrent.ForkJoinPool.commonPool(),
+                { previewAllowed() }, { capturePreview() })
+            val decisions = LinearLayout(context).apply {
+                gravity = Gravity.CENTER
+                setPadding(dp(6), 0, dp(6), dp(6))
+            }
+            val actions = LinearLayout(context).apply { gravity = Gravity.CENTER; visibility = View.GONE }
+            val pause = button(context.getString(R.string.nm_hands_preview_pause), ACCENT) {
+                if (previewAllowed()) {
+                    paused = togglePause()
+                    pauseButton?.setText(if (paused) R.string.nm_hands_preview_resume else R.string.nm_hands_preview_pause)
+                    ring?.turning(!paused)
+                    bars?.visibility = if (paused) View.GONE else View.VISIBLE
+                    titleView?.text = if (paused) context.getString(R.string.nm_goal_status_paused) else workingTitle
+                }
+            }
+            val phone = button(context.getString(R.string.nm_hands_handoff_phone), ACCENT) {
+                if (canHandOff()) onPhone?.invoke()
+            }.apply { filterTouchesWhenObscured = true }
+            pane = preview
+            controls = actions
+            togglePreview = null
+            pauseButton = pause
+            phoneButton = phone
+            pill.addView(texts)
+            pill.addView(stop)
+            decisions.addView(cont)
+            decisions.addView(open)
+            decisions.addView(allow)
+            decisions.addView(deny)
+            actions.addView(pause)
+            actions.addView(phone)
+            container.addView(pill)
+            container.addView(decisions)
+            val height = minOf((dm.heightPixels * 0.38f).toInt(), dp(320))
+            container.addView(preview, LinearLayout.LayoutParams(-1, height))
+            container.addView(actions)
+            windowRoot = container
+        } else {
+            pill.addView(faceBox)
+            pill.addView(barsView)
+            pill.addView(texts)
+            pill.addView(previewBtn)
+            pill.addView(cont)
+            pill.addView(open)
+            pill.addView(allow)
+            pill.addView(deny)
+            pill.addView(stop)
+            rootLayout.addView(pill)
+            windowRoot = rootLayout
+        }
+
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (backgroundPreview) backgroundWidth else WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = statusBarHeight() + dp(6)
+            if (backgroundPreview) {
+                gravity = Gravity.TOP or Gravity.START
+                x = dm.widthPixels - backgroundWidth - dp(12)
+                y = statusBarHeight() + dp(12)
+            } else {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                y = statusBarHeight() + dp(6)
+            }
+        }
+        if (backgroundPreview) {
+            windowRoot.alpha = 0f
+            windowRoot.scaleX = 0.96f
+            windowRoot.scaleY = 0.96f
+        } else {
+            setupDrag(pill, params, rootLayout)
         }
 
-        setupDrag(pill, params, rootLayout)
-
         try {
-            wm.addView(rootLayout, params)
+            if (backgroundPreview) params.flags = params.flags or WindowManager.LayoutParams.FLAG_SECURE
+            wm.addView(windowRoot, params)
         } catch (t: Throwable) {
             AppLogger.warning(TAG, "addView failed: ${t.message}")
             return
         }
-        rootLayout.animate().alpha(1f).translationY(0f).scaleX(1f).scaleY(1f).setDuration(320L).setInterpolator(DecelerateInterpolator(1.6f)).start()
-        ringView.turning(true)
-        barsView.start()
-        root = rootLayout; this.params = params; titleView = title; detailView = detail; continueBtn = cont; openBtn = open; allowBtn = allow; denyBtn = deny
-        previewToggleBtn = previewBtn
-        ring = ringView; bars = barsView
+        windowRoot.animate().alpha(1f).translationY(0f).scaleX(1f).scaleY(1f)
+            .setDuration(320L).setInterpolator(DecelerateInterpolator(1.6f)).start()
+        root = windowRoot
+        this.params = params
+        titleView = title
+        detailView = detail
+        continueBtn = cont
+        openBtn = open
+        allowBtn = allow
+        denyBtn = deny
+        previewToggleBtn = if (backgroundPreview) null else previewBtn
+        if (backgroundPreview) {
+            ring = null
+            bars = null
+            installBackgroundDrag(preview = checkNotNull(pane), window = windowRoot, params = params)
+        } else {
+            ringView.turning(true)
+            barsView.start()
+            ring = ringView
+            bars = barsView
+        }
+    }
+
+    /**
+     * The background display is a small screen, not a second top capsule. Dragging its picture
+     * moves the whole secure window; release projects the gesture and snaps to Mika's nearest
+     * safe corner. Buttons stay ordinary taps because the preview alone is the drag handle.
+     */
+    private fun installBackgroundDrag(
+        preview: View,
+        window: View,
+        params: WindowManager.LayoutParams,
+    ) {
+        var corner = HandsPipPhysics.Corner.BOTTOM_END
+        var downX = 0f
+        var downY = 0f
+        var startX = 0
+        var startY = 0
+        var dragging = false
+        var velocity: VelocityTracker? = null
+        var lastWidth = 0
+        var lastHeight = 0
+        val slop = ViewConfiguration.get(context).scaledTouchSlop
+
+        fun bounds(): HandsPipPhysics.Bounds {
+            val dm = context.resources.displayMetrics
+            return HandsPipPhysics.Bounds(
+                width = dm.widthPixels.toFloat(),
+                height = dm.heightPixels.toFloat(),
+                pipWidth = window.width.toFloat(),
+                pipHeight = window.height.toFloat(),
+                margin = dp(12).toFloat(),
+                top = statusBarHeight().toFloat(),
+                bottom = navigationBarHeight().toFloat(),
+            )
+        }
+
+        fun place(targetX: Float, targetY: Float, animate: Boolean) {
+            val (safeX, safeY) = bounds().clamp(targetX, targetY)
+            windowAnimator?.cancel()
+            if (!animate || stillMotion(context)) {
+                params.x = safeX.toInt()
+                params.y = safeY.toInt()
+                runCatching { wm.updateViewLayout(window, params) }
+                return
+            }
+            val fromX = params.x
+            val fromY = params.y
+            windowAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = 220L
+                interpolator = DecelerateInterpolator(1.4f)
+                addUpdateListener {
+                    val t = it.animatedValue as Float
+                    params.x = (fromX + (safeX - fromX) * t).toInt()
+                    params.y = (fromY + (safeY - fromY) * t).toInt()
+                    runCatching { wm.updateViewLayout(window, params) }
+                }
+                start()
+            }
+        }
+
+        window.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val width = right - left
+            val height = bottom - top
+            if (width <= 0 || height <= 0 ||
+                (width == lastWidth && height == lastHeight &&
+                    right - left == oldRight - oldLeft && bottom - top == oldBottom - oldTop)
+            ) {
+                return@addOnLayoutChangeListener
+            }
+            lastWidth = width
+            lastHeight = height
+            val (x, y) = bounds().position(corner)
+            place(x, y, animate = false)
+        }
+        preview.setOnTouchListener { _, event ->
+            val tracked = MotionEvent.obtain(event).apply { setLocation(event.rawX, event.rawY) }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    windowAnimator?.cancel()
+                    velocity?.recycle()
+                    velocity = VelocityTracker.obtain().also { it.addMovement(tracked) }
+                    downX = event.rawX
+                    downY = event.rawY
+                    startX = params.x
+                    startY = params.y
+                    dragging = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    velocity?.addMovement(tracked)
+                    val dx = event.rawX - downX
+                    val dy = event.rawY - downY
+                    if (!dragging && (kotlin.math.abs(dx) > slop || kotlin.math.abs(dy) > slop)) {
+                        dragging = true
+                    }
+                    if (dragging) place(startX + dx, startY + dy, animate = false)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    velocity?.addMovement(tracked)
+                    velocity?.computeCurrentVelocity(1000)
+                    val vx = velocity?.xVelocity ?: 0f
+                    val vy = velocity?.yVelocity ?: 0f
+                    velocity?.recycle()
+                    velocity = null
+                    if (dragging) {
+                        val safe = bounds()
+                        corner = HandsPipPhysics.snapCorner(
+                            params.x.toFloat(),
+                            params.y.toFloat(),
+                            vx,
+                            vy,
+                            safe,
+                        )
+                        val (x, y) = safe.position(corner)
+                        place(x, y, animate = true)
+                    }
+                }
+            }
+            tracked.recycle()
+            true
+        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
